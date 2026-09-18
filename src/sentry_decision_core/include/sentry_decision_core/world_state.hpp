@@ -17,7 +17,9 @@ struct RefereeState {
   int self_ammo = 0;
   int coins = 0;
   int base_hp = 0;
-  int outpost_hp = 0;
+  int our_outpost_hp = 0;
+  int enemy_outpost_hp = 0;
+  bool can_rebuild_outpost = false;
   SentryStance robot_stance = SentryStance::kIdle;
 };
 
