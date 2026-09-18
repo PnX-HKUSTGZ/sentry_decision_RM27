@@ -24,12 +24,21 @@
 ## 快速开始
 
 ```bash
-# 编译
-colcon build --symlink-install
-source install/setup.bash
+# 构建镜像（首次）
+docker build -f docker/Dockerfile -t sentry_decision_rm27:jazzy .
+
+# 构建工作区
+docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy build
+
+# 构建并测试
+docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy test
+
+# 运行最小决策闭环
+docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27:jazzy \
+  -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup decision_main"
 ```
 
-> 容器化开发环境与启动方式待确定后补充。
+完整命令与参数见 [docs/USAGE.md](docs/USAGE.md)。
 
 ## 目录结构
 
@@ -48,6 +57,7 @@ sentry_decision_RM27/
 ## 文档索引
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：技术架构设计（单一事实来源）
+- [docs/USAGE.md](docs/USAGE.md)：使用说明（命令与参数）
 - [docs/ROADMAP.md](docs/ROADMAP.md)：开发路线图（阶段、顺序、验收）
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md)：代码与文档规范
 - [docs/AGENT.md](docs/AGENT.md)：开发者与 AI 协作规范

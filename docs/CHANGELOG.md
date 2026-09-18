@@ -22,6 +22,7 @@
 - `sentry_decision_bringup`：`main` 最小闭环（WorldModel → 行为树 → IntentArbiter）、演示树与 launch
 - 新增 `docker/`（Dockerfile、entrypoint、compose）、`.dockerignore` 与 CI
 - `sentry_decision_io`：ROS IO 适配器（订阅 / 发布 / action / service），含容器冒烟测试
+- 新增 `docs/USAGE.md` 使用说明；README 精简为 Quick Start
 - 新增 `.vscode`（IntelliSense 与推荐扩展）与 `.devcontainer` 配置
 - Docker 镜像新增与宿主同 UID 的 `dev` 用户；构建产出合并的 `compile_commands.json`
 
