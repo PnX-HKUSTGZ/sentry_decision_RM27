@@ -122,6 +122,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
+| 格式检查 | `tools/format.sh --check` |
 
 ## 7. 环境变量
 

@@ -59,8 +59,8 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
   set_bool_client_ = create_client<std_srvs::srv::SetBool>(set_bool_service);
 }
 
-void RosIoNode::subscribe_u16(const std::string& topic,
-                              int sentry_decision::RefereeState::* field, bool mark_valid) {
+void RosIoNode::subscribe_u16(const std::string& topic, int sentry_decision::RefereeState::*field,
+                              bool mark_valid) {
   referee_subs_.push_back(create_subscription<std_msgs::msg::UInt16>(
       topic, 10, [this, field, mark_valid](const std_msgs::msg::UInt16::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(referee_mutex_);

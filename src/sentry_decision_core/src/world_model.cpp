@@ -11,12 +11,9 @@ bool fresh(TimePoint stamp, TimePoint now, Duration timeout) {
 
 }  // namespace
 
-WorldModel::WorldModel(RefereeSource& referee, OdometrySource& odometry,
-                       NavigationSink& navigation, WorldTimeouts timeouts)
-    : referee_(referee),
-      odometry_(odometry),
-      navigation_(navigation),
-      timeouts_(timeouts) {}
+WorldModel::WorldModel(RefereeSource& referee, OdometrySource& odometry, NavigationSink& navigation,
+                       WorldTimeouts timeouts)
+    : referee_(referee), odometry_(odometry), navigation_(navigation), timeouts_(timeouts) {}
 
 WorldState WorldModel::snapshot(TimePoint now) {
   WorldState state;

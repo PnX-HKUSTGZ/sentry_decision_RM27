@@ -1,11 +1,8 @@
 #pragma once
 
+#include <geometry_msgs/msg/twist.hpp>
 #include <memory>
 #include <mutex>
-#include <string>
-#include <vector>
-
-#include <geometry_msgs/msg/twist.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -13,6 +10,8 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/u_int16.hpp>
 #include <std_srvs/srv/set_bool.hpp>
+#include <string>
+#include <vector>
 
 #include "sentry_decision_core/io.hpp"
 
@@ -42,7 +41,7 @@ class RosIoNode : public rclcpp::Node,
   void set_flag(const std::string& name, bool value) override;
 
  private:
-  void subscribe_u16(const std::string& topic, int sentry_decision::RefereeState::* field,
+  void subscribe_u16(const std::string& topic, int sentry_decision::RefereeState::*field,
                      bool mark_valid);
 
   std::string map_frame_;

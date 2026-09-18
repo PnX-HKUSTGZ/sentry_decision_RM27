@@ -69,8 +69,8 @@ ConsoleSink::ConsoleSink(bool colored) : colored_(colored) {}
 void ConsoleSink::write(const LogRecord& record) {
   std::FILE* out = at_least(record.level, LogLevel::kWarn) ? stderr : stdout;
   if (colored_) {
-    std::fprintf(out, "%s[%s] [%s] %s\033[0m\n", level_color(record.level), level_name(record.level),
-                 record.tag.c_str(), record.message.c_str());
+    std::fprintf(out, "%s[%s] [%s] %s\033[0m\n", level_color(record.level),
+                 level_name(record.level), record.tag.c_str(), record.message.c_str());
   } else {
     std::fprintf(out, "[%s] [%s] %s\n", level_name(record.level), record.tag.c_str(),
                  record.message.c_str());

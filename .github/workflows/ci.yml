@@ -5,6 +5,20 @@ on:
   pull_request:
 
 jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装 clang-format
+        run: pip install "clang-format==18.1.8"
+      - name: 格式检查
+        run: |
+          files=$(git ls-files '*.cpp' '*.hpp')
+          clang-format --dry-run --Werror $files
+
   host-core-tests:
     runs-on: ubuntu-24.04
     steps:

@@ -94,9 +94,7 @@ void IntentArbiter::submit(const Intent& intent) {
 
 void IntentArbiter::clear_source(SourceId source) {
   intents_.erase(std::remove_if(intents_.begin(), intents_.end(),
-                                 [source](const Intent& intent) {
-                                   return intent.source == source;
-                                 }),
+                                [source](const Intent& intent) { return intent.source == source; }),
                  intents_.end());
 }
 
