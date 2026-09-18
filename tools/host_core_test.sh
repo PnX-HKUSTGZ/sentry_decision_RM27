@@ -6,5 +6,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CORE="$ROOT/src/sentry_decision_core"
 OUT="$(mktemp -d)"
 
-g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "$CORE/src/arbiter.cpp" "$CORE/test/test_arbiter.cpp" -o "$OUT/test_arbiter"
-"$OUT/test_arbiter"
+SOURCES=("$CORE/src/arbiter.cpp" "$CORE/src/logging.cpp")
+
+for test in test_arbiter test_logging; do
+  g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "${SOURCES[@]}" "$CORE/test/$test.cpp" -o "$OUT/$test"
+  "$OUT/$test"
+done

@@ -125,6 +125,19 @@ struct DecisionOutput {
 
 后续按需增加：`sentry_decision_msgs`（对外消息 / 服务 / action）、`sentry_decision_viz`（可视化）、`sentry_decision_sim`（裁判仿真）、`sentry_decision_test`（测试与回放工具）。
 
+### 5.1 包与层的关系
+
+层是逻辑划分，包是构建 / 部署边界，二者是多对多关系：
+
+| 包 | 覆盖的层 |
+| --- | --- |
+| `sentry_decision_core` | 信念层（融合）+ 指令层（仲裁 / 安全 / 限幅）+ 跨层基础（类型 / 几何 / 日志 / 配置） |
+| `sentry_decision_io` | 执行层（传输 / 下发）+ 信念层（原始解码） |
+| `sentry_decision_nodes` | 意图层（战略 / 任务 / 技能）+ `intervention` |
+| `sentry_decision_bringup` | 无（组合根） |
+
+`SafetySupervisor` 属于指令层，放在 `core` 且不可作为插件关闭；`nodes` 内部以模块（共享库）为真正边界。
+
 ```mermaid
 flowchart TD
   BRINGUP[bringup] --> NODES[nodes]
@@ -395,7 +408,7 @@ string state_json
 | INFO | 运行状态 | 是 | 否 |
 | ACT | 重要决策行为（模式切换、目标变更、分支抢占、资源请求） | 是 | **是** |
 | WARN | 潜在问题 | 是 | 是 |
-| ERROR / FATAL | 异常 | 是 | 是 |
+| ERROR | 异常 | 是 | 是 |
 
 - 统一使用项目日志接口，禁止散落的 `std::cout` 与原始 `RCLCPP_*`；
 - 状态转移日志只在「上次状态 ≠ 本次状态」时打印，避免逐 tick 刷屏；

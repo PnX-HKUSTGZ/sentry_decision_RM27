@@ -5,7 +5,6 @@
 
 ## 当前 sprint（P0 骨架）
 
-- 进行中：core 分级日志器（DEBUG / INFO / ACT / WARN / ERROR 双通道）。
 - 下一步：IO 接口抽象与 bringup 最小闭环。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
@@ -13,7 +12,8 @@
 
 - 仓库文档与架构设计（`docs/ARCHITECTURE.md`）。
 - `sentry_decision_core`：数据契约与字段级 `IntentArbiter`。
-- 宿主单测 `tools/host_core_test.sh`（无 ROS，g++ 直接编译运行），8 组用例通过。
+- `sentry_decision_core`：分级日志器（完整 / 简短双通道）。
+- 宿主单测 `tools/host_core_test.sh`（无 ROS，g++ 直接编译运行），arbiter + logging 全部通过。
 
 ## 注意事项
 
