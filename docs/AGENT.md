@@ -36,7 +36,7 @@
 
 ### 代码规范
 
-> 以下为初稿，随架构确定继续完善；行为树的编写规范见 `docs/ARCHITECTURE.md`。
+> 详细规范见 `docs/CONVENTIONS.md`；行为树编写规范见 `docs/ARCHITECTURE.md`。以下为摘要。
 
 - **命名**
   - 目录、文件、函数、变量：`snake_case`

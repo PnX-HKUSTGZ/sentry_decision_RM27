@@ -44,6 +44,8 @@ sentry_decision_RM27/
 ## 文档索引
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：技术架构设计（单一事实来源）
+- [docs/ROADMAP.md](docs/ROADMAP.md)：开发路线图（阶段、顺序、验收）
+- [docs/CONVENTIONS.md](docs/CONVENTIONS.md)：代码与文档规范
 - [docs/AGENT.md](docs/AGENT.md)：开发者与 AI 协作规范
 - [docs/NOTE.md](docs/NOTE.md)：开发临时笔记
 - [docs/CHANGELOG.md](docs/CHANGELOG.md)：变更日志

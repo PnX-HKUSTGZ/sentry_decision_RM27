@@ -13,6 +13,8 @@
 
 - 初始化项目文档（README、AGENT、ARCHITECTURE、NOTE、CHANGELOG、.gitignore）
 - 完成架构设计初版：分层、抢占与仲裁、人工干预模块
+- `sentry_decision_core`：数据契约与字段级 `IntentArbiter`，含宿主单元测试
+- 新增 `docs/ROADMAP.md` 开发路线图与 `docs/CONVENTIONS.md` 代码 / 文档规范
 
 ### Changed
 
