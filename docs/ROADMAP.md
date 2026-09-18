@@ -108,6 +108,5 @@
 
 ## 当前状态
 
-- 已完成：仓库与架构文档；core（契约 / 仲裁 / 日志 / 信念 / IO 抽象）；io 的 ROS 适配器；nodes 最小插件；bringup 最小闭环；Docker 与 CI。
-- 进行中：P0 收尾（CI 格式检查、`io` 的 ROS 实现）。
-- 下一步：进入 P1 信念与回放。
+- **P0 完成**：仓库与架构文档；core（契约 / 仲裁 / 日志 / 信念 / IO 抽象）；io 的 ROS 适配器；nodes 最小插件；bringup 最小闭环；Docker、Dev Container、CI（含格式检查）。
+- 下一步：P1 信念与回放——完善 `WorldState` 与裁判解码、`replay` 适配器、`DecisionState` 发布、bringup 切换到真实 io。
