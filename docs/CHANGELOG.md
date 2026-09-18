@@ -17,7 +17,10 @@
 - 新增 `docs/ROADMAP.md` 开发路线图与 `docs/CONVENTIONS.md` 代码 / 文档规范
 - `sentry_decision_core`：分级日志器（完整 / 简短双通道），含宿主单元测试
 - `sentry_decision_core`：IO 端口抽象与信念层 `WorldModel`（含超时降级），含宿主与容器测试
-- 新增 `docker/`（Dockerfile、entrypoint、compose）与 `.dockerignore`
+- `sentry_decision_core`：新增 `DecisionContext`（世界状态 + 每 tick 意图缓冲）
+- `sentry_decision_nodes`：最小行为树插件（`CheckLowHp` / `EmitTacticalMode` / `EmitNavGoal`）与节点注释模板
+- `sentry_decision_bringup`：`main` 最小闭环（WorldModel → 行为树 → IntentArbiter）、演示树与 launch
+- 新增 `docker/`（Dockerfile、entrypoint、compose）、`.dockerignore` 与 CI
 
 ### Changed
 

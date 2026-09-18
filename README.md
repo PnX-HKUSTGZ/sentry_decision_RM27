@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-> :construction: 设计阶段：架构文档已完成，代码骨架尚未搭建。
+> :construction: P0 骨架进行中：core / nodes / bringup 最小闭环与 Docker / CI 已就绪。
 
 ## 运行环境
 
@@ -31,15 +31,19 @@ source install/setup.bash
 
 > 容器化开发环境与启动方式待确定后补充。
 
-## 目录结构（规划）
+## 目录结构
 
 ```text
 sentry_decision_RM27/
-├── docs/    # 项目文档
-└── src/     # ROS 2 源码包（待创建）
+├── docs/                      # 项目文档
+├── docker/                    # 开发 / 测试容器
+├── tools/                     # 宿主测试脚本
+├── .github/workflows/         # CI
+└── src/
+    ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
+    ├── sentry_decision_nodes/   # 行为树节点插件
+    └── sentry_decision_bringup/ # main、行为树、launch
 ```
-
-> 目录结构随架构确定后更新。
 
 ## 文档索引
 

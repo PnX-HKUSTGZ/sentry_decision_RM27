@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.16)
+project(sentry_decision_bringup)
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(behaviortree_cpp REQUIRED)
+find_package(sentry_decision_core REQUIRED)
+find_package(sentry_decision_nodes REQUIRED)
+
+add_executable(decision_main src/main.cpp)
+target_link_libraries(decision_main
+  sentry_decision_core::sentry_decision_core
+  sentry_decision_nodes::sentry_decision_nodes
+  behaviortree_cpp::behaviortree_cpp)
+target_compile_definitions(decision_main PRIVATE
+  DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/demo_tree.xml")
+
+install(TARGETS decision_main DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY tree/ DESTINATION share/${PROJECT_NAME}/tree)
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
+
+if(BUILD_TESTING)
+  add_test(NAME demo_tree
+    COMMAND decision_main --ticks 40 --rate 200 --tree ${CMAKE_CURRENT_SOURCE_DIR}/tree/demo_tree.xml)
+endif()
+
+ament_package()

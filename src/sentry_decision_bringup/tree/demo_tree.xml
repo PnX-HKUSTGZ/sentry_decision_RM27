@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- 最小演示树：低血优先撤退，否则巡逻。端口值对应 TacticalMode 枚举。 -->
+<root BTCPP_format="4">
+  <BehaviorTree ID="MainTree">
+    <ReactiveFallback name="root">
+      <Sequence name="retreat">
+        <CheckLowHp hp_threshold="120"/>
+        <EmitTacticalMode mode="4"/>
+        <EmitNavGoal x="-2.0" y="0.0"/>
+      </Sequence>
+      <Sequence name="patrol">
+        <EmitTacticalMode mode="1"/>
+        <EmitNavGoal x="1.0" y="1.0"/>
+      </Sequence>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

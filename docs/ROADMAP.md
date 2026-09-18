@@ -108,6 +108,6 @@
 
 ## 当前状态
 
-- 已完成：仓库与架构文档、`sentry_decision_core` 数据契约与 `IntentArbiter`、宿主单测。
-- 进行中：core 分级日志器。
-- 下一步：IO 接口抽象与 bringup 最小闭环。
+- 已完成：仓库与架构文档；core（契约 / 仲裁 / 日志 / 信念 / IO 抽象）；nodes 最小插件；bringup 最小闭环；Docker 与 CI。
+- 进行中：P0 收尾（CI 格式检查、`io` 的 ROS 实现）。
+- 下一步：进入 P1 信念与回放。

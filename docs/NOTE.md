@@ -5,17 +5,17 @@
 
 ## 当前 sprint（P0 骨架）
 
-- 下一步：bringup 最小闭环（`main` + 最小可 tick 树），随后 CI。
+- 进行中：CI 格式检查、`io` 的 ROS 实现（real / sim / replay）。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
 ## 本 sprint 已完成
 
 - 仓库文档与架构设计（`docs/ARCHITECTURE.md`）。
-- `sentry_decision_core`：数据契约与字段级 `IntentArbiter`。
-- `sentry_decision_core`：分级日志器（完整 / 简短双通道）。
-- `sentry_decision_core`：IO 端口抽象（`RefereeSource` / `OdometrySource` / `NavigationSink` / `ChassisSink`）与信念层 `WorldModel`。
-- `docker/`：Dockerfile、entrypoint、compose、`.dockerignore`；镜像 `sentry_decision_rm27:jazzy` 构建通过，BT.CPP 4.10.0（旧镜像为 4.9.0，后续需锁定版本）。
-- 验证：宿主 `tools/host_core_test.sh` 全部通过；Jazzy 容器内 colcon 测试 3 tests / 0 failures。
+- `sentry_decision_core`：数据契约、字段级 `IntentArbiter`、分级日志器、IO 抽象、信念层 `WorldModel`、`DecisionContext`。
+- `sentry_decision_nodes`：`CheckLowHp` / `EmitTacticalMode` / `EmitNavGoal` 插件与节点注释模板。
+- `sentry_decision_bringup`：`main` 最小闭环（WorldModel → 行为树 → IntentArbiter）、演示树与 launch。
+- `docker/` 与 `.github/workflows/ci.yml`；镜像 `sentry_decision_rm27:jazzy` 构建通过（BT.CPP 4.10.0）。
+- 验证：宿主 core 全部通过；容器内 3 包构建、5 tests / 0 failures；实跑展示 `patrol → retreat` 抢占。
 
 ## 注意事项
 
