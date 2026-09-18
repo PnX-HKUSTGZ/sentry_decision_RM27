@@ -3,6 +3,7 @@ build/
 install/
 log/
 .cache/
+.docker-build/
 
 # 编译数据库与 IDE 缓存
 compile_commands.json

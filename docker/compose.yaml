@@ -1,0 +1,22 @@
+services:
+  decision-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: sentry_decision_rm27:jazzy
+    working_dir: /ws
+    entrypoint: ["/ws/docker/entrypoint.sh"]
+    command: ["shell"]
+    volumes:
+      - ..:/ws
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY:-}
+    stdin_open: true
+    tty: true
+    networks:
+      - rm27net
+
+networks:
+  rm27net:
+    driver: bridge

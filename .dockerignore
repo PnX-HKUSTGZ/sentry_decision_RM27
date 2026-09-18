@@ -1,0 +1,5 @@
+.git
+.docker-build
+build
+install
+log

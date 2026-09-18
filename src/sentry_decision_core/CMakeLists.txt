@@ -12,7 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 
-add_library(${PROJECT_NAME} src/arbiter.cpp src/logging.cpp)
+add_library(${PROJECT_NAME} src/arbiter.cpp src/logging.cpp src/world_model.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -33,6 +33,10 @@ if(BUILD_TESTING)
   add_executable(test_logging test/test_logging.cpp)
   target_link_libraries(test_logging ${PROJECT_NAME})
   add_test(NAME test_logging COMMAND test_logging)
+
+  add_executable(test_world_model test/test_world_model.cpp)
+  target_link_libraries(test_world_model ${PROJECT_NAME})
+  add_test(NAME test_world_model COMMAND test_world_model)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

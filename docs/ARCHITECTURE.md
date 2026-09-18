@@ -119,7 +119,7 @@ struct DecisionOutput {
 | 包 | 职责 | 依赖 |
 | --- | --- | --- |
 | `sentry_decision_core` | 数据契约、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
-| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；接口抽象 + real / sim / replay 实现 | core |
+| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
 | `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core |
 
@@ -393,7 +393,7 @@ string state_json
 | 模块 | 层 | 包 | 职责 |
 | --- | --- | --- | --- |
 | `nav_policy` | 意图层（任务 / 技能） | nodes | 决定去哪个点、是否撤退、脱困策略，产生 `nav_goal` Intent |
-| `nav_executor` | 指令 / 执行层 | io | 持有 Nav2 action client，跟随仲裁后的 goal，上报进度与当前点 |
+| `nav_executor` | 指令 / 执行层 | io | 直接用 `nav2_msgs/action/NavigateToPose` 自研薄封装（不依赖 `nav2_behavior_tree` / BehaviorTree.ROS2），跟随仲裁后的 goal 并上报进度与当前点 |
 
 闭环：`nav_executor` 把「已到达 / 失败 / 当前点 / 剩余距离」写回 `WorldState`，下一 tick `nav_policy` 读取后再决策。
 全系统只有一个活跃 `nav_goal`，因此它必须走仲裁。
@@ -438,13 +438,13 @@ string state_json
 
 - 目标运行环境：Ubuntu 24.04 + ROS 2 Jazzy。
 - 开发宿主若非 24.04，统一通过 Docker 开发与测试。
+- 当前阶段无法上实车，所有开发以本地 PC 容器验证为准；镜像、入口与 Compose 见 `docker/`。
 - 固定源码依赖（vcstool）与二进制依赖（rosdep），去掉临时的 clone + patch。
 - 采用 Docker Compose 与已验证的自定义 bridge 网络（不使用 host 网络），构建产物挂载到宿主避免重复编译。
 - 24.04 实车与容器使用同一套依赖描述，保证一致。
 
 ## 16. 开放问题
 
-- `ros-jazzy-nav2-behavior-tree` 是否可用，决定 `nav_executor` 采用 `BtActionNode` 还是自研薄封装。
 - BT tick 频率（10 Hz 或 20 Hz）与确定性要求。
 - 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
 - 可视化选型：Groot2 + rosbridge 战场页的组合细节。

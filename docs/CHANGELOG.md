@@ -16,6 +16,8 @@
 - `sentry_decision_core`：数据契约与字段级 `IntentArbiter`，含宿主单元测试
 - 新增 `docs/ROADMAP.md` 开发路线图与 `docs/CONVENTIONS.md` 代码 / 文档规范
 - `sentry_decision_core`：分级日志器（完整 / 简短双通道），含宿主单元测试
+- `sentry_decision_core`：IO 端口抽象与信念层 `WorldModel`（含超时降级），含宿主与容器测试
+- 新增 `docker/`（Dockerfile、entrypoint、compose）与 `.dockerignore`
 
 ### Changed
 
