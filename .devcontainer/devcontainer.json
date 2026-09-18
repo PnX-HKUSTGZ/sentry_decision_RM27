@@ -1,0 +1,18 @@
+{
+  "name": "sentry_decision_RM27 (ROS 2 Jazzy)",
+  "image": "sentry_decision_rm27:jazzy",
+  "workspaceFolder": "/ws",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/ws,type=bind",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "ms-iot.vscode-ros"
+      ]
+    }
+  },
+  "postCreateCommand": "git config --global --add safe.directory /ws && bash /ws/docker/entrypoint.sh build"
+}

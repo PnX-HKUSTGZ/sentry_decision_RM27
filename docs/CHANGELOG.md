@@ -21,6 +21,8 @@
 - `sentry_decision_nodes`：最小行为树插件（`CheckLowHp` / `EmitTacticalMode` / `EmitNavGoal`）与节点注释模板
 - `sentry_decision_bringup`：`main` 最小闭环（WorldModel → 行为树 → IntentArbiter）、演示树与 launch
 - 新增 `docker/`（Dockerfile、entrypoint、compose）、`.dockerignore` 与 CI
+- 新增 `.vscode`（IntelliSense 与推荐扩展）与 `.devcontainer` 配置
+- Docker 镜像新增与宿主同 UID 的 `dev` 用户；构建产出合并的 `compile_commands.json`
 
 ### Changed
 

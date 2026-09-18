@@ -297,6 +297,8 @@ sequenceDiagram
   IO->>B: 反馈（到达 / 失败 / 当前点）
 ```
 
+BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
+
 ### 9.5 与抢占的关系
 
 先树内抢占，再跨来源仲裁：树内用 `ReactiveFallback` / `ReactiveSequence` 打断同策略的低优先级分支；
@@ -445,7 +447,6 @@ string state_json
 
 ## 16. 开放问题
 
-- BT tick 频率（10 Hz 或 20 Hz）与确定性要求。
 - 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
 - 可视化选型：Groot2 + rosbridge 战场页的组合细节。
 - 回放文件格式与录制范围。

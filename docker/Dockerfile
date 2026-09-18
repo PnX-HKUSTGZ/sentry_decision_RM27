@@ -23,4 +23,13 @@ RUN rosdep init || true
 
 RUN echo 'source /opt/ros/jazzy/setup.bash' >> /etc/bash.bashrc
 
+# 创建与宿主同 UID 的开发用户，避免 Dev Container / 容器写入的文件归属混乱。
+ARG USER_UID=1001
+ARG USER_GID=1001
+RUN if ! getent group ${USER_GID} >/dev/null; then groupadd --gid ${USER_GID} dev; fi \
+    && if ! id -u ${USER_UID} >/dev/null 2>&1; then useradd --uid ${USER_UID} --gid ${USER_GID} --create-home --shell /bin/bash dev; fi \
+    && echo 'dev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER dev
+
 WORKDIR /ws
