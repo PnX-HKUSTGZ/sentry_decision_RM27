@@ -66,7 +66,9 @@ source .docker-build/install/setup.bash
 ros2 run sentry_decision_bringup decision_main
 ```
 
-演示行为：启动约 1 秒后血量从 300 掉到 50，行为树由巡逻抢占到撤退，ACT 日志显示 `mode` 与 `goal` 变化。
+本地仿真：由 `sentry_decision_sim` 的 dummy 裁判系统与伪导航驱动信念层，无需下位机通信包与 navigation 仓库。
+演示行为：启动约 1 秒后血量从 400 掉到 50，行为树由巡逻抢占到撤退，伪导航朝新目标移动，ACT 日志显示 `mode`、
+`goal` 与当前位置变化。
 
 ### 4.2 IO 节点
 
@@ -98,6 +100,7 @@ ros2 bag record /decision/state /decision/world_state
 | --- | --- | --- |
 | `--ticks` | `50` | tick 次数 |
 | `--rate` | `20.0` | tick 频率（Hz） |
+| `--hp-drop` | `1.0` | 仿真中血量掉到 50 的秒数 |
 | `--tree` | 安装后的 `demo_tree.xml` | 行为树 XML 路径 |
 | `--plugin` | 空 | 节点插件 `.so` 路径；为空时使用链接注册 |
 

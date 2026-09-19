@@ -148,11 +148,12 @@ struct DecisionOutput {
 | --- | --- | --- |
 | `sentry_decision_core` | 数据契约、裁判协议解码、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
 | `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
+| `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关） | core |
 | `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
 | `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core |
 
-后续按需增加：`sentry_decision_viz`（可视化）、`sentry_decision_sim`（裁判仿真）、`sentry_decision_test`（测试与回放工具）。`sentry_decision_msgs` 已落地，后续补充 action / service（干预、调试）。
+后续按需增加：`sentry_decision_viz`（可视化）、`sentry_decision_test`（测试与回放工具）。`sentry_decision_msgs` 与 `sentry_decision_sim` 已落地；msgs 后续补充 action / service（干预、调试）。
 
 ### 5.1 包与层的关系
 
@@ -477,6 +478,8 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 - 目标运行环境：Ubuntu 24.04 + ROS 2 Jazzy。
 - 开发宿主若非 24.04，统一通过 Docker 开发与测试。
 - 当前阶段无法上实车，所有开发以本地 PC 容器验证为准；镜像、入口与 Compose 见 `docker/`。
+- 本地仿真：`sentry_decision_sim` 提供 dummy 裁判系统 `RefereeSimulator` 与伪导航 `NavSimulator`，
+  直接实现 core 的 IO 端口并驱动信念层，因此无需下位机通信包与 navigation 仓库即可调试。
 - 固定源码依赖（vcstool）与二进制依赖（rosdep），去掉临时的 clone + patch。
 - 采用 Docker Compose 与已验证的自定义 bridge 网络（不使用 host 网络），构建产物挂载到宿主避免重复编译。
 - 24.04 实车与容器使用同一套依赖描述，保证一致。

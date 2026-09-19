@@ -12,7 +12,8 @@
 - 已完成：新增 `sentry_decision_msgs`（`DecisionState` / `WorldState` / `DecisionOutput`）与 io 的 `DecisionStatePublisher`（发布 `/decision/state`、`/decision/world_state`），含纯转换与容器单测。
 - 已完成：core 确定性回放 `ReplaySource` / `ReplayData`（固定步长、按时间取最近记录、时间戳 = epoch + at），含宿主单测。
 - 已完成：io 的 `load_replay_data` 从 rosbag2 读取旧话题并填充 `ReplayData`，含往返测试。
-- 进行中：回放回归（新旧输出逐 tick 对比）；io 接线。
+- 已完成：本地仿真 `sentry_decision_sim`（dummy 裁判系统 + 伪导航，ROS 无关），bringup `decision_main` 默认改用仿真。
+- 进行中：回放回归（新旧输出逐 tick 对比）；真实 io 接线（待通信包确定）。
 - 待决策：对外消息包 `sentry_decision_msgs` 的字段范围；回放文件格式（rosbag2 + 时间轴抽象）。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
