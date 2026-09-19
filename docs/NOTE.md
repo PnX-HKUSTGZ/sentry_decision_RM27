@@ -3,18 +3,15 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（P1 信念与回放）
+## 当前 sprint（P2 策略迁移准备）
 
-- 已完成：裁判协议位段解码 `referee_protocol`（纯函数 + 宿主单测）。
-- 已完成：`WorldState` 契约按参考 `ros_interfaces` 字段对齐（GameInfo / TeamInformation / RadarInfo / SentryInfoOnline / SentryInfoOffline），`SelfState` 预留 IMU 四元数 `SelfState.imu`。
+- P1 已完成（本地范围）：裁判协议解码、`WorldState` 契约对齐、`sentry_decision_msgs` + `DecisionStatePublisher`、core 回放 `ReplaySource`、rosbag 读取、本地仿真 `sentry_decision_sim`。
+- 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
+- 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无样本）。
 - 已移除：`sentry_info_3`（姿态剩余强化时间）解码，疑似临时规则，待协议明确。
-- 已确认（暂缓落地）：下位机通信包定义位置未定，不在 core 落地 `UplinkFrame` / `DownlinkFrame`；动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
-- 已完成：新增 `sentry_decision_msgs`（`DecisionState` / `WorldState` / `DecisionOutput`）与 io 的 `DecisionStatePublisher`（发布 `/decision/state`、`/decision/world_state`），含纯转换与容器单测。
-- 已完成：core 确定性回放 `ReplaySource` / `ReplayData`（固定步长、按时间取最近记录、时间戳 = epoch + at），含宿主单测。
-- 已完成：io 的 `load_replay_data` 从 rosbag2 读取旧话题并填充 `ReplayData`，含往返测试。
-- 已完成：本地仿真 `sentry_decision_sim`（dummy 裁判系统 + 伪导航，ROS 无关），bringup `decision_main` 默认改用仿真。
-- 进行中：回放回归（新旧输出逐 tick 对比）；真实 io 接线（待通信包确定）。
-- 待决策：对外消息包 `sentry_decision_msgs` 的字段范围；回放文件格式（rosbag2 + 时间轴抽象）。
+- 已确认（暂缓落地）：下位机通信包动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
+- P2 重点：行为树目录与插件清单、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
+- 待决策：`sentry_decision_msgs` 的 action / service 字段；回放差异报告格式。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
 ## P0 已完成

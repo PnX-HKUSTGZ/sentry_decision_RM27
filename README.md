@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-> :construction: P1 信念与回放进行中：core 数据契约与裁判协议解码、DecisionState 发布、rosbag 回放已就绪；本地仿真（dummy 裁判 + 伪导航）可独立调试，真实 io 接线待通信包确定。
+> :white_check_mark: P1 完成（本地范围）：裁判解码、WorldState 契约、DecisionState 发布、确定性回放与 rosbag 读取、本地仿真（dummy 裁判 + 伪导航）。真实 io 接线待通信包确定；下一步 P2 策略迁移。
 
 ## 运行环境
 

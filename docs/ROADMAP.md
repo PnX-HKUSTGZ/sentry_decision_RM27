@@ -20,7 +20,7 @@
 | P3 可视化与仿真 | 可观测、可手动干预 | TreeStatePublisher、Groot2、rosbridge 战场页、referee_simulator、场景脚本 | 网页实时显示树状态与机器人 / 敌方位置；仿真驱动完整对局；干预可记录与回放 |
 | P4 切换与冻结 | 新仓库成为默认 | 实车 / 仿真跑通、旧仓库打 tag 归档、迁移报告 | 24.04 实车与容器行为一致；文档齐全 |
 
-## P0 骨架（当前）
+## P0 骨架（已完成）
 
 **目标**：在无 ROS 的宿主上即可测试核心逻辑；在 Jazzy 容器内可构建、可测试、可跑最小闭环。
 
@@ -40,7 +40,7 @@
 - 日志双通道按级别正确分流。
 - 最小行为树以固定频率 tick，且状态可观测。
 
-## P1 信念与回放
+## P1 信念与回放（已完成，本地范围）
 
 **目标**：由单一 I/O 节点接管全部外部交互，并把「回放」打通为可用的调试底座。
 
@@ -109,7 +109,8 @@
 ## 当前状态
 
 - **P0 完成**：仓库与架构文档；core（契约 / 仲裁 / 日志 / 信念 / IO 抽象）；io 的 ROS 适配器；nodes 最小插件；bringup 最小闭环；Docker、Dev Container、CI（含格式检查）。
-- **P1 进行中**：裁判协议位段解码（`event_code` / `sentry_info_1/2`）、`WorldState` 契约按 `ros_interfaces` 对齐、`sentry_decision_msgs`（`DecisionState` / `WorldState`）与发布类、core 确定性回放 `ReplaySource` 已落地。
-- 已完成：io 的 rosbag → `ReplayData` 读取（`load_replay_data` + 往返测试）。
-- 已完成：本地仿真 `sentry_decision_sim`（dummy 裁判 `RefereeSimulator` + 伪导航 `NavSimulator`，ROS 无关），bringup 默认改用仿真。
-- 下一步：待下位机通信包确定后落地 `UplinkFrame` / `DownlinkFrame` 与真实 io 接线；回放回归（新旧输出逐 tick 对比）。
+- **P1 完成（本地范围）**：
+  - 已交付：裁判协议位段解码、`WorldState` 契约按 `ros_interfaces` 对齐、`sentry_decision_msgs` 与 `DecisionStatePublisher`、core 确定性回放 `ReplaySource`、rosbag 读取 `load_replay_data`、本地仿真 `sentry_decision_sim`。
+  - 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
+  - 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无可用旧 bag，待提供样本）。
+- **下一步：P2 策略迁移**——行为树目录与插件清单、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
