@@ -18,7 +18,6 @@ const std::vector<OwnerRule>& owner_rules() {
       {IntentField::kChassisVel,
        SourceId::kRecovery,
        {SourceId::kSupervisor, SourceId::kIntervention}},
-      {IntentField::kStance, SourceId::kSkill, {SourceId::kSupervisor, SourceId::kIntervention}},
       {IntentField::kResourceRequest, SourceId::kSkill, {SourceId::kIntervention}},
       {IntentField::kTacticalMode, SourceId::kStrategic, {SourceId::kIntervention}},
   };
@@ -50,8 +49,6 @@ bool has_matching_value(const Intent& intent) {
       return std::holds_alternative<Point2D>(intent.value);
     case IntentField::kChassisVel:
       return std::holds_alternative<Twist>(intent.value);
-    case IntentField::kStance:
-      return std::holds_alternative<SentryStance>(intent.value);
     case IntentField::kResourceRequest:
       return std::holds_alternative<ResourceRequest>(intent.value);
     case IntentField::kTacticalMode:
@@ -67,9 +64,6 @@ void apply(const Intent& winner, DecisionOutput& out) {
       break;
     case IntentField::kChassisVel:
       out.cmd_vel = std::get<Twist>(winner.value);
-      break;
-    case IntentField::kStance:
-      out.stance = std::get<SentryStance>(winner.value);
       break;
     case IntentField::kResourceRequest:
       out.resource = std::get<ResourceRequest>(winner.value);
@@ -145,8 +139,7 @@ ArbiterResult IntentArbiter::resolve(TimePoint now) const {
   }
 
   const IntentField fields[] = {IntentField::kNavGoal, IntentField::kChassisVel,
-                                IntentField::kStance, IntentField::kResourceRequest,
-                                IntentField::kTacticalMode};
+                                IntentField::kResourceRequest, IntentField::kTacticalMode};
   for (IntentField field : fields) {
     const Intent* winner = nullptr;
     std::vector<SourceId> losers;

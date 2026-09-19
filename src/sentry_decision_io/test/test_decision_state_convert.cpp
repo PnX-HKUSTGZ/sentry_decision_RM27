@@ -28,7 +28,6 @@ void test_decision_output_conversion() {
   DecisionOutput output;
   output.nav_goal = Point2D{1.5, -2.5, 0.75};
   output.cmd_vel = Twist{0.1, 0.2, 0.3};
-  output.stance = SentryStance::kAttack;
   output.tactical_mode = TacticalMode::kRetreat;
   output.resource.ammo = 17;
   output.resource.hp = 3;
@@ -43,7 +42,6 @@ void test_decision_output_conversion() {
   CHECK(msg.cmd_vel.linear.x == 0.1);
   CHECK(msg.cmd_vel.linear.y == 0.2);
   CHECK(msg.cmd_vel.angular.z == 0.3);
-  CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kAttack));
   CHECK(msg.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kRetreat));
   CHECK(msg.resource_ammo == 17);
   CHECK(msg.resource_hp == 3);

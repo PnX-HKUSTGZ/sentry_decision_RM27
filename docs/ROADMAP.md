@@ -65,7 +65,7 @@
 
 - 行为树目录与 `tree_manifest.yaml`、插件加载与启动校验。
 - 战术 / 战略层（`StrategicPolicy` 接口 + 首个实现）。
-- 任务 / 技能模块，先 `nav`，再 `stance`、`resource`、`tactical`。
+- 任务 / 技能模块，先 `nav`，再 `resource`、`tactical`。
 - `nav_executor` 与 `IntentArbiter` 接入，`SafeSupervisor` 兜底。
 - `intervention` 模块（意图注入、世界状态注入、模块开关）。
 

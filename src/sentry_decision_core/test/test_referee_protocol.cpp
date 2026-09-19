@@ -18,13 +18,6 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
-void test_decode_stance() {
-  CHECK(decode_stance(0) == SentryStance::kIdle);
-  CHECK(decode_stance(1) == SentryStance::kAttack);
-  CHECK(decode_stance(2) == SentryStance::kDefend);
-  CHECK(decode_stance(3) == SentryStance::kMove);
-}
-
 void test_decode_game_status() {
   CHECK(decode_game_status(0) == GameStatus::kNotStarted);
   CHECK(decode_game_status(1) == GameStatus::kPreparation);
@@ -75,22 +68,17 @@ void test_decode_sentry_info2() {
   const SentryInfo2 info = decode_sentry_info2(raw);
   CHECK(info.disengaged);
   CHECK(info.remaining_ammo_exchange == 0x7FF);
-  CHECK(info.stance == SentryStance::kDefend);
   CHECK(info.can_activate_energy);
-  CHECK(info.stance_enhanced);
 
   const SentryInfo2 none = decode_sentry_info2(0);
   CHECK(!none.disengaged);
   CHECK(none.remaining_ammo_exchange == 0);
-  CHECK(none.stance == SentryStance::kIdle);
   CHECK(!none.can_activate_energy);
-  CHECK(!none.stance_enhanced);
 }
 
 }  // namespace
 
 int main() {
-  test_decode_stance();
   test_decode_game_status();
   test_decode_event_code();
   test_decode_sentry_info1();

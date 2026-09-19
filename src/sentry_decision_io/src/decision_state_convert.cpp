@@ -17,7 +17,6 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
     msg.cmd_vel.linear.y = output.cmd_vel->vy;
     msg.cmd_vel.angular.z = output.cmd_vel->wz;
   }
-  msg.stance = static_cast<std::uint8_t>(output.stance);
   msg.tactical_mode = static_cast<std::uint8_t>(output.tactical_mode);
   msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
   msg.resource_hp = static_cast<std::uint16_t>(output.resource.hp);

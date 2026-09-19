@@ -116,7 +116,7 @@ IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用�
 
 ```cpp
 // 意图：请求，不代表最终生效
-enum class IntentField { NavGoal, ChassisVel, Stance, ResourceRequest, TacticalMode };
+enum class IntentField { NavGoal, ChassisVel, ResourceRequest, TacticalMode };
 
 struct Intent {
   IntentField field;
@@ -133,7 +133,6 @@ struct Intent {
 struct DecisionOutput {
   std::optional<Point2D> nav_goal;
   std::optional<Twist>   safe_cmd_vel;
-  SentryStance           desired_stance;
   ResourceRequest        resource;
   TimePoint              stamp;
   // 各字段的 owner 与默认值见第 9 节
@@ -237,7 +236,6 @@ tree/
 ├── tactical/{root,attack,defend}.xml
 ├── nav/{root,patrol,retreat,unstick}.xml
 ├── resource/{...}.xml
-├── stance/{...}.xml
 └── gimbal/{...}.xml
 ```
 
@@ -303,7 +301,6 @@ safety(急停 / 看门狗) > intervention(人工干预 / 调试注入) > recover
 | --- | --- | --- |
 | `nav_goal` | 导航决策模块 | safety、intervention |
 | `safe_cmd_vel` | recovery（仅接管时） | safety（急停） |
-| `desired_stance` | 姿态模块 | safety、intervention |
 | `resource` | 资源模块 | intervention |
 
 - 非 owner 提交该字段记 `WARN`；
@@ -354,7 +351,7 @@ BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
 
 ```text
 # decision_msgs/action/ManualOverride.action
-IntentField field      # nav.goal / stance / resource.request / chassis.vel ...
+IntentField field      # nav.goal / resource.request / chassis.vel ...
 string      value      # 类型化取值
 float64     lease_sec  # 生效时长，到点自动撤销
 string      reason     # 记录到日志与回放

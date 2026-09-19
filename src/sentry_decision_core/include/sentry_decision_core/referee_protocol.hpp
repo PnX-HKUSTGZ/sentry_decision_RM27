@@ -40,18 +40,13 @@ struct SentryInfo1 {
   std::uint16_t instant_resurrect_cost = 0;       // bit 21-30：立即复活所需金币
 };
 
-// SentryInfoOnline.sentry_info_2：姿态、脱战与可兑换弹量。
+// SentryInfoOnline.sentry_info_2：脱战、可兑换弹量与能量机关。
+// bit 12-13（姿态）与 bit 15（姿态强化）为已废弃规则，按约定不解码。
 struct SentryInfo2 {
   bool disengaged = false;                    // bit 0：脱战状态
   std::uint16_t remaining_ammo_exchange = 0;  // bit 1-11：17mm 剩余可兑换发弹量
-  SentryStance stance = SentryStance::kIdle;  // bit 12-13：当前姿态（不含强化位）
   bool can_activate_energy = false;           // bit 14：能否进入能量机关激活状态
-  bool stance_enhanced = false;               // bit 15：当前姿态是否处于强化状态
 };
-
-// 协议中的姿态取值：0 空闲、1 攻击、2 防御、3 移动。
-// 与 SentryStance 的枚举顺序不同，必须显式映射，禁止直接 static_cast。
-SentryStance decode_stance(std::uint8_t raw);
 
 GameStatus decode_game_status(std::uint8_t raw);
 EventCode decode_event_code(std::uint32_t raw);

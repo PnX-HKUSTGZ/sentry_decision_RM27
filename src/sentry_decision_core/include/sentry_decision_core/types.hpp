@@ -14,7 +14,6 @@ using Duration = std::chrono::milliseconds;
 enum class IntentField {
   kNavGoal,
   kChassisVel,
-  kStance,
   kResourceRequest,
   kTacticalMode,
 };
@@ -37,8 +36,6 @@ enum class Priority : int {
   kIntervention = 3,
   kSafety = 4,
 };
-
-enum class SentryStance { kIdle, kMove, kAttack, kDefend };
 
 enum class TacticalMode { kUnknown, kPatrol, kAttack, kDefend, kRetreat, kHeal, kRespawn };
 
@@ -69,8 +66,7 @@ struct ResourceRequest {
 };
 
 // 意图载荷；具体用哪一项由 Intent::field 决定。
-using IntentValue =
-    std::variant<std::monostate, Point2D, Twist, SentryStance, TacticalMode, ResourceRequest>;
+using IntentValue = std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest>;
 
 // 意图：一次请求，不保证最终生效。
 struct Intent {
@@ -87,7 +83,6 @@ struct Intent {
 struct DecisionOutput {
   std::optional<Point2D> nav_goal;
   std::optional<Twist> cmd_vel;
-  SentryStance stance = SentryStance::kIdle;
   ResourceRequest resource{};
   TacticalMode tactical_mode = TacticalMode::kUnknown;
   TimePoint stamp{};
