@@ -10,7 +10,8 @@
 - 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无样本）。
 - 已移除：`sentry_info_3`（姿态剩余强化时间）解码，疑似临时规则，待协议明确。
 - 已确认（暂缓落地）：下位机通信包动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
-- P2 重点：行为树目录与插件清单、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
+- 已同步：stance（姿态）为旧规则已废弃，删除相关类型 / 逻辑 / 消息 / 文档；行为树迁移到仓库根目录 `tree/`。
+- P2 重点：行为树目录与插件清单（`tree/`）、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
 - 待决策：`sentry_decision_msgs` 的 action / service 字段；回放差异报告格式。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 

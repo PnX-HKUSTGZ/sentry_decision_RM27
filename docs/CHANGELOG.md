@@ -38,4 +38,10 @@
 
 ### Changed
 
+- 行为树源文件迁移到仓库根目录 `tree/`；bringup 构建、安装与测试路径同步，运行路径不变
+
+### Removed
+
+- 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
+
 ### Fixed
