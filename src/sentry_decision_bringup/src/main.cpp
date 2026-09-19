@@ -3,6 +3,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 
@@ -12,6 +13,8 @@
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
+#include "sentry_decision_sim/nav_simulator.hpp"
+#include "sentry_decision_sim/referee_simulator.hpp"
 
 #ifndef DEFAULT_TREE_PATH
 #define DEFAULT_TREE_PATH "tree/demo_tree.xml"
@@ -19,11 +22,14 @@
 
 namespace {
 
+using sentry_decision::Duration;
 using sentry_decision::SteadyClock;
+using sentry_decision::TimePoint;
 
 struct Options {
   int ticks = 50;
   double rate_hz = 20.0;
+  double hp_drop_sec = 1.0;
   std::string tree = DEFAULT_TREE_PATH;
   std::string plugin;
 };
@@ -43,6 +49,8 @@ Options parse_options(int argc, char** argv) {
       options.ticks = std::stoi(next("--ticks"));
     } else if (arg == "--rate") {
       options.rate_hz = std::stod(next("--rate"));
+    } else if (arg == "--hp-drop") {
+      options.hp_drop_sec = std::stod(next("--hp-drop"));
     } else if (arg == "--tree") {
       options.tree = next("--tree");
     } else if (arg == "--plugin") {
@@ -55,52 +63,9 @@ Options parse_options(int argc, char** argv) {
   return options;
 }
 
-// 演示用裁判源：启动 1 秒后掉血，用于触发撤退分支切换。
-struct DemoReferee : sentry_decision::RefereeSource {
-  SteadyClock::time_point start = SteadyClock::now();
-
-  bool referee(sentry_decision::RefereeState* out) const override {
-    const auto now = SteadyClock::now();
-    *out = sentry_decision::RefereeState{};
-    out->stamp = now;
-    out->valid = true;
-    out->self_hp = std::chrono::duration<double>(now - start).count() < 1.0 ? 300 : 50;
-    out->self_ammo = 100;
-    return true;
-  }
-};
-
-struct DemoOdometry : sentry_decision::OdometrySource {
-  bool odometry(sentry_decision::SelfState* out) const override {
-    *out = sentry_decision::SelfState{};
-    out->stamp = SteadyClock::now();
-    out->valid = true;
-    return true;
-  }
-};
-
-struct DemoNavigation : sentry_decision::NavigationSink {
-  sentry_decision::NavState state;
-
-  void send_goal(const sentry_decision::Point2D& goal) override {
-    state.current_goal = goal;
-    state.stamp = SteadyClock::now();
-    state.valid = true;
-  }
-
-  void cancel_goal() override {
-    state.current_goal.reset();
-    state.stamp = SteadyClock::now();
-    state.valid = true;
-  }
-
-  sentry_decision::NavState status() const override {
-    return state;
-  }
-};
-
 }  // namespace
 
+// 本地仿真入口：用 dummy 裁判系统与伪导航驱动信念层，不依赖下位机通信包与导航仓库。
 int main(int argc, char** argv) {
   const Options options = parse_options(argc, argv);
 
@@ -112,10 +77,11 @@ int main(int argc, char** argv) {
 
   sentry_decision::DecisionContext context;
 
-  DemoReferee referee;
-  DemoOdometry odometry;
-  DemoNavigation navigation;
-  sentry_decision::WorldModel world_model(referee, odometry, navigation);
+  sentry_decision_sim::RefereeSimulator referee;
+  sentry_decision_sim::NavSimulator navigation(2.0, 0.2);
+  referee.schedule(Duration{static_cast<std::int64_t>(options.hp_drop_sec * 1000.0)},
+                   [](sentry_decision::RefereeState& state) { state.self_hp = 50; });
+  sentry_decision::WorldModel world_model(referee, navigation, navigation);
 
   BT::BehaviorTreeFactory factory;
   if (!options.plugin.empty()) {
@@ -137,10 +103,14 @@ int main(int argc, char** argv) {
   }();
 
   sentry_decision::IntentArbiter arbiter;
-  const std::chrono::duration<double> period(1.0 / options.rate_hz);
+  const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
+  const TimePoint epoch = SteadyClock::now();
+  std::optional<sentry_decision::Point2D> last_goal;
 
   for (int tick = 0; tick < options.ticks; ++tick) {
-    const auto now = SteadyClock::now();
+    const TimePoint now = epoch + period * tick;
+    referee.update(now);
+    navigation.update(now);
     context.world = world_model.snapshot(now);
     context.clear_intents();
     tree.tickOnce();
@@ -152,10 +122,23 @@ int main(int argc, char** argv) {
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);
 
+    // 用仲裁后的目标驱动伪导航；做边沿检测，避免每 tick 重发导致无法到达。
     if (result.output.nav_goal.has_value()) {
-      SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f)", tick,
+      const sentry_decision::Point2D& goal = *result.output.nav_goal;
+      if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y) {
+        navigation.send_goal(goal);
+        last_goal = goal;
+      }
+    } else if (last_goal.has_value()) {
+      navigation.cancel_goal();
+      last_goal.reset();
+    }
+
+    if (result.output.nav_goal.has_value()) {
+      SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f) pos=(%.2f, %.2f)", tick,
                  context.world.referee.self_hp, static_cast<int>(result.output.tactical_mode),
-                 result.output.nav_goal->x, result.output.nav_goal->y);
+                 result.output.nav_goal->x, result.output.nav_goal->y, navigation.pose().x,
+                 navigation.pose().y);
     } else {
       SD_LOG_ACT("bringup", "tick %d hp=%d 无导航目标", tick, context.world.referee.self_hp);
     }

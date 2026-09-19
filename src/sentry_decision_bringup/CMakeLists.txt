@@ -10,11 +10,13 @@ find_package(ament_cmake REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(sentry_decision_core REQUIRED)
 find_package(sentry_decision_nodes REQUIRED)
+find_package(sentry_decision_sim REQUIRED)
 
 add_executable(decision_main src/main.cpp)
 target_link_libraries(decision_main
   sentry_decision_core::sentry_decision_core
   sentry_decision_nodes::sentry_decision_nodes
+  sentry_decision_sim::sentry_decision_sim
   behaviortree_cpp::behaviortree_cpp)
 target_compile_definitions(decision_main PRIVATE
   DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/demo_tree.xml")
