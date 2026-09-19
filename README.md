@@ -47,6 +47,7 @@ sentry_decision_RM27/
 ├── docs/                      # 项目文档
 ├── docker/                    # 开发 / 测试容器
 ├── tools/                     # 宿主测试脚本
+├── tree/                      # 行为树 XML（tree_manifest.yaml、root.xml 等）
 ├── .github/workflows/         # CI
 └── src/
     ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
@@ -54,7 +55,7 @@ sentry_decision_RM27/
     ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
     ├── sentry_decision_sim/     # 本地仿真：dummy 裁判系统与伪导航
     ├── sentry_decision_nodes/   # 行为树节点插件
-    └── sentry_decision_bringup/ # main、行为树、launch
+    └── sentry_decision_bringup/ # main、launch（行为树见根目录 tree/）
 ```
 
 ## 文档索引

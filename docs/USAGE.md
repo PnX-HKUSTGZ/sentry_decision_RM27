@@ -70,6 +70,8 @@ ros2 run sentry_decision_bringup decision_main
 演示行为：启动约 1 秒后血量从 400 掉到 50，行为树由巡逻抢占到撤退，伪导航朝新目标移动，ACT 日志显示 `mode`、
 `goal` 与当前位置变化。
 
+行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；`--tree` 默认指向安装后路径。
+
 ### 4.2 IO 节点
 
 ```bash

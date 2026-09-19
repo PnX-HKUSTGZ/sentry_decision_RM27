@@ -22,12 +22,13 @@ target_compile_definitions(decision_main PRIVATE
   DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/demo_tree.xml")
 
 install(TARGETS decision_main DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY tree/ DESTINATION share/${PROJECT_NAME}/tree)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/ DESTINATION share/${PROJECT_NAME}/tree)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 
 if(BUILD_TESTING)
   add_test(NAME demo_tree
-    COMMAND decision_main --ticks 40 --rate 200 --tree ${CMAKE_CURRENT_SOURCE_DIR}/tree/demo_tree.xml)
+    COMMAND decision_main --ticks 40 --rate 200 --tree
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/demo_tree.xml)
 
   add_executable(test_replay_determinism test/test_replay_determinism.cpp)
   target_link_libraries(test_replay_determinism
@@ -35,7 +36,7 @@ if(BUILD_TESTING)
     sentry_decision_nodes::sentry_decision_nodes
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME replay_determinism
-    COMMAND test_replay_determinism ${CMAKE_CURRENT_SOURCE_DIR}/tree/demo_tree.xml)
+    COMMAND test_replay_determinism ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/demo_tree.xml)
 endif()
 
 ament_package()
