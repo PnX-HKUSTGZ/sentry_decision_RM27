@@ -109,7 +109,7 @@ struct WorldState {
 
 下行指令的语义（待通信包确定后落地）：
 
-- 每个动作在配置时**必须显式选择** `kOneShot`（一次性，如兑换一次发弹量）或 `kPolled`（轮询，如立即复活）；
+- 每个动作在配置时**必须显式选择** `kOneShot`（一次性，如兑换一次发弹量）或 `kPolled`（轮询，如确认复活）；
 - `kPolled` 动作带**轮询间隔**，按间隔重发而非每帧重发；`kOneShot` 边沿触发，发送成功后消费，不重复执行。
 
 IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用，作为 `SelfState.imu` 保留。
@@ -454,7 +454,9 @@ string state_json
 核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
 （固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `RefereeSource` /
 `OdometrySource` / `NavigationSink`，可直接驱动 `WorldModel`，并统计决策下发的目标数用于回归断言。
-rosbag 读取由 io 适配器负责填充 `ReplayData`；core 回放不依赖任何 ROS 类型，确定性由宿主单测覆盖。
+rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 `ReplayData`，默认映射旧仓库
+的简单话题（`/ifhealth`、`/remain_ammo`、`/our_base_health`、`/our_outpost_health`、
+`/enemy_outpost_health`、`/can_rebuild_outpost`、`/odom`）；core 回放不依赖任何 ROS 类型，确定性由宿主单测覆盖。
 
 测试金字塔：
 

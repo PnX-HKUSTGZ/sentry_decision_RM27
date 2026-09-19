@@ -11,7 +11,8 @@
 - 已确认（暂缓落地）：下位机通信包定义位置未定，不在 core 落地 `UplinkFrame` / `DownlinkFrame`；动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
 - 已完成：新增 `sentry_decision_msgs`（`DecisionState` / `WorldState` / `DecisionOutput`）与 io 的 `DecisionStatePublisher`（发布 `/decision/state`、`/decision/world_state`），含纯转换与容器单测。
 - 已完成：core 确定性回放 `ReplaySource` / `ReplayData`（固定步长、按时间取最近记录、时间戳 = epoch + at），含宿主单测。
-- 进行中：io 的 rosbag → `ReplayData` 读取；io 接线。
+- 已完成：io 的 `load_replay_data` 从 rosbag2 读取旧话题并填充 `ReplayData`，含往返测试。
+- 进行中：回放回归（新旧输出逐 tick 对比）；io 接线。
 - 待决策：对外消息包 `sentry_decision_msgs` 的字段范围；回放文件格式（rosbag2 + 时间轴抽象）。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 

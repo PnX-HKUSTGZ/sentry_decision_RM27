@@ -34,7 +34,7 @@ jobs:
       - name: 安装构建工具
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends python3-colcon-common-extensions ros-jazzy-behaviortree-cpp
+          apt-get install -y --no-install-recommends python3-colcon-common-extensions ros-jazzy-behaviortree-cpp ros-jazzy-rosbag2
           rm -rf /var/lib/apt/lists/*
       - name: colcon build
         shell: bash

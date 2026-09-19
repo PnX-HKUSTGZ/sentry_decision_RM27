@@ -110,4 +110,5 @@
 
 - **P0 完成**：仓库与架构文档；core（契约 / 仲裁 / 日志 / 信念 / IO 抽象）；io 的 ROS 适配器；nodes 最小插件；bringup 最小闭环；Docker、Dev Container、CI（含格式检查）。
 - **P1 进行中**：裁判协议位段解码（`event_code` / `sentry_info_1/2`）、`WorldState` 契约按 `ros_interfaces` 对齐、`sentry_decision_msgs`（`DecisionState` / `WorldState`）与发布类、core 确定性回放 `ReplaySource` 已落地。
-- 下一步：io 的 rosbag → `ReplayData` 读取；待下位机通信包确定后落地 `UplinkFrame` / `DownlinkFrame` 与真实 io 接线。
+- 已完成：io 的 rosbag → `ReplayData` 读取（`load_replay_data` + 往返测试）。
+- 下一步：待下位机通信包确定后落地 `UplinkFrame` / `DownlinkFrame` 与真实 io 接线；回放回归（新旧输出逐 tick 对比）。
