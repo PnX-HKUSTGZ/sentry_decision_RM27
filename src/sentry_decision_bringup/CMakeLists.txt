@@ -28,6 +28,14 @@ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 if(BUILD_TESTING)
   add_test(NAME demo_tree
     COMMAND decision_main --ticks 40 --rate 200 --tree ${CMAKE_CURRENT_SOURCE_DIR}/tree/demo_tree.xml)
+
+  add_executable(test_replay_determinism test/test_replay_determinism.cpp)
+  target_link_libraries(test_replay_determinism
+    sentry_decision_core::sentry_decision_core
+    sentry_decision_nodes::sentry_decision_nodes
+    behaviortree_cpp::behaviortree_cpp)
+  add_test(NAME replay_determinism
+    COMMAND test_replay_determinism ${CMAKE_CURRENT_SOURCE_DIR}/tree/demo_tree.xml)
 endif()
 
 ament_package()
