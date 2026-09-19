@@ -1,0 +1,61 @@
+#pragma once
+
+#include <cstdint>
+
+#include "sentry_decision_core/types.hpp"
+
+namespace sentry_decision {
+
+// 裁判系统协议位段解码：把裁判消息中「未解码」的原始整数拆成具名字段。
+//
+// 本模块只做纯位运算，不依赖 ROS，也不持有状态，因此可在宿主机直接单测。
+// 位段定义来自 RM 裁判系统协议，与参考实现 navi_minco_bit/bt_manager 保持一致；
+// 协议变更时先改这里，再同步 io 适配器。
+
+// 比赛阶段，来自 GameInfo.game_status。
+enum class GameStatus : std::uint8_t {
+  kNotStarted = 0,   // 未开始比赛
+  kPreparation = 1,  // 准备阶段
+  kSelfCheck = 2,    // 15s 裁判系统自检
+  kCountdown = 3,    // 5s 倒计时
+  kRunning = 4,      // 比赛中
+  kSettling = 5,     // 比赛结算中
+  kUnknown = 0xFF,   // 未识别取值，便于上层判定协议异常
+};
+
+// GameInfo.event_code 中的场地事件位段。
+struct EventCode {
+  std::uint8_t small_energy_status = 0;     // bit 3-4：己方小能量机关激活状态
+  std::uint8_t big_energy_status = 0;       // bit 5-6：己方大能量机关激活状态
+  std::uint8_t fort_occupation_status = 0;  // bit 25-26：己方堡垒增益点占领状态
+};
+
+// SentryInfoOnline.sentry_info_1：兑换与复活信息。
+struct SentryInfo1 {
+  std::uint16_t ammo_exchanged_local = 0;  // bit 0-10：本地已成功兑换的允许发弹量
+  std::uint8_t remote_ammo_exchange_count = 0;    // bit 11-14：远程兑换发弹量次数
+  std::uint8_t remote_health_exchange_count = 0;  // bit 15-18：远程兑换血量次数
+  bool can_free_resurrect = false;                // bit 19：是否可确认免费复活
+  bool can_instant_resurrect = false;             // bit 20：是否可兑换立即复活
+  std::uint16_t instant_resurrect_cost = 0;       // bit 21-30：立即复活所需金币
+};
+
+// SentryInfoOnline.sentry_info_2：姿态、脱战与可兑换弹量。
+struct SentryInfo2 {
+  bool disengaged = false;                    // bit 0：脱战状态
+  std::uint16_t remaining_ammo_exchange = 0;  // bit 1-11：17mm 剩余可兑换发弹量
+  SentryStance stance = SentryStance::kIdle;  // bit 12-13：当前姿态（不含强化位）
+  bool can_activate_energy = false;           // bit 14：能否进入能量机关激活状态
+  bool stance_enhanced = false;               // bit 15：当前姿态是否处于强化状态
+};
+
+// 协议中的姿态取值：0 空闲、1 攻击、2 防御、3 移动。
+// 与 SentryStance 的枚举顺序不同，必须显式映射，禁止直接 static_cast。
+SentryStance decode_stance(std::uint8_t raw);
+
+GameStatus decode_game_status(std::uint8_t raw);
+EventCode decode_event_code(std::uint32_t raw);
+SentryInfo1 decode_sentry_info1(std::uint32_t raw);
+SentryInfo2 decode_sentry_info2(std::uint16_t raw);
+
+}  // namespace sentry_decision

@@ -54,6 +54,14 @@ struct Twist {
   double wz = 0.0;
 };
 
+// 下位机 IMU 姿态（四元数）。决策当前暂不使用，先保留以备后续需求。
+struct Quaternion {
+  double w = 1.0;
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+};
+
 struct ResourceRequest {
   int ammo = 0;
   int hp = 0;
