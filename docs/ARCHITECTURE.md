@@ -86,6 +86,34 @@ struct WorldState {
 };
 ```
 
+裁判消息中「未解码」的原始整数（`event_code`、`sentry_info_1/2`）不直接进决策，而是先经
+`core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2`），再写入 `RefereeState`。
+`sentry_info_3`（各姿态剩余强化时间）对应的规则疑似为临时规则，暂不解码，待协议明确后再补。
+位段定义集中在这一处，协议变更只改这里，并配套 `test/test_referee_protocol.cpp` 单测；io 适配器只负责
+把消息字段喂给解码函数，不内联位运算。
+
+### 4.1 下位机通信（暂缓实现）
+
+裁判系统与下位机传感器信息由下位机（MCU）统一采集，决策侧不直接接触裁判串口或字节流。
+通信包（上行 / 下行帧）的定义位置尚未确定（不在本仓库与 navigation 仓库），确认前不在 `core` 落地
+`UplinkFrame` / `DownlinkFrame`，本仓库只维护「决策视图」的数据契约。`WorldState` 字段与参考消息
+`ros_interfaces` 的映射：
+
+| 参考消息 | 对应子状态 | 备注 |
+| --- | --- | --- |
+| `GameInfo` | `RefereeState` | 阶段 / 时间 / 金币 / 场地事件 / 手动点 / 建筑血量 |
+| `TeamInformation` | `RefereeState` + `WorldState.allies` | 己方建筑血量、队友状态 |
+| `RadarInfo` | `EnemyState.enemies` + `RefereeState` | 敌方列表、敌方经济、前哨感知 |
+| `SentryInfoOnline` | `RefereeState`（自身）+ `SentryInfo1/2` | 血量 / 弹量 / 热量 / 姿态 / 兑换 |
+| `SentryInfoOffline` | `EnemyState`（锁定）+ `RefereeState` | 目标锁定、升降、变形、电容、隧道对齐 |
+
+下行指令的语义（待通信包确定后落地）：
+
+- 每个动作在配置时**必须显式选择** `kOneShot`（一次性，如兑换一次发弹量）或 `kPolled`（轮询，如立即复活）；
+- `kPolled` 动作带**轮询间隔**，按间隔重发而非每帧重发；`kOneShot` 边沿触发，发送成功后消费，不重复执行。
+
+IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用，作为 `SelfState.imu` 保留。
+
 ```cpp
 // 意图：请求，不代表最终生效
 enum class IntentField { NavGoal, ChassisVel, Stance, ResourceRequest, TacticalMode };
@@ -118,12 +146,13 @@ struct DecisionOutput {
 
 | 包 | 职责 | 依赖 |
 | --- | --- | --- |
-| `sentry_decision_core` | 数据契约、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
+| `sentry_decision_core` | 数据契约、裁判协议解码、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
+| `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
 | `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
 | `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core |
 
-后续按需增加：`sentry_decision_msgs`（对外消息 / 服务 / action）、`sentry_decision_viz`（可视化）、`sentry_decision_sim`（裁判仿真）、`sentry_decision_test`（测试与回放工具）。
+后续按需增加：`sentry_decision_viz`（可视化）、`sentry_decision_sim`（裁判仿真）、`sentry_decision_test`（测试与回放工具）。`sentry_decision_msgs` 已落地，后续补充 action / service（干预、调试）。
 
 ### 5.1 包与层的关系
 
@@ -415,12 +444,17 @@ string state_json
 - 统一使用项目日志接口，禁止散落的 `std::cout` 与原始 `RCLCPP_*`；
 - 状态转移日志只在「上次状态 ≠ 本次状态」时打印，避免逐 tick 刷屏；
 - 高频回调禁止逐帧 INFO / DEBUG；
-- 发布 `TreeStatus` / `DecisionState`，支持 Groot2 实时查看，并用 rosbag 记录 `/decision/*` 供赛后回放。
+- 发布 `DecisionState` / `WorldState` 到 `/decision/state`、`/decision/world_state`，供可视化与 rosbag 记录；`TreeStatus` / Groot2 后续（P3）接入。
 
 ## 13. 回放与测试
 
 **回放契约**：凡决策读到的输入、发出的输出、以及人工干预，都必须能记录并用同一份 core 确定性重放
 （`use_sim_time`、固定 tick 顺序、固定随机种子）。
+
+核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
+（固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `RefereeSource` /
+`OdometrySource` / `NavigationSink`，可直接驱动 `WorldModel`，并统计决策下发的目标数用于回归断言。
+rosbag 读取由 io 适配器负责填充 `ReplayData`；core 回放不依赖任何 ROS 类型，确定性由宿主单测覆盖。
 
 测试金字塔：
 
@@ -448,6 +482,7 @@ string state_json
 ## 16. 开放问题
 
 - 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
+- 下位机通信包（上行 / 下行帧）的定义位置与字节协议；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
 - 可视化选型：Groot2 + rosbridge 战场页的组合细节。
 - 回放文件格式与录制范围。
 - BT.CPP 在 Jazzy 镜像中的具体版本锁定与语义复验。

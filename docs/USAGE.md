@@ -75,6 +75,21 @@ ros2 run sentry_decision_io io_node
 ros2 node info /sentry_decision_io
 ```
 
+### 4.3 决策状态话题
+
+`sentry_decision_io::DecisionStatePublisher` 负责发布决策快照（供可视化与 rosbag）：
+
+| 话题 | 类型 | 说明 |
+| --- | --- | --- |
+| `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
+| `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
+
+```bash
+ros2 bag record /decision/state /decision/world_state
+```
+
+该发布类待决策节点接线后生效（P1 后续）。
+
 ## 5. 命令参数
 
 ### 5.1 decision_main

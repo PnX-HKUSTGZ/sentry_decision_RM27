@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-> :construction: P0 骨架进行中：core / nodes / bringup 最小闭环与 Docker / CI 已就绪。
+> :construction: P1 信念与回放进行中：core 数据契约与裁判协议解码、DecisionState 发布已就绪；回放适配器与 io 接线进行中。
 
 ## 运行环境
 
@@ -50,6 +50,8 @@ sentry_decision_RM27/
 ├── .github/workflows/         # CI
 └── src/
     ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
+    ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState
+    ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
     ├── sentry_decision_nodes/   # 行为树节点插件
     └── sentry_decision_bringup/ # main、行为树、launch
 ```
