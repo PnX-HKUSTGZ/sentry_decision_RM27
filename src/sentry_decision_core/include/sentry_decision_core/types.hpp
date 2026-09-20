@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <variant>
 
@@ -86,6 +87,32 @@ struct DecisionOutput {
   ResourceRequest resource{};
   TacticalMode tactical_mode = TacticalMode::kUnknown;
   TimePoint stamp{};
+};
+
+// 决策动作类型（下行给下位机）。
+enum class DecisionActionKind {
+  kNone,
+  kAmmoExchange,        // 本地兑换允许发弹量，value = 数量
+  kHpExchange,          // 本地兑换血量，value = 数量
+  kFreeResurrect,       // 确认免费复活
+  kInstantResurrect,    // 兑换立即复活
+  kRemoteAmmoExchange,  // 远程兑换发弹量，value = 次数
+  kRemoteHpExchange,    // 远程兑换血量，value = 次数
+};
+
+// 动作发送模式：配置动作时必须显式选择。
+enum class ActionMode {
+  kOneShot,  // 边沿触发，执行一次即完成
+  kPolled,   // 轮询，按 interval 重发，以最新值为准
+};
+
+// 一个决策动作。
+struct DecisionAction {
+  DecisionActionKind kind = DecisionActionKind::kNone;
+  ActionMode mode = ActionMode::kOneShot;
+  Duration interval{0};  // 仅 kPolled 使用
+  int value = 0;
+  std::uint32_t request_id = 0;
 };
 
 }  // namespace sentry_decision

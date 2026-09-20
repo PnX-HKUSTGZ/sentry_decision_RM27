@@ -113,4 +113,5 @@
   - 已交付：裁判协议位段解码、`WorldState` 契约按 `ros_interfaces` 对齐、`sentry_decision_msgs` 与 `DecisionStatePublisher`、core 确定性回放 `ReplaySource`、rosbag 读取 `load_replay_data`、本地仿真 `sentry_decision_sim`。
   - 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
   - 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无可用旧 bag，待提供样本）。
+- **P2 进行中**：上位机接口重构——`sentry_interfaces` 契约与 `docs/INTERFACES.md`（5 上行 + `DecisionAck` + `DecisionCommand`）已落地，决策侧与 auto-aim 侧已迁移；新增 `decision_node` 把真实 IO、行为树、仲裁与状态发布闭环。
 - **下一步：P2 策略迁移**——行为树目录与插件清单、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。

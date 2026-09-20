@@ -147,6 +147,7 @@ struct DecisionOutput {
 | --- | --- | --- |
 | `sentry_decision_core` | 数据契约、裁判协议解码、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
 | `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
+| `sentry_interfaces` | 与 auto-aim 的裁判上行 / 决策下行接口消息 | std_msgs、geometry_msgs |
 | `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关） | core |
 | `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
@@ -181,6 +182,9 @@ flowchart TD
 
 关键约束：行为树节点不得直接创建 ROS 节点或订阅。所有 I/O 集中在 `io` 的单一节点（建议 `rclcpp_components`），
 订阅回调只做「解码 + 更新原始值」，BT tick 线程读取不可变快照。
+
+组合根 `bringup` 的 `decision_node` 把 `RosIoNode`、行为树、`IntentArbiter` 与 `DecisionStatePublisher`
+放在同一进程/执行器内闭环：IO 回调与 tick 分属不同回调组，tick 每次读取不可变快照。
 
 ## 6. 插件机制
 

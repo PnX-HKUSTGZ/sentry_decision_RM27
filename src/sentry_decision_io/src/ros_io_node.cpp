@@ -4,43 +4,86 @@
 #include <exception>
 
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_io/sentry_bridge.hpp"
 
 namespace sentry_decision_io {
 
 RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
     : rclcpp::Node("sentry_decision_io", options) {
   map_frame_ = declare_parameter<std::string>("map_frame", "map");
-  const auto health_topic = declare_parameter<std::string>("health_topic", "/ifhealth");
-  const auto ammo_topic = declare_parameter<std::string>("ammo_topic", "/remain_ammo");
-  const auto base_health_topic =
-      declare_parameter<std::string>("base_health_topic", "/our_base_health");
-  const auto our_outpost_topic =
-      declare_parameter<std::string>("our_outpost_topic", "/our_outpost_health");
-  const auto enemy_outpost_topic =
-      declare_parameter<std::string>("enemy_outpost_topic", "/enemy_outpost_health");
-  const auto can_rebuild_topic =
-      declare_parameter<std::string>("can_rebuild_topic", "/can_rebuild_outpost");
-  const auto odom_topic = declare_parameter<std::string>("odom_topic", "/odom");
+  const auto game_info_topic =
+      declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
+  const auto online_info_topic =
+      declare_parameter<std::string>("online_info_topic", "/sentry/online_info");
+  const auto offline_info_topic =
+      declare_parameter<std::string>("offline_info_topic", "/sentry/offline_info");
+  const auto team_info_topic =
+      declare_parameter<std::string>("team_info_topic", "/sentry/team_info");
+  const auto radar_info_topic =
+      declare_parameter<std::string>("radar_info_topic", "/sentry/radar_info");
+  const auto decision_ack_topic =
+      declare_parameter<std::string>("decision_ack_topic", "/sentry/decision_ack");
+  const auto decision_command_topic =
+      declare_parameter<std::string>("decision_command_topic", "/sentry/decision_command");
+  const auto odom_topic = declare_parameter<std::string>("odom_topic", "/aft_mapped_to_init");
   const auto cmd_vel_topic = declare_parameter<std::string>("cmd_vel_topic", "cmd_vel");
   const auto navigate_action =
       declare_parameter<std::string>("navigate_action", "navigate_to_pose");
-  const auto set_bool_service = declare_parameter<std::string>("set_bool_service", "/set_bool");
 
-  subscribe_u16(health_topic, &sentry_decision::RefereeState::self_hp, true);
-  subscribe_u16(ammo_topic, &sentry_decision::RefereeState::self_ammo, false);
-  subscribe_u16(base_health_topic, &sentry_decision::RefereeState::base_hp, false);
-  subscribe_u16(our_outpost_topic, &sentry_decision::RefereeState::our_outpost_hp, false);
-  subscribe_u16(enemy_outpost_topic, &sentry_decision::RefereeState::enemy_outpost_hp, false);
-
-  can_rebuild_sub_ = create_subscription<std_msgs::msg::Bool>(
-      can_rebuild_topic, 10, [this](const std_msgs::msg::Bool::SharedPtr msg) {
+  game_info_sub_ = create_subscription<sentry_interfaces::msg::GameInfo>(
+      game_info_topic, 10, [this](sentry_interfaces::msg::GameInfo::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(referee_mutex_);
-        referee_.can_rebuild_outpost = msg->data;
+        merge(*msg, &referee_);
         referee_.stamp = sentry_decision::SteadyClock::now();
+        referee_.valid = true;
+      });
+
+  online_info_sub_ = create_subscription<sentry_interfaces::msg::SentryInfoOnline>(
+      online_info_topic, 10, [this](sentry_interfaces::msg::SentryInfoOnline::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(referee_mutex_);
+        merge(*msg, &referee_);
+        referee_.stamp = sentry_decision::SteadyClock::now();
+        referee_.valid = true;
+      });
+
+  offline_info_sub_ = create_subscription<sentry_interfaces::msg::SentryInfoOffline>(
+      offline_info_topic, 10, [this](sentry_interfaces::msg::SentryInfoOffline::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(referee_mutex_);
+        merge(*msg, &referee_);
+        referee_.stamp = sentry_decision::SteadyClock::now();
+        referee_.valid = true;
+      });
+
+  team_info_sub_ = create_subscription<sentry_interfaces::msg::TeamInfo>(
+      team_info_topic, 10, [this](sentry_interfaces::msg::TeamInfo::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(referee_mutex_);
+        merge(*msg, &referee_);
+        referee_.stamp = sentry_decision::SteadyClock::now();
+        referee_.valid = true;
+      });
+
+  radar_info_sub_ = create_subscription<sentry_interfaces::msg::RadarInfo>(
+      radar_info_topic, 10, [this](sentry_interfaces::msg::RadarInfo::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(referee_mutex_);
+        merge(*msg, &referee_);
+        referee_.stamp = sentry_decision::SteadyClock::now();
+        referee_.valid = true;
+      });
+
+  decision_ack_sub_ = create_subscription<sentry_interfaces::msg::DecisionAck>(
+      decision_ack_topic, 10, [this](sentry_interfaces::msg::DecisionAck::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(decision_mutex_);
+        last_ack_ = *msg;
+        if (msg->accepted) {
+          SD_LOG_ACT("io", "决策动作已执行 request_id=%u", msg->request_id);
+        } else {
+          SD_LOG_WARN("io", "决策动作被拒绝 request_id=%u code=%u", msg->request_id,
+                      static_cast<unsigned>(msg->code));
+        }
       });
 
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-      odom_topic, 10, [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+      odom_topic, 10, [this](nav_msgs::msg::Odometry::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(odometry_mutex_);
         odometry_.pose.x = msg->pose.pose.position.x;
         odometry_.pose.y = msg->pose.pose.position.y;
@@ -55,21 +98,9 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
       });
 
   cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic, 10);
+  decision_pub_ =
+      create_publisher<sentry_interfaces::msg::DecisionCommand>(decision_command_topic, 10);
   nav_client_ = rclcpp_action::create_client<NavigateToPose>(this, navigate_action);
-  set_bool_client_ = create_client<std_srvs::srv::SetBool>(set_bool_service);
-}
-
-void RosIoNode::subscribe_u16(const std::string& topic, int sentry_decision::RefereeState::*field,
-                              bool mark_valid) {
-  referee_subs_.push_back(create_subscription<std_msgs::msg::UInt16>(
-      topic, 10, [this, field, mark_valid](const std_msgs::msg::UInt16::SharedPtr msg) {
-        std::lock_guard<std::mutex> lock(referee_mutex_);
-        referee_.*field = static_cast<int>(msg->data);
-        referee_.stamp = sentry_decision::SteadyClock::now();
-        if (mark_valid) {
-          referee_.valid = true;
-        }
-      }));
 }
 
 bool RosIoNode::referee(sentry_decision::RefereeState* out) const {
@@ -82,6 +113,11 @@ bool RosIoNode::odometry(sentry_decision::SelfState* out) const {
   std::lock_guard<std::mutex> lock(odometry_mutex_);
   *out = odometry_;
   return odometry_.valid;
+}
+
+std::optional<sentry_interfaces::msg::DecisionAck> RosIoNode::last_ack() const {
+  std::lock_guard<std::mutex> lock(decision_mutex_);
+  return last_ack_;
 }
 
 void RosIoNode::send_goal(const sentry_decision::Point2D& goal) {
@@ -164,14 +200,10 @@ void RosIoNode::set_velocity(const sentry_decision::Twist& cmd) {
   cmd_vel_pub_->publish(msg);
 }
 
-void RosIoNode::set_flag(const std::string& name, bool value) {
-  if (!set_bool_client_->service_is_ready()) {
-    SD_LOG_WARN("io", "set_bool 服务未就绪（%s）", name.c_str());
-    return;
-  }
-  auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
-  request->data = value;
-  set_bool_client_->async_send_request(request);
+void RosIoNode::send_action(const sentry_decision::DecisionAction& action) {
+  auto msg = to_msg(action);
+  msg.header.stamp = now();
+  decision_pub_->publish(msg);
 }
 
 }  // namespace sentry_decision_io

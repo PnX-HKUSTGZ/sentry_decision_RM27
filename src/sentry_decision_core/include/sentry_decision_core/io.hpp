@@ -30,12 +30,18 @@ class NavigationSink {
   virtual NavState status() const = 0;
 };
 
-// 底盘执行端：决策只发速度与开关标志。
+// 底盘执行端：决策只发速度。
 class ChassisSink {
  public:
   virtual ~ChassisSink() = default;
   virtual void set_velocity(const Twist& cmd) = 0;
-  virtual void set_flag(const std::string& name, bool value) = 0;
+};
+
+// 决策下行：把动作发给执行端（auto-aim），由后者经串口转给 MCU。
+class DecisionSink {
+ public:
+  virtual ~DecisionSink() = default;
+  virtual void send_action(const DecisionAction& action) = 0;
 };
 
 }  // namespace sentry_decision

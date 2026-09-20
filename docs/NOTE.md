@@ -3,7 +3,7 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（P2 策略迁移准备）
+## 当前 sprint（P2 上位机接口重构）
 
 - P1 已完成（本地范围）：裁判协议解码、`WorldState` 契约对齐、`sentry_decision_msgs` + `DecisionStatePublisher`、core 回放 `ReplaySource`、rosbag 读取、本地仿真 `sentry_decision_sim`。
 - 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
@@ -12,6 +12,8 @@
 - 已确认（暂缓落地）：下位机通信包动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
 - 已同步：stance（姿态）为旧规则已废弃，删除相关类型 / 逻辑 / 消息 / 文档；行为树迁移到仓库根目录 `tree/`。
 - 已修复 Copilot PR 审阅 4 条意见（`--rate` 校验、目标 yaw 检测、回放二分查找、rosbag 录制时刻）及 `NavSimulator` 两处小问题。
+- P2 进行中：上位机接口重构已打通（`sentry_interfaces` + 决策侧 `RosIoNode` + auto-aim 桥）；新增 `decision_node` 实现真实 IO 闭环（IO + 行为树 + 仲裁 + 状态发布）。
+- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 的串口帧——均待与电控/MCU 确认协议。
 - P2 重点：行为树目录与插件清单（`tree/`）、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
 - 待决策：`sentry_decision_msgs` 的 action / service 字段；回放差异报告格式。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。

@@ -15,11 +15,11 @@
   <depend>nav_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
   <depend>rosbag2_cpp</depend>
   <depend>rosbag2_storage</depend>
   <depend>sentry_decision_core</depend>
   <depend>sentry_decision_msgs</depend>
+  <depend>sentry_interfaces</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

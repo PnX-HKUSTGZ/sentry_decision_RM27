@@ -1,22 +1,20 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>sentry_decision_bringup</name>
+  <name>sentry_interfaces</name>
   <version>0.0.0</version>
-  <description>RM27 哨兵决策组合根：main、行为树与 launch。</description>
+  <description>RM27 哨兵上位机接口契约：auto-aim 与决策之间的裁判上行 / 决策下行消息。</description>
   <maintainer email="hluo262@connect.hkust-gz.edu.cn">Appleblue17</maintainer>
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <depend>behaviortree_cpp</depend>
-  <depend>sentry_decision_core</depend>
-  <depend>sentry_decision_nodes</depend>
-  <depend>sentry_decision_io</depend>
-  <depend>sentry_decision_sim</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
 
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 容器内冒烟测试 sentry_decision_io：启动节点，检查订阅与导航 action client 是否建立。
+# 容器内冒烟测试 sentry_decision_io：启动节点，检查上下行话题与导航 action client 是否建立。
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/ws/.docker-build/install}"
@@ -21,9 +21,16 @@ INFO="$(ros2 node info /sentry_decision_io)"
 echo "${INFO}"
 
 fail=0
-for topic in /ifhealth /remain_ammo /our_base_health /our_outpost_health /enemy_outpost_health /can_rebuild_outpost /odom; do
+for topic in /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info /sentry/decision_ack /aft_mapped_to_init; do
   if ! grep -q "${topic}" <<<"${INFO}"; then
     echo "缺少订阅: ${topic}" >&2
+    fail=1
+  fi
+done
+
+for topic in /sentry/decision_command /cmd_vel; do
+  if ! grep -q "${topic}" <<<"${INFO}"; then
+    echo "缺少发布: ${topic}" >&2
     fail=1
   fi
 done
