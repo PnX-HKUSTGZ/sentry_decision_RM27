@@ -27,6 +27,7 @@ struct RefereeState {
   int enemy_coins_accumulated = 0;  // 敌方累计金币（RadarInfo）
   Point2D manual_point{};           // 手动指定目标点（minimap）
   int manual_key = 0;               // 手动按键
+  int detect_color = 0;             // 红蓝方（编码待确认）
 
   // 建筑血量与经济（GameInfo + TeamInformation）
   int base_hp = 0;
