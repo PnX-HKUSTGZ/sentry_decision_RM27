@@ -52,6 +52,7 @@ sentry_decision_RM27/
 └── src/
     ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
     ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState
+    ├── sentry_interfaces/       # 与 auto-aim 的上位机接口契约
     ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
     ├── sentry_decision_sim/     # 本地仿真：dummy 裁判系统与伪导航
     ├── sentry_decision_nodes/   # 行为树节点插件
@@ -62,6 +63,7 @@ sentry_decision_RM27/
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：技术架构设计（单一事实来源）
 - [docs/USAGE.md](docs/USAGE.md)：使用说明（命令与参数）
+- [docs/INTERFACES.md](docs/INTERFACES.md)：上位机接口契约（auto-aim ↔ 决策）
 - [docs/ROADMAP.md](docs/ROADMAP.md)：开发路线图（阶段、顺序、验收）
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md)：代码与文档规范
 - [docs/AGENT.md](docs/AGENT.md)：开发者与 AI 协作规范

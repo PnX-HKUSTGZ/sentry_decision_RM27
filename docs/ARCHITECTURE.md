@@ -147,6 +147,7 @@ struct DecisionOutput {
 | --- | --- | --- |
 | `sentry_decision_core` | 数据契约、裁判协议解码、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
 | `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
+| `sentry_interfaces` | 与 auto-aim 的裁判上行 / 决策下行接口消息 | std_msgs、geometry_msgs |
 | `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关） | core |
 | `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
