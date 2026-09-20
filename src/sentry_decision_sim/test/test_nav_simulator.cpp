@@ -30,7 +30,7 @@ void test_moves_and_reaches_goal() {
   const TimePoint t0{};
   NavSimulator nav(2.0, 0.1);
   nav.set_pose(Point2D{0.0, 0.0, 0.0});
-  nav.send_goal(Point2D{2.0, 0.0, 0.0});
+  nav.send_goal(Point2D{2.0, 0.0, 1.25});
 
   nav.update(t0);
   SelfState self;
@@ -46,6 +46,7 @@ void test_moves_and_reaches_goal() {
   CHECK(nav.odometry(&self));
   CHECK(self.pose.x == 2.0);
   CHECK(self.pose.y == 0.0);
+  CHECK(self.pose.yaw == 1.25);
   CHECK(nav.status().reached);
   CHECK(!nav.status().failed);
 }
@@ -61,6 +62,8 @@ void test_cancel_and_fail() {
 
   nav.send_goal(Point2D{5.0, 0.0, 0.0});
   nav.fail_current_goal();
+  CHECK(nav.status().failed);  // 立即生效，无需等待 update
+  CHECK(!nav.status().reached);
   nav.update(t0 + Duration{100});
   CHECK(nav.status().failed);
   CHECK(!nav.status().reached);

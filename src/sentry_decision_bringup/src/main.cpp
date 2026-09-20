@@ -60,6 +60,11 @@ Options parse_options(int argc, char** argv) {
       std::exit(2);
     }
   }
+  // 频率决定仿真周期：过小导致周期为 0（时间不前进），非正数会产生非法换算。
+  if (!(options.rate_hz > 0.0) || options.rate_hz > 1000.0) {
+    std::cerr << "参数 --rate 必须在 (0, 1000] Hz 之间\n";
+    std::exit(2);
+  }
   return options;
 }
 
@@ -125,7 +130,8 @@ int main(int argc, char** argv) {
     // 用仲裁后的目标驱动伪导航；做边沿检测，避免每 tick 重发导致无法到达。
     if (result.output.nav_goal.has_value()) {
       const sentry_decision::Point2D& goal = *result.output.nav_goal;
-      if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y) {
+      if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y ||
+          last_goal->yaw != goal.yaw) {
         navigation.send_goal(goal);
         last_goal = goal;
       }

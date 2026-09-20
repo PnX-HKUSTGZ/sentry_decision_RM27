@@ -49,10 +49,12 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
 
   while (reader.has_next()) {
     const auto bag_msg = reader.read_next();
+    // 使用录制时刻（send_timestamp，rosbag2 未提供时会回退为 recv_timestamp），
+    // 而不是读取时的时钟，保证回放时间轴可复现。
     if (start_ns < 0) {
-      start_ns = bag_msg->recv_timestamp;
+      start_ns = bag_msg->send_timestamp;
     }
-    const Duration at{std::max<std::int64_t>(0, (bag_msg->recv_timestamp - start_ns) / 1000000)};
+    const Duration at{std::max<std::int64_t>(0, (bag_msg->send_timestamp - start_ns) / 1000000)};
     const std::string& topic = bag_msg->topic_name;
 
     if (topic == topics.odometry) {

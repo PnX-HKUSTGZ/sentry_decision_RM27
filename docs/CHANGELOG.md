@@ -45,3 +45,9 @@
 - 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
 
 ### Fixed
+
+- `decision_main` 校验 `--rate` 必须落在 `(0, 1000]`，并补充越界回归测试
+- 目标变化检测纳入 `yaw`，仅改朝向时也会重发导航目标
+- `ReplaySource::latest()` 改用二分查找，避免逐 tick 线性扫描
+- rosbag 回放改用录制时刻（`send_timestamp`）而非读取时钟
+- `NavSimulator` 失败状态立即生效，到达时对齐目标 `yaw`

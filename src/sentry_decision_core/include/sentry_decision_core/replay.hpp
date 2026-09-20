@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 #include "sentry_decision_core/io.hpp"
@@ -66,16 +68,16 @@ class ReplaySource : public RefereeSource, public OdometrySource, public Navigat
 
  private:
   // 返回 at <= now 的最后一条记录；无则 nullptr。records 需按 at 升序。
+  // 用二分而非每次从头扫描，避免逐 tick 查询退化为 O(ticks × records)。
   template <typename T>
   static const ReplayRecord<T>* latest(const std::vector<ReplayRecord<T>>& records, Duration now) {
-    const ReplayRecord<T>* found = nullptr;
-    for (const auto& record : records) {
-      if (record.at > now) {
-        break;
-      }
-      found = &record;
+    const auto it = std::upper_bound(
+        records.begin(), records.end(), now,
+        [](Duration value, const ReplayRecord<T>& record) { return value < record.at; });
+    if (it == records.begin()) {
+      return nullptr;
     }
-    return found;
+    return &(*std::prev(it));
   }
 
   ReplayData data_;

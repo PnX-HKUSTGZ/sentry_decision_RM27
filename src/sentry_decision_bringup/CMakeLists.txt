@@ -30,6 +30,12 @@ if(BUILD_TESTING)
     COMMAND decision_main --ticks 40 --rate 200 --tree
             ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/demo_tree.xml)
 
+  # --rate 越界必须被拒绝（非零退出）。
+  add_test(NAME invalid_rate_zero COMMAND decision_main --ticks 1 --rate 0)
+  set_tests_properties(invalid_rate_zero PROPERTIES WILL_FAIL TRUE)
+  add_test(NAME invalid_rate_high COMMAND decision_main --ticks 1 --rate 2000)
+  set_tests_properties(invalid_rate_high PROPERTIES WILL_FAIL TRUE)
+
   add_executable(test_replay_determinism test/test_replay_determinism.cpp)
   target_link_libraries(test_replay_determinism
     sentry_decision_core::sentry_decision_core

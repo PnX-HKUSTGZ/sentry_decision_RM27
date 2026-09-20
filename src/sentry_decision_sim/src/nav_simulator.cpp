@@ -17,6 +17,9 @@ void NavSimulator::set_pose(const sentry_decision::Point2D& pose) {
 void NavSimulator::fail_current_goal() {
   failed_ = true;
   reached_ = false;
+  // 立即反映到状态，不等下一次 update()，避免调用方读到旧值。
+  nav_.failed = true;
+  nav_.reached = false;
 }
 
 bool NavSimulator::odometry(sentry_decision::SelfState* out) const {
@@ -63,6 +66,7 @@ void NavSimulator::update(sentry_decision::TimePoint now) {
     if (dist <= tolerance_ || step >= dist) {
       self_.pose.x = goal_->x;
       self_.pose.y = goal_->y;
+      self_.pose.yaw = goal_->yaw;  // 到达时对齐目标朝向
       reached_ = true;
     } else if (step > 0.0 && dist > 0.0) {
       self_.pose.x += dx / dist * step;
