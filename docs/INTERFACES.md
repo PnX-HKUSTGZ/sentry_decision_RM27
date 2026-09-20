@@ -42,6 +42,14 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 
 带宽：只承载裁判/决策的低频数据，IMU/云台/导航仍走原有高频帧，115200 足够。
 
+**当前已实现的串口协议**（`GimbalToVision` / `VisionToGimbal` / `NavToGimbalV2` / `DecisionToGimbal`）
+此前只隐式定义在 auto-aim 代码里，现已补文档：`auto-aim-new/docs/serial_protocol.md`。
+其校验为 **CRC-16/MCRF4XX**（poly 0x1021 反射、init 0xFFFF、小端），与本表 `crc16` 一致。
+
+另有 minco 导航栈的分帧协议（`navi_minco_bit/src/navigation/communication/include/utils/protocol.hpp` +
+`custom_protocol.hpp`），其 `GameInfo` / `SentryInfoOnline` / ... 数据体与我们的 5 条消息一一对应，可作为新帧设计参考；
+但它的校验是逐 2 字节求和且 `check()` 尚未完成，不直接复用。
+
 ## 4. 上行 ROS 消息（auto-aim 发布）
 
 | 话题 | 消息 | 关键字段 | 来源 |
