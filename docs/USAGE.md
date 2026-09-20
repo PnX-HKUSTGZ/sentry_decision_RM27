@@ -72,14 +72,24 @@ ros2 run sentry_decision_bringup decision_main
 
 行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；`--tree` 默认指向安装后路径。
 
-### 4.2 IO 节点
+### 4.2 真实 IO 决策闭环
+
+```bash
+ros2 run sentry_decision_bringup decision_node
+```
+
+`decision_node` 把 `RosIoNode`（订阅 `/sentry/*`、`/sentry/decision_ack`，发布 `/cmd_vel` 与
+`/sentry/decision_command`）、行为树、`IntentArbiter` 与 `DecisionStatePublisher` 放在同一进程闭环。
+依赖 auto-aim 提供 `/sentry/game_info` 等话题、定位提供 `/aft_mapped_to_init`；无导航 action server 时告警但不退出。
+
+### 4.3 IO 节点
 
 ```bash
 ros2 run sentry_decision_io io_node
 ros2 node info /sentry_decision_io
 ```
 
-### 4.3 决策状态话题
+### 4.4 决策状态话题
 
 `sentry_decision_io::DecisionStatePublisher` 负责发布决策快照（供可视化与 rosbag）：
 
@@ -111,7 +121,16 @@ ros2 run sentry_decision_bringup decision_main --ticks 500 --rate 20
 ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decision_nodes.so
 ```
 
-### 5.2 io_node 参数
+### 5.2 decision_node 参数
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--rate` | `20.0` | tick 频率（Hz），取值 `(0, 1000]` |
+| `--ticks` | `0` | 运行 tick 数，`0` 表示一直运行 |
+| `--tree` | 安装后的 `demo_tree.xml` | 行为树 XML 路径 |
+| `--plugin` | 空 | 节点插件 `.so` 路径 |
+
+### 5.3 io_node 参数
 
 均为 ROS 参数，可用 `--ros-args -p name:=value` 覆盖。
 

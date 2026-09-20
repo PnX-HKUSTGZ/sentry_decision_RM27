@@ -12,7 +12,8 @@
 - 已确认（暂缓落地）：下位机通信包动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
 - 已同步：stance（姿态）为旧规则已废弃，删除相关类型 / 逻辑 / 消息 / 文档；行为树迁移到仓库根目录 `tree/`。
 - 已修复 Copilot PR 审阅 4 条意见（`--rate` 校验、目标 yaw 检测、回放二分查找、rosbag 录制时刻）及 `NavSimulator` 两处小问题。
-- P2 进行中：上位机接口重构。`sentry_interfaces` 契约与 `docs/INTERFACES.md` 已就绪；决策侧 `RosIoNode` 已迁移（订阅 5 上行 + `DecisionAck`，发布 `DecisionCommand`）；auto-aim 侧迁移进行中。
+- P2 进行中：上位机接口重构已打通（`sentry_interfaces` + 决策侧 `RosIoNode` + auto-aim 桥）；新增 `decision_node` 实现真实 IO 闭环（IO + 行为树 + 仲裁 + 状态发布）。
+- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 的串口帧——均待与电控/MCU 确认协议。
 - P2 重点：行为树目录与插件清单（`tree/`）、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
 - 待决策：`sentry_decision_msgs` 的 action / service 字段；回放差异报告格式。
 - 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。

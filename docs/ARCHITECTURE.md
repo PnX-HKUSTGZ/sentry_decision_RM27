@@ -183,6 +183,9 @@ flowchart TD
 关键约束：行为树节点不得直接创建 ROS 节点或订阅。所有 I/O 集中在 `io` 的单一节点（建议 `rclcpp_components`），
 订阅回调只做「解码 + 更新原始值」，BT tick 线程读取不可变快照。
 
+组合根 `bringup` 的 `decision_node` 把 `RosIoNode`、行为树、`IntentArbiter` 与 `DecisionStatePublisher`
+放在同一进程/执行器内闭环：IO 回调与 tick 分属不同回调组，tick 每次读取不可变快照。
+
 ## 6. 插件机制
 
 使用 BehaviorTree.CPP v4 的共享库插件机制，而不是手写注册清单：
