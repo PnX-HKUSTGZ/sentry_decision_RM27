@@ -14,14 +14,22 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
 find_package(sentry_decision_core REQUIRED)
+find_package(sentry_decision_msgs REQUIRED)
 
-add_library(${PROJECT_NAME} src/ros_io_node.cpp)
+add_library(${PROJECT_NAME}
+  src/ros_io_node.cpp
+  src/decision_state_convert.cpp
+  src/decision_state_publisher.cpp
+  src/rosbag_replay.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
 ament_target_dependencies(${PROJECT_NAME}
-  sentry_decision_core rclcpp rclcpp_action nav2_msgs nav_msgs geometry_msgs std_msgs std_srvs)
+  sentry_decision_core sentry_decision_msgs rclcpp rclcpp_action nav2_msgs nav_msgs geometry_msgs
+  std_msgs std_srvs rosbag2_cpp rosbag2_storage)
 
 add_executable(io_node src/io_main.cpp)
 target_link_libraries(io_node ${PROJECT_NAME})
@@ -37,5 +45,19 @@ install(DIRECTORY include/ DESTINATION include)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(sentry_decision_core rclcpp rclcpp_action nav2_msgs nav_msgs geometry_msgs std_msgs std_srvs)
+ament_export_dependencies(
+  sentry_decision_core sentry_decision_msgs rclcpp rclcpp_action nav2_msgs nav_msgs geometry_msgs
+  std_msgs std_srvs rosbag2_cpp rosbag2_storage)
+
+if(BUILD_TESTING)
+  add_executable(test_decision_state_convert test/test_decision_state_convert.cpp)
+  target_link_libraries(test_decision_state_convert ${PROJECT_NAME})
+  add_test(NAME test_decision_state_convert COMMAND test_decision_state_convert)
+
+  add_executable(test_rosbag_replay test/test_rosbag_replay.cpp)
+  target_link_libraries(test_rosbag_replay ${PROJECT_NAME})
+  ament_target_dependencies(test_rosbag_replay rclcpp rosbag2_cpp rosbag2_storage std_msgs)
+  add_test(NAME test_rosbag_replay COMMAND test_rosbag_replay)
+endif()
+
 ament_package()

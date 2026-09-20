@@ -66,7 +66,11 @@ source .docker-build/install/setup.bash
 ros2 run sentry_decision_bringup decision_main
 ```
 
-演示行为：启动约 1 秒后血量从 300 掉到 50，行为树由巡逻抢占到撤退，ACT 日志显示 `mode` 与 `goal` 变化。
+本地仿真：由 `sentry_decision_sim` 的 dummy 裁判系统与伪导航驱动信念层，无需下位机通信包与 navigation 仓库。
+演示行为：启动约 1 秒后血量从 400 掉到 50，行为树由巡逻抢占到撤退，伪导航朝新目标移动，ACT 日志显示 `mode`、
+`goal` 与当前位置变化。
+
+行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；`--tree` 默认指向安装后路径。
 
 ### 4.2 IO 节点
 
@@ -74,6 +78,21 @@ ros2 run sentry_decision_bringup decision_main
 ros2 run sentry_decision_io io_node
 ros2 node info /sentry_decision_io
 ```
+
+### 4.3 决策状态话题
+
+`sentry_decision_io::DecisionStatePublisher` 负责发布决策快照（供可视化与 rosbag）：
+
+| 话题 | 类型 | 说明 |
+| --- | --- | --- |
+| `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
+| `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
+
+```bash
+ros2 bag record /decision/state /decision/world_state
+```
+
+该发布类待决策节点接线后生效（P1 后续）。
 
 ## 5. 命令参数
 
@@ -83,6 +102,7 @@ ros2 node info /sentry_decision_io
 | --- | --- | --- |
 | `--ticks` | `50` | tick 次数 |
 | `--rate` | `20.0` | tick 频率（Hz） |
+| `--hp-drop` | `1.0` | 仿真中血量掉到 50 的秒数 |
 | `--tree` | 安装后的 `demo_tree.xml` | 行为树 XML 路径 |
 | `--plugin` | 空 | 节点插件 `.so` 路径；为空时使用链接注册 |
 
@@ -122,6 +142,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
+| 格式检查 | `tools/format.sh --check` |
 
 ## 7. 环境变量
 

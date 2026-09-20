@@ -14,7 +14,7 @@
 
 ## 2. 格式
 
-- 统一使用根目录 `.clang-format`；提交前不得有格式差异。
+- 统一使用根目录 `.clang-format`（clang-format 18.1.8）；提交前用 `tools/format.sh` 格式化，`tools/format.sh --check` 校验，不得有格式差异。
 - 编译 0 warning：core 以 `-Wall -Wextra -Werror` 为基线。
 - 头文件用 `#pragma once`；include 顺序：对应头文件、标准库、第三方、本项目。
 - 头文件中禁止 `using namespace`。

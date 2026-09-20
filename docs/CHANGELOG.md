@@ -23,9 +23,31 @@
 - 新增 `docker/`（Dockerfile、entrypoint、compose）、`.dockerignore` 与 CI
 - `sentry_decision_io`：ROS IO 适配器（订阅 / 发布 / action / service），含容器冒烟测试
 - 新增 `docs/USAGE.md` 使用说明；README 精简为 Quick Start
+- 统一 clang-format 18.1.8 格式，新增 `tools/format.sh` 与 CI 格式检查
 - 新增 `.vscode`（IntelliSense 与推荐扩展）与 `.devcontainer` 配置
 - Docker 镜像新增与宿主同 UID 的 `dev` 用户；构建产出合并的 `compile_commands.json`
+- `sentry_decision_core`：裁判协议位段解码 `referee_protocol`（`event_code` / `sentry_info_1/2` 纯函数 + 宿主单测；`sentry_info_3` 待协议明确）
+- `sentry_decision_core`：`WorldState` 契约按参考 `ros_interfaces` 字段对齐（含敌方列表 / 经济、自身热量与电容等），`SelfState` 预留 IMU 四元数
+- 新增 `sentry_decision_msgs`：`DecisionState` / `WorldState` / `DecisionOutput` 对外消息
+- `sentry_decision_io`：`DecisionStatePublisher` 发布 `/decision/state`、`/decision/world_state`，含 core→msg 纯转换与测试
+- `sentry_decision_core`：确定性回放 `ReplaySource` / `ReplayData`（ROS 无关，固定步长与时间对齐），含宿主单测
+- `sentry_decision_io`：`load_replay_data` 从 rosbag2 读取旧话题并填充 `ReplayData`，含往返测试
+- `sentry_decision_sim`：dummy 裁判系统 `RefereeSimulator` 与伪导航 `NavSimulator`（ROS 无关），含宿主单测
+- `sentry_decision_bringup`：`decision_main` 改用本地仿真驱动信念层，新增 `--hp-drop` 参数
+- `sentry_decision_bringup`：树级 `replay_determinism` 回归测试（同一份回放两次输出逐 tick 一致）
 
 ### Changed
 
+- 行为树源文件迁移到仓库根目录 `tree/`；bringup 构建、安装与测试路径同步，运行路径不变
+
+### Removed
+
+- 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
+
 ### Fixed
+
+- `decision_main` 校验 `--rate` 必须落在 `(0, 1000]`，并补充越界回归测试
+- 目标变化检测纳入 `yaw`，仅改朝向时也会重发导航目标
+- `ReplaySource::latest()` 改用二分查找，避免逐 tick 线性扫描
+- rosbag 回放改用录制时刻（`send_timestamp`）而非读取时钟
+- `NavSimulator` 失败状态立即生效，到达时对齐目标 `yaw`

@@ -1,5 +1,4 @@
 #include <memory>
-
 #include <rclcpp/rclcpp.hpp>
 
 #include "sentry_decision_io/ros_io_node.hpp"

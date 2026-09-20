@@ -5,10 +5,24 @@ on:
   pull_request:
 
 jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: 安装 clang-format
+        run: pip install "clang-format==18.1.8"
+      - name: 格式检查
+        run: |
+          files=$(git ls-files '*.cpp' '*.hpp')
+          clang-format --dry-run --Werror $files
+
   host-core-tests:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 宿主 core 纯逻辑测试
         run: tools/host_core_test.sh
 
@@ -16,11 +30,14 @@ jobs:
     runs-on: ubuntu-24.04
     container: ros:jazzy-ros-base
     steps:
-      - uses: actions/checkout@v4
-      - name: 安装构建工具
+      - uses: actions/checkout@v5
+      - name: 安装构建工具与依赖
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends python3-colcon-common-extensions ros-jazzy-behaviortree-cpp
+          apt-get install -y --no-install-recommends python3-colcon-common-extensions python3-rosdep
+          rosdep init || true
+          rosdep update --rosdistro jazzy
+          rosdep install --from-paths src --ignore-src -y --rosdistro jazzy
           rm -rf /var/lib/apt/lists/*
       - name: colcon build
         shell: bash

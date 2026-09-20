@@ -99,8 +99,13 @@ class Logger {
 
 }  // namespace sentry_decision
 
-#define SD_LOG_DEBUG(tag, ...) ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kDebug, tag, __VA_ARGS__)
-#define SD_LOG_INFO(tag, ...) ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kInfo, tag, __VA_ARGS__)
-#define SD_LOG_ACT(tag, ...) ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kAct, tag, __VA_ARGS__)
-#define SD_LOG_WARN(tag, ...) ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kWarn, tag, __VA_ARGS__)
-#define SD_LOG_ERROR(tag, ...) ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kError, tag, __VA_ARGS__)
+#define SD_LOG_DEBUG(tag, ...) \
+  ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kDebug, tag, __VA_ARGS__)
+#define SD_LOG_INFO(tag, ...) \
+  ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kInfo, tag, __VA_ARGS__)
+#define SD_LOG_ACT(tag, ...) \
+  ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kAct, tag, __VA_ARGS__)
+#define SD_LOG_WARN(tag, ...) \
+  ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kWarn, tag, __VA_ARGS__)
+#define SD_LOG_ERROR(tag, ...) \
+  ::sentry_decision::Logger::instance().log(::sentry_decision::LogLevel::kError, tag, __VA_ARGS__)
