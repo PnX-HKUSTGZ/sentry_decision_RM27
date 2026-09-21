@@ -1,0 +1,53 @@
+# 完整对局场景：巡逻 -> 进攻 -> 撤退 -> 复活。
+# 由 referee_sim_node --scenario 执行：按时间轴 set_world，并在 expect 时刻断言 /decision/state。
+name: full_match
+
+# 初始世界（时间轴之前应用）。
+world:
+  game_status: 4
+  game_time_remaining: 500
+  coins: 0
+  self_hp: 400
+  self_ammo: 100
+  base_hp: 5000
+  our_outpost_hp: 1500
+  enemy_outpost_hp: 1500
+  can_rebuild_outpost: false
+
+timeline:
+  # 敌方前哨存活 + 超出进攻时间窗 -> 巡逻（1），目标 patrol_a (0, 1.1)。
+  - at: 2.0
+    expect:
+      tactical_mode: patrol
+      has_nav_goal: true
+      nav_goal_x: 0.0
+      nav_goal_y: 1.1
+
+  # 进入进攻时间窗 -> 进攻（2），目标 enemy_outpost (1.1, 1.1)。
+  - at: 3.0
+    set_world:
+      game_time_remaining: 300
+  - at: 4.5
+    expect:
+      tactical_mode: attack
+      nav_goal_x: 1.1
+      nav_goal_y: 1.1
+
+  # 血量低于撤退阈值 -> 撤退（4），目标 home (-5, 3)。
+  - at: 6.0
+    set_world:
+      self_hp: 40
+  - at: 7.5
+    expect:
+      tactical_mode: retreat
+      nav_goal_x: -5.0
+      nav_goal_y: 3.0
+
+  # 阵亡 -> 复活（6），不发导航目标。
+  - at: 9.0
+    set_world:
+      self_hp: 0
+  - at: 10.5
+    expect:
+      tactical_mode: respawn
+      has_nav_goal: false

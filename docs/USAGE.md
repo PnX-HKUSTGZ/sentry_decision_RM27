@@ -123,6 +123,47 @@ XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key�
 生效配置打印为 `ACT` 日志。
 `decision_node` 会把地图配置的 `frame_id` 注入 IO 节点的 `map_frame` 参数，保证 Nav2 目标坐标系一致。
 
+### 4.6 裁判仿真与场景脚本
+
+`referee_sim_node` 在本机模拟裁判系统与执行端，无需 MCU 与 navigation 仓库即可驱动 `decision_node` 走真实 IO 路径：
+
+```bash
+ros2 run sentry_decision_bringup decision_node     # 终端 1
+ros2 run sentry_decision_sim referee_sim_node      # 终端 2：持续发布世界状态
+```
+
+它发布 `/sentry/*` 五条上行与 odom，提供 `NavigateToPose` action server，并把 `DecisionCommand` 按延迟回成 `DecisionAck`。
+
+带场景脚本时按时间轴改世界，并在指定时刻断言 `/decision/state`，结束以退出码表示成败：
+
+```bash
+ros2 run sentry_decision_sim referee_sim_node --scenario \
+  "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/full_match.yaml"
+```
+
+场景 YAML 结构（`full_match.yaml` 跑通巡逻→进攻→撤退→复活）：
+
+```yaml
+name: full_match
+world:                          # 初始世界（时间轴之前应用）
+  self_hp: 400
+  self_ammo: 100
+  enemy_outpost_hp: 1500
+timeline:
+  - at: 2.0
+    expect:    { tactical_mode: patrol, has_nav_goal: true }
+  - at: 3.0
+    set_world: { game_time_remaining: 300 }
+  - at: 6.0
+    set_world: { self_hp: 40 }
+  - at: 7.5
+    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
+```
+
+`set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
+`add_intent` / `disable` 依赖 P3.2 的干预接口，将在其落地后接入。
+端到端回归由 `tools/scenario_smoke_test.sh` 驱动（也注册为 `scenario_full_match` 测试）。
+
 ## 5. 命令参数
 
 ### 5.1 decision_main
@@ -159,22 +200,34 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
 | `map_frame` | `map` | 导航目标坐标系 |
-| `health_topic` | `/ifhealth` | 己方血量（UInt16） |
-| `ammo_topic` | `/remain_ammo` | 剩余弹量（UInt16） |
-| `base_health_topic` | `/our_base_health` | 己方基地血量（UInt16） |
-| `our_outpost_topic` | `/our_outpost_health` | 己方前哨血量（UInt16） |
-| `enemy_outpost_topic` | `/enemy_outpost_health` | 敌方前哨血量（UInt16） |
-| `can_rebuild_topic` | `/can_rebuild_outpost` | 是否可重建前哨（Bool） |
-| `odom_topic` | `/odom` | 里程计（Odometry） |
+| `game_info_topic` | `/sentry/game_info` | 比赛宏观信息（GameInfo） |
+| `online_info_topic` | `/sentry/online_info` | 自身在线状态（SentryInfoOnline） |
+| `offline_info_topic` | `/sentry/offline_info` | 自身视觉 / 形态（SentryInfoOffline） |
+| `team_info_topic` | `/sentry/team_info` | 队伍信息（TeamInfo） |
+| `radar_info_topic` | `/sentry/radar_info` | 雷达 / 敌方信息（RadarInfo） |
+| `decision_ack_topic` | `/sentry/decision_ack` | 动作回执（DecisionAck） |
+| `decision_command_topic` | `/sentry/decision_command` | 决策下行（DecisionCommand） |
+| `odom_topic` | `/aft_mapped_to_init` | 里程计（Odometry） |
 | `cmd_vel_topic` | `cmd_vel` | 速度指令（Twist） |
 | `navigate_action` | `navigate_to_pose` | 导航 action（NavigateToPose） |
-| `set_bool_service` | `/set_bool` | 底盘标志服务（SetBool） |
 
 ```bash
 ros2 run sentry_decision_io io_node --ros-args \
   -p odom_topic:=/sentry/odom \
   -p navigate_action:=/navigate_to_pose
 ```
+
+### 5.4 referee_sim_node 参数
+
+上行 / 下行话题与 `io_node` 同名同默认，另加：
+
+| 参数 / 命令行 | 默认 | 说明 |
+| --- | --- | --- |
+| `--rate` | `20.0` | 发布与 tick 频率（Hz），取值 `(0, 1000]` |
+| `--scenario` | 空 | 场景 YAML 路径；为空则持续发布世界状态 |
+| `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
+| `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
+| `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |
 
 ## 6. 测试
 

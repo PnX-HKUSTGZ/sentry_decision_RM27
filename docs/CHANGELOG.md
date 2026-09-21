@@ -15,6 +15,8 @@
 - `sentry_decision_msgs`：新增 `TreeNodeStatus` / `TreeStatus` 消息
 - 新增 `sentry_decision_viz` 包：`TreeStatePublisher`（发布 `/decision/tree_status`）与可选 Groot2 桥
 - `decision_node`：新增 `--groot2-port` 参数（默认关闭）
+- `sentry_decision_sim`：新增 `referee_sim_node`（发布 `/sentry/*` 与 odom、提供 `NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与 ROS 无关的场景解析 / 消息级仿真世界
+- 新增场景脚本 `scenario/full_match.yaml` 与端到端测试 `tools/scenario_smoke_test.sh`（巡逻→进攻→撤退→复活）
 
 ## [v0.2.0]
 

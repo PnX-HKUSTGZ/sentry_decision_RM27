@@ -582,19 +582,22 @@ Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> I
 - 场景脚本 YAML 描述带时间轴的事件与断言：
 
 ```yaml
-# scenario/retreat.yaml（片段）
-- at: 5.0
-  set_world: { self_hp: 20 }
-- at: 6.0
-  add_intent: { field: chassis_vel, value: [0, 0, 0], lease: 2.0 }
-- at: 8.0
-  disable: [nav]
-- at: 12.0
-  expect:  { tactical_mode: retreat, nav_goal: home }
+# scenario/full_match.yaml（片段）
+world:   { self_hp: 400, self_ammo: 100, enemy_outpost_hp: 1500 }
+timeline:
+  - at: 2.0
+    expect:    { tactical_mode: patrol, has_nav_goal: true }
+  - at: 3.0
+    set_world: { game_time_remaining: 300 }
+  - at: 6.0
+    set_world: { self_hp: 40 }
+  - at: 7.5
+    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
 ```
 
-场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state`
-在时刻 ± 容差内断言，等价于 §10.5 的「干预即测试用例」。
+P3.1 支持 `set_world` / `expect`；`add_intent` / `disable` 依赖 §10.5 的干预通道，
+待 P3.2 落地后接入。场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，
+订阅 `/decision/state` 在事件时刻断言，等价于 §10.5 的「干预即测试用例」。
 
 ### 14.5 干预回放
 

@@ -21,10 +21,10 @@
 
 - 文档已同步：`ARCHITECTURE.md` §14（可视化与仿真）与 §5 / §10.6 / §12 / §17 引用；`ROADMAP.md` P3 子阶段与状态；`CHANGELOG.md` Unreleased。
 - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 包与 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过，`format.sh --check` 通过。
+- 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。
 
 ### 待办
 
-- P3.1 `referee_sim_node` 与场景脚本。
 - P3.2 干预 action / service 与 `InterventionServer`。
 - P3.3 干预回放通道。
 - P3.4 rosbridge 网页面板（需镜像加 `ros-jazzy-rosbridge-suite`）。
