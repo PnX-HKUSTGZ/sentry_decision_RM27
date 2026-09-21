@@ -6,18 +6,33 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "behaviortree_cpp/bt_factory.h"
+#include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/tree_loader.hpp"
+#include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
+#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_core/nav_goal_tracker.hpp"
+#include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
+#include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
+#include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/referee_simulator.hpp"
 
 #ifndef DEFAULT_TREE_PATH
-#define DEFAULT_TREE_PATH "tree/demo_tree.xml"
+#define DEFAULT_TREE_PATH "tree/root.xml"
+#endif
+#ifndef DEFAULT_CONFIG_PATH
+#define DEFAULT_CONFIG_PATH "config/profiles.yaml"
+#endif
+#ifndef DEFAULT_MODULE_LIB_DIR
+#define DEFAULT_MODULE_LIB_DIR ""
 #endif
 
 namespace {
@@ -31,6 +46,7 @@ struct Options {
   double rate_hz = 20.0;
   double hp_drop_sec = 1.0;
   std::string tree = DEFAULT_TREE_PATH;
+  std::string config = DEFAULT_CONFIG_PATH;
   std::string plugin;
 };
 
@@ -53,6 +69,8 @@ Options parse_options(int argc, char** argv) {
       options.hp_drop_sec = std::stod(next("--hp-drop"));
     } else if (arg == "--tree") {
       options.tree = next("--tree");
+    } else if (arg == "--config") {
+      options.config = next("--config");
     } else if (arg == "--plugin") {
       options.plugin = next("--plugin");
     } else {
@@ -80,7 +98,21 @@ int main(int argc, char** argv) {
   logger.add_short_sink(console);
   logger.set_short_min_level(sentry_decision::LogLevel::kAct);
 
+  const sentry_decision_bringup::ConfigLoadResult loaded =
+      sentry_decision_bringup::load_policy_config(options.config);
+  if (!loaded.ok()) {
+    std::cerr << "配置加载失败: " << options.config << "\n";
+    for (const auto& error : loaded.errors) {
+      std::cerr << "  - " << error << "\n";
+    }
+    return 1;
+  }
+  SD_LOG_ACT("config", "%s", sentry_decision_bringup::format_config(loaded.config).c_str());
+
   sentry_decision::DecisionContext context;
+  context.config = &loaded.config;
+  const sentry_decision::RuleBasedStrategicPolicy policy =
+      sentry_decision::RuleBasedStrategicPolicy::from_config(loaded.config);
 
   sentry_decision_sim::RefereeSimulator referee;
   sentry_decision_sim::NavSimulator navigation(2.0, 0.2);
@@ -89,10 +121,18 @@ int main(int argc, char** argv) {
   sentry_decision::WorldModel world_model(referee, navigation, navigation);
 
   BT::BehaviorTreeFactory factory;
+  std::vector<std::string> errors;
   if (!options.plugin.empty()) {
     factory.registerFromPlugin(options.plugin);
-  } else {
-    sentry_decision::register_sentry_nodes(factory);
+  }
+  if (!sentry_decision_bringup::setup_tree_factory(factory, options.tree, &loaded.config, &errors,
+                                                   DEFAULT_MODULE_LIB_DIR,
+                                                   options.plugin.empty())) {
+    std::cerr << "行为树校验失败: " << options.tree << "\n";
+    for (const auto& error : errors) {
+      std::cerr << "  - " << error << "\n";
+    }
+    return 1;
   }
 
   auto blackboard = BT::Blackboard::create();
@@ -108,43 +148,75 @@ int main(int argc, char** argv) {
   }();
 
   sentry_decision::IntentArbiter arbiter;
+  sentry_decision::ActionDispatcher dispatcher;
+  sentry_decision::InterventionController intervention;
+  sentry_decision::SafetySupervisor safety;
+  sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
   const TimePoint epoch = SteadyClock::now();
-  std::optional<sentry_decision::Point2D> last_goal;
+  sentry_decision::NavGoalTracker nav_tracker;
+  bool safety_emergency = false;
 
   for (int tick = 0; tick < options.ticks; ++tick) {
     const TimePoint now = epoch + period * tick;
     referee.update(now);
     navigation.update(now);
-    context.world = world_model.snapshot(now);
+    context.world = intervention.apply_world(world_model.snapshot(now));
     context.clear_intents();
+    context.apply_strategy(policy.decide(context.world));
+    for (const auto& intent : intervention.active_intents(now)) {
+      context.emit(intent);
+    }
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter.clear_source(sentry_decision::SourceId::kSkill);
     for (const auto& intent : context.intents) {
+      if (!intervention.allows(intent.field)) {
+        continue;  // 运行期模块开关关闭时，丢弃该字段的意图
+      }
       arbiter.submit(intent);
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);
 
-    // 用仲裁后的目标驱动伪导航；做边沿检测，避免每 tick 重发导致无法到达。
-    if (result.output.nav_goal.has_value()) {
-      const sentry_decision::Point2D& goal = *result.output.nav_goal;
-      if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y ||
-          last_goal->yaw != goal.yaw) {
-        navigation.send_goal(goal);
-        last_goal = goal;
+    // 安全监督：仲裁后做最终限幅与急停兜底。
+    const sentry_decision::SafetyResult safe = safety.apply(context.world, result.output);
+    if (safe.emergency != safety_emergency) {
+      if (safe.emergency) {
+        SD_LOG_WARN("safety", "触发急停");
+      } else {
+        SD_LOG_ACT("safety", "急停解除");
       }
-    } else if (last_goal.has_value()) {
+      safety_emergency = safe.emergency;
+    }
+    sentry_decision::ArbiterResult safe_result = result;
+    safe_result.output = safe.output;
+
+    // 用仲裁后的目标驱动伪导航；NavGoalTracker 负责边沿 / 取消契约。
+    const sentry_decision::NavGoalTracker::Step nav_step =
+        nav_tracker.update(safe_result.output.nav_goal);
+    if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kSend &&
+        nav_step.goal.has_value()) {
+      navigation.send_goal(*nav_step.goal);
+    } else if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kCancel) {
       navigation.cancel_goal();
-      last_goal.reset();
     }
 
-    if (result.output.nav_goal.has_value()) {
+    // 决策动作：本地模拟执行端回执，离线跑通 one-shot / ack 闭环。
+    for (const auto& ack : actuator.take_acks()) {
+      dispatcher.on_ack(ack);
+    }
+    sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
+    for (const auto& action : dispatcher.poll(now)) {
+      actuator.send_action(action);
+    }
+    actuator.update();
+
+    if (safe_result.output.nav_goal.has_value()) {
       SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f) pos=(%.2f, %.2f)", tick,
-                 context.world.referee.self_hp, static_cast<int>(result.output.tactical_mode),
-                 result.output.nav_goal->x, result.output.nav_goal->y, navigation.pose().x,
-                 navigation.pose().y);
+                 context.world.referee.self_hp, static_cast<int>(safe_result.output.tactical_mode),
+                 safe_result.output.nav_goal->x, safe_result.output.nav_goal->y,
+                 navigation.pose().x, navigation.pose().y);
     } else {
       SD_LOG_ACT("bringup", "tick %d hp=%d 无导航目标", tick, context.world.referee.self_hp);
     }

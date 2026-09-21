@@ -26,57 +26,79 @@ const char* kTree = R"xml(
   <BehaviorTree ID="MainTree">
     <ReactiveFallback name="root">
       <Sequence name="retreat">
-        <CheckLowHp hp_threshold="120"/>
-        <EmitTacticalMode mode="4"/>
-        <EmitNavGoal x="-2.0" y="0.0"/>
+        <IfLowHp hp_key="nav.retreat_hp"/>
+        <EmitNavGoalFromPoint point="home"/>
       </Sequence>
       <Sequence name="patrol">
-        <EmitTacticalMode mode="1"/>
-        <EmitNavGoal x="1.0" y="1.0"/>
+        <EmitNavGoalFromPoint point="patrol_a"/>
       </Sequence>
     </ReactiveFallback>
   </BehaviorTree>
 </root>
 )xml";
 
-void test_branch_switch() {
-  DecisionContext context;
-  context.world.referee.valid = true;
-  context.world.referee.self_hp = 50;
+PolicyConfig make_config() {
+  PolicyConfig config;
+  config.points["home"] = Point2D{-2.0, 0.0, 0.0};
+  config.points["patrol_a"] = Point2D{1.0, 1.0, 0.0};
+  config.numbers["nav.retreat_hp"] = 120.0;
+  return config;
+}
 
+BT::Tree make_tree(DecisionContext* context) {
   BT::BehaviorTreeFactory factory;
   register_sentry_nodes(factory);
   auto blackboard = BT::Blackboard::create();
-  blackboard->set("context", &context);
-  auto tree = factory.createTreeFromText(kTree, blackboard);
+  blackboard->set("context", context);
+  return factory.createTreeFromText(kTree, blackboard);
+}
+
+void test_branch_switch() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world.referee.valid = true;
+  context.world.referee.self_hp = 50;
+  BT::Tree tree = make_tree(&context);
 
   context.clear_intents();
   tree.tickOnce();
-  CHECK(context.intents.size() == 2);
-  CHECK(context.intents[0].field == IntentField::kTacticalMode);
-  CHECK(std::get<TacticalMode>(context.intents[0].value) == TacticalMode::kRetreat);
-  CHECK(context.intents[1].field == IntentField::kNavGoal);
-  CHECK(std::get<Point2D>(context.intents[1].value).x == -2.0);
+  CHECK(context.intents.size() == 1);
+  CHECK(context.intents[0].field == IntentField::kNavGoal);
+  CHECK(std::get<Point2D>(context.intents[0].value).x == -2.0);
 
   context.world.referee.self_hp = 300;
   context.clear_intents();
   tree.tickOnce();
-  CHECK(context.intents.size() == 2);
-  CHECK(std::get<TacticalMode>(context.intents[0].value) == TacticalMode::kPatrol);
-  CHECK(std::get<Point2D>(context.intents[1].value).x == 1.0);
+  CHECK(context.intents.size() == 1);
+  CHECK(std::get<Point2D>(context.intents[0].value).x == 1.0);
 }
 
 void test_invalid_referee_falls_back() {
+  PolicyConfig config = make_config();
   DecisionContext context;
+  context.config = &config;
   context.world.referee.valid = false;
-  BT::BehaviorTreeFactory factory;
-  register_sentry_nodes(factory);
-  auto blackboard = BT::Blackboard::create();
-  blackboard->set("context", &context);
-  auto tree = factory.createTreeFromText(kTree, blackboard);
+  BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
-  CHECK(std::get<TacticalMode>(context.intents[0].value) == TacticalMode::kPatrol);
+  CHECK(context.intents.size() == 1);
+  CHECK(std::get<Point2D>(context.intents[0].value).x == 1.0);
+}
+
+// 配置缺 key 时条件失败，回退到巡逻分支而不是崩溃。
+void test_missing_config_key_falls_back() {
+  PolicyConfig config = make_config();
+  config.numbers.clear();
+  DecisionContext context;
+  context.config = &config;
+  context.world.referee.valid = true;
+  context.world.referee.self_hp = 50;
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.size() == 1);
+  CHECK(std::get<Point2D>(context.intents[0].value).x == 1.0);
 }
 
 }  // namespace
@@ -84,6 +106,7 @@ void test_invalid_referee_falls_back() {
 int main() {
   test_branch_switch();
   test_invalid_referee_falls_back();
+  test_missing_config_key_falls_back();
   if (g_failures == 0) {
     std::printf("all nodes tests passed\n");
     return 0;

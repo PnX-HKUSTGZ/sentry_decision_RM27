@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  任务：低血撤退回补给点。
+  进入条件：战略模式 = kRetreat(4)。
+  退出条件：血量恢复后模式变化，被更高优先级任务或巡逻接管。
+  抢占关系：MissionPriority 第一优先。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionRetreat">
+  <BehaviorTree ID="MissionRetreat">
+    <Sequence name="RetreatSequence">
+      <IfTacticalMode mode="4"/>
+      <SubTree ID="GotoNamedPoint" target_point="home"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

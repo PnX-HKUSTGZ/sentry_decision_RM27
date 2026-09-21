@@ -57,12 +57,19 @@ flowchart TD
 
 ### 3.2 意图层
 
-意图层分三层，接口逐层收窄：
+意图层分三层，接口逐层收窄，每层只产出一层数据：
 
-- **战术 / 战略层**：只回答「现在是什么姿态」。定义为 `StrategicPolicy` 接口（输入 `WorldState`，输出 `Posture` / `Objective`）。
-  当前用状态机 / 效用函数实现；将来替换为学习模型也只是换一个实现，不影响下层。
-- **任务层**：把姿态展开为目标与任务序列（打前哨、守家、回血）。
-- **技能层**：可复用的原子行为（去某点、追踪、脱离、购买），产生 `Intent`。
+- **战术 / 战略层**：只回答「现在是什么战术模式（`TacticalMode`）+ 目标（`Objective`）」。
+  定义为 `StrategicPolicy` 接口（输入 `WorldState`，输出 `StrategicDecision`），是**纯 C++ 组件**，
+  在行为树 tick 之前求值，结果写入 `DecisionContext.strategy` 供任务层读取。
+  当前用状态机实现；将来替换为效用打分 / 学习模型只是换一个实现，不影响下层。
+- **任务层**：读 `context.strategy` 与 `WorldState`，选择任务并拆解步骤（打前哨、守家、回血、撤退）。
+  实现为 `tree/mission/` 下的多棵小树，只做条件判断与 `SubTree` 组合，不直接产生 `Intent`、不写死坐标。
+- **技能层**：可复用的原子行为（去某点、巡逻、兑换、等待恢复），把任务转成 `Intent`。
+  实现为 `tree/skill/` 下的多棵小树，只发 `Intent`、实现 `halt()`，不关心任务为何被选中。
+
+任务树与技能树通过 `SubTree` 端口的**参数（命名点 / 配置 key）**与 **NodeStatus** 交互；
+每棵小树都有独立 `BehaviorTree ID`，可脱离整棵树单独加载测试。分层规则见 §7.5。
 
 ### 3.3 指令层
 
@@ -190,13 +197,20 @@ flowchart TD
 
 使用 BehaviorTree.CPP v4 的共享库插件机制，而不是手写注册清单：
 
-- 每个模块编译为独立 `.so`，内部用 `BT_REGISTER_NODES(factory)` 自注册节点。
-- 组合根用 `factory.registerFromPlugin(lib)` 按 YAML 清单加载。
+- 每个功能域模块编译为独立 `.so`，内部用 `BT_REGISTER_NODES(factory)` 自注册节点。
+- 组合根用 `factory.registerFromPlugin(lib)` 按清单加载；`StrategicPolicy` 等非 BT 逻辑以普通库提供。
 - 模块清单 `module.yaml` 声明：`enabled`、`library`、`params`、`nodes`、**提供的输出字段**、**消费的信念字段**。
-- 启动时校验：XML 只引用已加载节点；每个消费字段都有生产者；否则启动即失败。
+- 树清单 `tree/tree_manifest.yaml` 声明：入口 XML、各模块开关与覆盖参数。
+- 启动时校验（失败即启动报错）：
+  1. `enabled` 模块的库可加载；
+  2. 会被加载的 XML 引用的节点 / 子树均已注册、文件存在；
+  3. 每个消费字段都有生产者；配置里的 key 均存在。
 - 新增 / 删除 / 开关模块 = 增删一个库 + 改一行配置，不碰核心代码。
 
-这样才真正实现「独立开关模块而不影响其他模块」。
+这样才真正实现「独立开关模块而不影响其他模块」。已拆分的模块：`common`（条件）、`nav`（导航技能）、
+`resource`（资源 / 复活）、`strategic`（C++ 策略，非 BT 插件）；`intervention` 的 ROS 动作留 P3。
+模块库由 `tree_manifest.yaml` 的 `library` 指定、经 `registerFromPlugin` 加载，
+`module.yaml` 的 provides / consumes 在启动时校验。
 
 ## 7. 行为树规范
 
@@ -212,10 +226,10 @@ flowchart TD
 
 ### 7.2 节点注释模板
 
-每个 BT 节点必须在头文件类声明上方包含以下模板，缺一即 CI 失败：
+每个 BT 节点必须在头文件类声明上方包含以下模板，缺一即 CI 失败。
+**不使用 `===` / `---` 分隔线**：Markdown 预览会把分隔线后的一行误判为标题（Setext heading）。
 
 ```cpp
-// =============================================================================
 // Node:         CheckEnemyOutpostHealth
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断敌方前哨站血量是否低于阈值，用于前哨进攻分支。
@@ -226,24 +240,42 @@ flowchart TD
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/nav/attack.xml -> Priority1AutoOutpostAttack
-// =============================================================================
 ```
 
-### 7.3 目录与清单
+同类节点实现放在同一个 `.cpp` 时，用一行 `// [节点名]` 作为分隔，便于定位（同样避免 Markdown 分隔线）。
 
-行为树按模块分目录，而不是按覆盖顺序堆一个巨型 XML：
+### 7.3 目录与命名
+
+行为树按**层**分目录，再按**功能域**分子目录；相似的树可归类到子文件夹，零散的直接放在层目录下，不强制分组：
 
 ```text
 tree/
-├── tree_manifest.yaml     # XML 与模块、启用开关，启动时校验
+├── tree_manifest.yaml     # 入口 XML 与模块、启用开关，启动时校验
 ├── root.xml               # 只做组合，不写业务逻辑
-├── tactical/{root,attack,defend}.xml
-├── nav/{root,patrol,retreat,unstick}.xml
-├── resource/{...}.xml
-└── gimbal/{...}.xml
+├── mission/               # 任务层：选任务、拆步骤
+│   ├── root.xml           # 唯一写优先级的地方
+│   ├── nav/{supply,retreat,outpost,fort,highland,patrol}.xml
+│   └── resource/{revive,exchange}.xml
+├── skill/                 # 技能层：可复用原子行为，发 Intent
+│   ├── goto_named_point.xml
+│   ├── supply_and_recover.xml
+│   └── patrol_loop.xml
+└── condition/             # 需要成子树的条件；简单条件用 If* 叶子节点即可
 ```
 
-每个 XML 顶部注释写明「进入条件 / 退出条件 / 抢占关系」。
+**命名规范**（一眼区分引用的节点 / 子树属于哪一层）：
+
+| 种类 | 前缀 / 形式 | 示例 |
+| --- | --- | --- |
+| 条件节点 / 条件子树 | `If` | `IfLowHp`、`IfSupplyNeeded` |
+| 任务子树 | `Mission` | `MissionSupply`、`MissionRetreat` |
+| 技能子树 | `<Verb><Object>` | `GotoNamedPoint`、`SupplyAndRecover` |
+| 发 Intent 的叶子节点 | `Emit` | `EmitNavGoal`、`EmitResourceRequest` |
+| 写 context 状态的叶子节点 | `Set` | `SetTacticalMode` |
+| 发起外部请求的叶子节点 | `Request` | `RequestExchange` |
+
+- 注册名用 `PascalCase`，端口与黑板 key 用 `snake_case`。
+- 每个 XML 顶部注释写明「进入条件 / 退出条件 / 抢占关系」。
 
 ### 7.4 禁止事项
 
@@ -251,6 +283,16 @@ tree/
 - 禁止在 BT 节点里直接 `std::cout` 或直接创建 ROS 对象。
 - 禁止保留被注释掉的策略分支（会污染日志与可视化）。
 - 禁止新增全局可变状态；所有决策状态显式放进数据契约。
+
+### 7.5 分层与解耦规则
+
+- `root.xml` 只组合，不写业务；
+- 优先级只在 `mission/root.xml` 一处定义；
+- 任务树只允许出现**条件节点 / 子树**与 `SubTree`，不得直接放发 Intent 的动作叶子，也不得写死坐标 / 阈值；
+- 技能树只发 Intent、只读自身端口与配置，不读优先级、不判断「为什么」；
+- 条件节点只读 `DecisionContext` / 配置并返回 `NodeStatus`，不得写 Intent、不得有副作用；
+- 跨任务复用的逻辑必须下沉到 `skill/` 或 `condition/`；
+- XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
 
 ## 8. 抢占
 
@@ -347,7 +389,7 @@ BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
 | --- | --- | --- | --- |
 | 世界状态注入 | `WorldState` 字段（血量、弹量、阶段、敌方位置） | IO 的 Sim / Override 源 | 触发策略分支 |
 | 意图注入 | 直接加一条 `Intent` | `IntentArbiter` 的 intervention 来源 | 手动接管 / 加动作 |
-| 模块开关 | 启用 / 禁用插件或子树 | 组合根 / 仲裁器来源过滤 | 隔离测试 |
+| 模块开关 | 加载期禁用插件；运行期按字段过滤意图 | `tree_manifest.yaml` 的 `enabled`；`InterventionController::allows`（`kNavGoal→nav` 等） | 隔离测试 |
 
 ### 10.2 接口
 
@@ -419,6 +461,9 @@ string state_json
 干预模块是受控入口，不是绕过安全的后门：它进入仲裁器，而不是直接写 `DecisionOutput`；
 所有干预记 `ACT` 日志并进回放；比赛模式下可关闭调试专用能力。
 
+P2 范围：先落地 core 侧的三类注入（意图注入、世界状态覆盖、模块开关）；结构化 action / service
+与网页面板留到 P3。
+
 ## 11. 导航模块
 
 导航拆成决策与执行两个模块，分属不同层：
@@ -430,6 +475,9 @@ string state_json
 
 闭环：`nav_executor` 把「已到达 / 失败 / 当前点 / 剩余距离」写回 `WorldState`，下一 tick `nav_policy` 读取后再决策。
 全系统只有一个活跃 `nav_goal`，因此它必须走仲裁。
+
+P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/skill/`（去点、巡逻、脱困，产生 `kNavGoal` Intent）；
+`nav_executor` 直接在 `io` 中用 `nav2_msgs/action/NavigateToPose` 跟随仲裁后的目标，并把进展回写 `NavState`。
 
 ## 12. 日志与可观测性
 
@@ -471,8 +519,19 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 ## 14. 配置
 
 - 保留并强化 profile：地图 profile、策略 profile、赛前开关。
-- 点位、区域、阈值、模块开关全部外置 YAML，禁止硬编码几何。
-- 所有 YAML 用 JSON Schema 校验，加载失败启动即报错并列出可用 key；启动时把生效配置打印为 `ACT` 日志 / 落盘，便于复盘。
+- **单一入口 + 按职责分文件**：
+
+```text
+config/
+├── profiles.yaml           # 唯一入口：map_profile / strategy_profile / pre_match
+├── maps/<MAP>.yaml         # 命名点、区域、frame
+└── policies/<POLICY>.yaml  # 阈值、时间窗、冷却、兑换步长
+```
+
+- `core` 只定义纯结构 `PolicyConfig`（不依赖 YAML）；`bringup` 用 `yaml-cpp` 解析为结构并做校验。
+- XML 不写数值，坐标用命名点、阈值用配置 key；key 在节点构造时解析，缺失即启动失败。
+- 所有 YAML 做必填 / 类型 / 范围校验，加载失败启动即报错并列出可用 key；
+  启动时把生效配置打印为 `ACT` 日志 / 落盘，便于复盘。
 
 ## 15. 运行环境与部署
 

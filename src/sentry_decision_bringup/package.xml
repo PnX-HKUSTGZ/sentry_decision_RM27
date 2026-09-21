@@ -14,6 +14,7 @@
   <depend>sentry_decision_nodes</depend>
   <depend>sentry_decision_io</depend>
   <depend>sentry_decision_sim</depend>
+  <depend>yaml-cpp</depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>

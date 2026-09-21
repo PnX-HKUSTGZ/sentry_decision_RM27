@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  任务：双方前哨存活时进攻敌方前哨。
+  进入条件：战略模式 = kAttack(2)。
+  退出条件：前哨被击毁或超出进攻时间窗。
+  抢占关系：低于高地，高于巡逻。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionAttackOutpost">
+  <BehaviorTree ID="MissionAttackOutpost">
+    <Sequence name="AttackOutpostSequence">
+      <IfTacticalMode mode="2"/>
+      <SubTree ID="GotoNamedPoint" target_point="enemy_outpost"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  任务：敌方前哨被击毁后转中央高地辅助。
+  进入条件：敌方前哨血量 <= 0（且我方前哨存活，否则被防守任务抢先）。
+  退出条件：条件不再成立。
+  抢占关系：低于防守，高于进攻 / 巡逻。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionHighland">
+  <BehaviorTree ID="MissionHighland">
+    <Sequence name="HighlandSequence">
+      <IfEnemyOutpostDead/>
+      <SubTree ID="GotoNamedPoint" target_point="central_highland"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

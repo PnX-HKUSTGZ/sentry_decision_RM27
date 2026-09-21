@@ -70,7 +70,9 @@ ros2 run sentry_decision_bringup decision_main
 演示行为：启动约 1 秒后血量从 400 掉到 50，行为树由巡逻抢占到撤退，伪导航朝新目标移动，ACT 日志显示 `mode`、
 `goal` 与当前位置变化。
 
-行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；`--tree` 默认指向安装后路径。
+行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；`--tree` 默认指向安装后 `tree/root.xml`。
+行为树按层组织：`root.xml`（组合）→ `mission/root.xml`（优先级）→ `mission/nav/*`（任务）+ `skill/*`（技能）；
+点位与阈值在 `config/`，XML 只引用命名点与配置 key。
 
 ### 4.2 真实 IO 决策闭环
 
@@ -104,6 +106,21 @@ ros2 bag record /decision/state /decision/world_state
 
 该发布类待决策节点接线后生效（P1 后续）。
 
+### 4.5 配置
+
+配置采用「单一入口 + 按职责分文件」，详见 `docs/ARCHITECTURE.md` §14：
+
+```text
+config/
+├── profiles.yaml           # 入口：map_profile / strategy_profile / pre_match
+├── maps/<MAP>.yaml         # 命名点、frame
+└── policies/<POLICY>.yaml  # 阈值、时间窗、兑换步长
+```
+
+XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
+启动时校验配置与行为树的引用一致性；缺失即启动报错并列出缺项，生效配置打印为 `ACT` 日志。
+`decision_node` 会把地图配置的 `frame_id` 注入 IO 节点的 `map_frame` 参数，保证 Nav2 目标坐标系一致。
+
 ## 5. 命令参数
 
 ### 5.1 decision_main
@@ -113,8 +130,9 @@ ros2 bag record /decision/state /decision/world_state
 | `--ticks` | `50` | tick 次数 |
 | `--rate` | `20.0` | tick 频率（Hz） |
 | `--hp-drop` | `1.0` | 仿真中血量掉到 50 的秒数 |
-| `--tree` | 安装后的 `demo_tree.xml` | 行为树 XML 路径 |
-| `--plugin` | 空 | 节点插件 `.so` 路径；为空时使用链接注册 |
+| `--tree` | 安装后的 `tree/root.xml` | 行为树入口 XML 路径 |
+| `--config` | 安装后的 `config/profiles.yaml` | 配置入口 YAML 路径 |
+| `--plugin` | 空 | 节点插件 `.so` 路径；为空时按 `tree_manifest.yaml` 注册 |
 
 ```bash
 ros2 run sentry_decision_bringup decision_main --ticks 500 --rate 20
@@ -127,7 +145,8 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | --- | --- | --- |
 | `--rate` | `20.0` | tick 频率（Hz），取值 `(0, 1000]` |
 | `--ticks` | `0` | 运行 tick 数，`0` 表示一直运行 |
-| `--tree` | 安装后的 `demo_tree.xml` | 行为树 XML 路径 |
+| `--tree` | 安装后的 `tree/root.xml` | 行为树入口 XML 路径 |
+| `--config` | 安装后的 `config/profiles.yaml` | 配置入口 YAML 路径 |
 | `--plugin` | 空 | 节点插件 `.so` 路径 |
 
 ### 5.3 io_node 参数

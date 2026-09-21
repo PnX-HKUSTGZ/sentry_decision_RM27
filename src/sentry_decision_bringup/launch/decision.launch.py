@@ -5,13 +5,23 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    tree = PathJoinSubstitution(
-        [FindPackageShare("sentry_decision_bringup"), "tree", "demo_tree.xml"]
-    )
+    share = FindPackageShare("sentry_decision_bringup")
+    tree = PathJoinSubstitution([share, "tree", "root.xml"])
+    config = PathJoinSubstitution([share, "config", "profiles.yaml"])
     return LaunchDescription(
         [
             ExecuteProcess(
-                cmd=["decision_main", "--ticks", "200", "--rate", "20", "--tree", tree],
+                cmd=[
+                    "decision_main",
+                    "--ticks",
+                    "200",
+                    "--rate",
+                    "20",
+                    "--tree",
+                    tree,
+                    "--config",
+                    config,
+                ],
                 output="screen",
             ),
         ]

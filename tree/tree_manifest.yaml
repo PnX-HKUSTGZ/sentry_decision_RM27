@@ -1,0 +1,33 @@
+# 行为树清单：入口 XML 与模块开关。启动时校验；失败即启动报错。
+#
+# 每个功能域模块编成独立 .so，由组合根按 library 加载并自注册 BT 节点；
+# type: policy 的模块为纯 C++（非 BT 插件），由组合根链接。
+root: root.xml
+
+# 模块库目录；留空则使用编译期默认（安装 lib 目录）。
+module_lib_dir: ""
+
+modules:
+  common:
+    enabled: true
+    library: libsentry_decision_common.so   # 条件 + 通用 Intent 叶子节点
+    type: bt
+    manifest: common.yaml
+  nav:
+    enabled: true
+    library: libsentry_decision_nav.so      # 导航技能节点
+    type: bt
+    manifest: nav.yaml
+  strategic:
+    enabled: true
+    library: libsentry_decision_strategic.so  # 战略策略（C++）
+    type: policy
+    manifest: strategic.yaml
+  resource:
+    enabled: true
+    library: libsentry_decision_resource.so  # 资源 / 复活技能节点
+    type: bt
+    manifest: resource.yaml
+  intervention:
+    enabled: false
+    builtin: true                           # P2.4

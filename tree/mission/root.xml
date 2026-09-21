@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!--
+  任务层优先级（唯一写优先级的地方）。
+  进入条件：每 tick；退出条件：-。
+  抢占关系：ReactiveFallback 从第一个孩子重扫，低优先级任务被高优先级任务抢占。
+  顺序（战略模式映射）：撤退(4) > 补给(5) > 防守(3) > 高地(敌前哨已毁) > 进攻(2) > 巡逻(默认)。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionRoot">
+  <include path="../skill/goto_named_point.xml"/>
+  <include path="nav/respawn.xml"/>
+  <include path="nav/retreat.xml"/>
+  <include path="nav/supply.xml"/>
+  <include path="nav/defend.xml"/>
+  <include path="nav/highland.xml"/>
+  <include path="nav/attack_outpost.xml"/>
+  <include path="nav/patrol.xml"/>
+  <BehaviorTree ID="MissionRoot">
+    <ReactiveFallback name="MissionPriority">
+      <SubTree ID="MissionRespawn"/>
+      <SubTree ID="MissionRetreat"/>
+      <SubTree ID="MissionSupply"/>
+      <SubTree ID="MissionDefend"/>
+      <SubTree ID="MissionHighland"/>
+      <SubTree ID="MissionAttackOutpost"/>
+      <SubTree ID="MissionPatrol"/>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

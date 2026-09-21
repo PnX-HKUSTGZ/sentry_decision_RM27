@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  任务：我方前哨阵亡时回堡垒防守。
+  进入条件：战略模式 = kDefend(3)。
+  退出条件：前哨复活后模式变化。
+  抢占关系：低于补给，高于高地 / 进攻。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionDefend">
+  <BehaviorTree ID="MissionDefend">
+    <Sequence name="DefendSequence">
+      <IfTacticalMode mode="3"/>
+      <SubTree ID="GotoNamedPoint" target_point="fort"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
