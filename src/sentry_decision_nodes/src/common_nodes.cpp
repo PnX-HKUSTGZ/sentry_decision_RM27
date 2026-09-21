@@ -5,6 +5,7 @@
 
 namespace sentry_decision {
 
+// [IfLowHp]
 IfLowHp::IfLowHp(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -30,6 +31,7 @@ BT::NodeStatus IfLowHp::tick() {
                                                              : BT::NodeStatus::FAILURE;
 }
 
+// [IfTacticalMode]
 IfTacticalMode::IfTacticalMode(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -51,6 +53,7 @@ BT::NodeStatus IfTacticalMode::tick() {
              : BT::NodeStatus::FAILURE;
 }
 
+// [IfEnemyOutpostDead]
 IfEnemyOutpostDead::IfEnemyOutpostDead(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -67,6 +70,7 @@ BT::NodeStatus IfEnemyOutpostDead::tick() {
                                                       : BT::NodeStatus::FAILURE;
 }
 
+// [EmitTacticalMode]
 EmitTacticalMode::EmitTacticalMode(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -93,6 +97,7 @@ BT::NodeStatus EmitTacticalMode::tick() {
   return BT::NodeStatus::SUCCESS;
 }
 
+// [EmitNavGoal]
 EmitNavGoal::EmitNavGoal(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 

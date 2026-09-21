@@ -5,6 +5,7 @@
 
 namespace sentry_decision {
 
+// [EmitNavGoalFromPoint]
 EmitNavGoalFromPoint::EmitNavGoalFromPoint(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 

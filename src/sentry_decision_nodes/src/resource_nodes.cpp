@@ -18,6 +18,7 @@ void emit_resource(DecisionContext* context, const ResourceRequest& request) {
 
 }  // namespace
 
+// [IfCanFreeResurrect]
 IfCanFreeResurrect::IfCanFreeResurrect(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -34,6 +35,7 @@ BT::NodeStatus IfCanFreeResurrect::tick() {
                                                          : BT::NodeStatus::FAILURE;
 }
 
+// [IfLowAmmo]
 IfLowAmmo::IfLowAmmo(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -59,6 +61,7 @@ BT::NodeStatus IfLowAmmo::tick() {
                                                                : BT::NodeStatus::FAILURE;
 }
 
+// [IfCoinsAtLeast]
 IfCoinsAtLeast::IfCoinsAtLeast(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -84,6 +87,7 @@ BT::NodeStatus IfCoinsAtLeast::tick() {
                                                            : BT::NodeStatus::FAILURE;
 }
 
+// [RequestFreeRevive]
 RequestFreeRevive::RequestFreeRevive(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -102,6 +106,7 @@ BT::NodeStatus RequestFreeRevive::tick() {
   return BT::NodeStatus::SUCCESS;
 }
 
+// [RequestHpExchange]
 RequestHpExchange::RequestHpExchange(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 
@@ -129,6 +134,7 @@ BT::NodeStatus RequestHpExchange::tick() {
   return BT::NodeStatus::SUCCESS;
 }
 
+// [RequestAmmoExchange]
 RequestAmmoExchange::RequestAmmoExchange(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
 

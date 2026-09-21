@@ -226,10 +226,10 @@ flowchart TD
 
 ### 7.2 节点注释模板
 
-每个 BT 节点必须在头文件类声明上方包含以下模板，缺一即 CI 失败：
+每个 BT 节点必须在头文件类声明上方包含以下模板，缺一即 CI 失败。
+**不使用 `===` / `---` 分隔线**：Markdown 预览会把分隔线后的一行误判为标题（Setext heading）。
 
 ```cpp
-// =============================================================================
 // Node:         CheckEnemyOutpostHealth
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断敌方前哨站血量是否低于阈值，用于前哨进攻分支。
@@ -240,8 +240,9 @@ flowchart TD
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/nav/attack.xml -> Priority1AutoOutpostAttack
-// =============================================================================
 ```
+
+同类节点实现放在同一个 `.cpp` 时，用一行 `// [节点名]` 作为分隔，便于定位（同样避免 Markdown 分隔线）。
 
 ### 7.3 目录与命名
 
