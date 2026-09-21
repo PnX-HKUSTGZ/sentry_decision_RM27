@@ -17,6 +17,11 @@
 - `decision_node`：新增 `--groot2-port` 参数（默认关闭）
 - `sentry_decision_sim`：新增 `referee_sim_node`（发布 `/sentry/*` 与 odom、提供 `NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与 ROS 无关的场景解析 / 消息级仿真世界
 - 新增场景脚本 `scenario/full_match.yaml` 与端到端测试 `tools/scenario_smoke_test.sh`（巡逻→进攻→撤退→复活）
+- `sentry_decision_msgs`：新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`
+- `sentry_decision_core`：`IntentArbiter` 结果新增逐字段 `winners`；`InterventionController` 支持按字段清除与只读视图
+- `sentry_decision_io`：新增 `InterventionServer`（干预 action / service 服务端与线程安全命令队列）及取值解析
+- `decision_node`：接入干预服务端，发布 `/decision/intervention`，`list_state` 返回 JSON 快照
+- 新增 `tools/intervention_smoke_test.sh` 干预冒烟测试
 
 ## [v0.2.0]
 

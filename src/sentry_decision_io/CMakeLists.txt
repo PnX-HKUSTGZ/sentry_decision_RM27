@@ -18,19 +18,23 @@ find_package(rosbag2_storage REQUIRED)
 find_package(sentry_decision_core REQUIRED)
 find_package(sentry_decision_msgs REQUIRED)
 find_package(sentry_interfaces REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/ros_io_node.cpp
   src/sentry_bridge.cpp
   src/decision_state_convert.cpp
   src/decision_state_publisher.cpp
-  src/rosbag_replay.cpp)
+  src/rosbag_replay.cpp
+  src/intervention_convert.cpp
+  src/intervention_server.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
 ament_target_dependencies(${PROJECT_NAME}
   sentry_decision_core sentry_decision_msgs sentry_interfaces rclcpp rclcpp_action nav2_msgs
   nav_msgs geometry_msgs std_msgs rosbag2_cpp rosbag2_storage)
+target_link_libraries(${PROJECT_NAME} yaml-cpp::yaml-cpp)
 
 add_executable(io_node src/io_main.cpp)
 target_link_libraries(io_node ${PROJECT_NAME})
@@ -63,6 +67,15 @@ if(BUILD_TESTING)
   add_executable(test_sentry_bridge test/test_sentry_bridge.cpp)
   target_link_libraries(test_sentry_bridge ${PROJECT_NAME})
   add_test(NAME test_sentry_bridge COMMAND test_sentry_bridge)
+
+  add_executable(test_intervention_convert test/test_intervention_convert.cpp)
+  target_link_libraries(test_intervention_convert ${PROJECT_NAME} yaml-cpp::yaml-cpp)
+  add_test(NAME test_intervention_convert COMMAND test_intervention_convert)
+
+  add_executable(test_intervention_server test/test_intervention_server.cpp)
+  target_link_libraries(test_intervention_server ${PROJECT_NAME})
+  ament_target_dependencies(test_intervention_server rclcpp rclcpp_action)
+  add_test(NAME test_intervention_server COMMAND test_intervention_server)
 endif()
 
 ament_package()

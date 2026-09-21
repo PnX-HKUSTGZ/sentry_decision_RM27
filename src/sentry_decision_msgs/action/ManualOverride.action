@@ -1,0 +1,27 @@
+# 人工干预：对某个意图字段做带 lease 的覆盖。走 IntentArbiter，不能绕过 SafetySupervisor。
+# field 与 core::IntentField 一致。
+
+uint8 FIELD_NAV_GOAL = 0
+uint8 FIELD_CHASSIS_VEL = 1
+uint8 FIELD_RESOURCE_REQUEST = 2
+uint8 FIELD_TACTICAL_MODE = 3
+
+uint8 field
+# 类型化取值（YAML/JSON 文本），按 field 解析：
+#   nav_goal:         [x, y] 或 [x, y, yaw]
+#   chassis_vel:      [vx, vy, wz]
+#   resource_request: {ammo: N, hp: N, revive: true|false}
+#   tactical_mode:    patrol|attack|defend|retreat|heal|respawn 或 0-6
+string value
+# 生效时长（秒），0 表示不过期，直到被同字段覆盖或清除
+float64 lease_sec
+# 记录到日志与回放
+string reason
+---
+bool accepted
+string message
+---
+# 反馈：该字段当前是否在仲裁中胜出
+bool effective
+# 若未胜出，给出该字段的胜出来源（否则为空）
+string overridden_by

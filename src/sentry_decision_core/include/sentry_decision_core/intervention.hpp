@@ -29,6 +29,9 @@ class InterventionController {
   // 注入一条带 lease 的意图覆盖（按 field 覆盖前值）；source / priority / stamp 由本类设置。
   void inject(Intent intent, TimePoint now);
 
+  // 撤销某字段的注入意图（不影响其他字段）。
+  void clear_intent(IntentField field);
+
   void set_world_override(WorldField field, double value);
   void clear_world_override(WorldField field);
 
@@ -47,6 +50,14 @@ class InterventionController {
   std::vector<Intent> active_intents(TimePoint now) const;
   // 把世界覆盖应用到副本（不修改入参）。
   WorldState apply_world(const WorldState& world) const;
+
+  // 只读视图，供 list_state / 可视化展示。
+  const std::map<std::string, bool>& module_switches() const {
+    return module_switches_;
+  }
+  const std::map<WorldField, double>& world_overrides() const {
+    return world_overrides_;
+  }
 
  private:
   std::map<IntentField, Intent> intents_;

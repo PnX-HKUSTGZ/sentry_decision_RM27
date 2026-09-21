@@ -25,3 +25,6 @@ __pycache__/
 
 # Docker 本地覆盖
 docker-compose.override.yml
+
+# 参考资料（大体积 PDF 与抽取文本，不入库）
+refs/

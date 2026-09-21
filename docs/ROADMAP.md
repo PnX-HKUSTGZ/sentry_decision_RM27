@@ -107,7 +107,7 @@
 | --- | --- | --- |
 | P3.0 观测底座（已完成） | `TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（节点状态 + active path）、Groot2 可选 hook | `/decision/tree_status` 状态与 active path 正确；容器测试通过 |
 | P3.1 裁判仿真 + 场景脚本（已完成） | `referee_sim_node`（发 `/sentry/*` + odom、导航 action server、动作回执）+ 场景 YAML 时间轴与断言 | 脚本驱动完整对局（巡逻→进攻→撤退→复活）并通过断言 |
-| P3.2 干预 ROS 接口 | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
+| P3.2 干预 ROS 接口（已完成） | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
 | P3.3 干预回放 | `ReplayData` 增干预通道、`ReplaySource` / `load_replay_data` 支持 | 含干预的回放逐 tick 确定，干预在原时刻复现 |
 | P3.4 网页面板 | rosbridge + roslibjs 静态页：树状态、战场俯视图、WorldState / Intent、按钮组 | 网页实时显示树状态与机器人 / 敌方位置；按钮生效 |
 | P3.5 文档与验收 | ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；完整对局录制 + 回放 | 三条验收闭环 |
@@ -165,4 +165,5 @@
   - 设计已对齐（本地）：新增 `sentry_decision_viz`、树状态消息与 `/decision/tree_status`、Groot2 可选、干预 action / service（线程安全队列、tick 边界应用）、`referee_sim_node` 与场景脚本、干预回放、无构建网页面板；见 `docs/ARCHITECTURE.md` §14。
   - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过。
   - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（五条上行 + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与场景 YAML（`set_world` / `expect`）；`scenario/full_match.yaml` 端到端跑通巡逻→进攻→撤退→复活（12/12 断言）；容器 8 包 / 37 测试通过。
+  - 已完成（本地）：P3.2 干预 ROS 接口——`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`、`InterventionServer`（线程安全队列、tick 边界应用、action 生命周期反馈）、仲裁逐字段 `winners`、`/decision/intervention` 记录；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
   - P2 主体已完成（本地范围）。

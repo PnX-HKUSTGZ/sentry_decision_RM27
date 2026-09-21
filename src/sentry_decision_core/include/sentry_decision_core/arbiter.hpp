@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,8 @@ struct ArbiterResult {
   DecisionOutput output;
   std::vector<Conflict> conflicts;
   std::vector<std::string> warnings;
+  // 每个有胜出者的字段 -> 胜出来源；用于观测「逐字段胜负」与干预反馈。
+  std::map<IntentField, SourceId> winners;
 };
 
 // 意图仲裁器：把所有来源的 Intent 在字段级裁决成唯一的 DecisionOutput。

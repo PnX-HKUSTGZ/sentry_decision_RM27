@@ -81,6 +81,13 @@ if(BUILD_TESTING)
   set_tests_properties(scenario_full_match PROPERTIES
     ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
     TIMEOUT 90)
+
+  # 端到端：干预 service / action 与 /decision/intervention。
+  add_test(NAME intervention_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/intervention_smoke_test.sh)
+  set_tests_properties(intervention_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 90)
 endif()
 
 ament_package()

@@ -159,6 +159,7 @@ ArbiterResult IntentArbiter::resolve(TimePoint now) const {
     }
     if (winner != nullptr) {
       apply(*winner, result.output);
+      result.winners[field] = winner->source;
       if (!losers.empty()) {
         result.conflicts.push_back(Conflict{field, winner->source, losers});
       }

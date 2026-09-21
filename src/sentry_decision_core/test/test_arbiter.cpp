@@ -44,6 +44,7 @@ void test_priority_wins() {
   CHECK(result.output.nav_goal.has_value());
   CHECK(result.output.nav_goal->x == 2.0);
   CHECK(result.conflicts.size() == 1);
+  CHECK(result.winners.at(IntentField::kNavGoal) == SourceId::kIntervention);
 }
 
 void test_lease_expiry() {
@@ -52,6 +53,7 @@ void test_lease_expiry() {
   arbiter.submit(make_nav(SourceId::kSkill, Priority::kTactical, t0, 1.0, Duration{100}));
   CHECK(arbiter.resolve(t0).output.nav_goal.has_value());
   CHECK(!arbiter.resolve(t0 + Duration{101}).output.nav_goal.has_value());
+  CHECK(arbiter.resolve(t0 + Duration{101}).winners.empty());
 }
 
 void test_replace_same_source() {
@@ -77,6 +79,7 @@ void test_clear_source() {
   arbiter.submit(make_nav(SourceId::kSkill, Priority::kTactical, t0, 1.0));
   arbiter.clear_source(SourceId::kSkill);
   CHECK(!arbiter.resolve(t0).output.nav_goal.has_value());
+  CHECK(arbiter.resolve(t0).winners.empty());
 }
 
 void test_type_mismatch() {

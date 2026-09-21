@@ -164,6 +164,29 @@ timeline:
 `add_intent` / `disable` 依赖 P3.2 的干预接口，将在其落地后接入。
 端到端回归由 `tools/scenario_smoke_test.sh` 驱动（也注册为 `scenario_full_match` 测试）。
 
+### 4.7 人工干预
+
+`decision_node` 提供结构化干预入口（走同一仲裁，安全仍最高）：
+
+```bash
+# 通用调试 / 状态查询（service）
+ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+  "{command: 'set_world', args: '{field: self_hp, value: 20}'}"
+ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+  "{command: 'list_state', args: ''}"
+ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+  "{command: 'set_module', args: '{module: nav, enabled: false}'}"
+
+# 带 lease 的意图接管（action），goal 保持执行态直到过期或被取消
+ros2 action send_goal /decision/manual_override \
+  sentry_decision_msgs/action/ManualOverride \
+  "{field: 0, value: '[1.0, 2.0]', lease_sec: 3.0, reason: 'manual'}"
+```
+
+`field` 与 `value` 语法、action / service 语义见 `docs/ARCHITECTURE.md` §14.3。
+所有已应用的干预发布到 `/decision/intervention`，可随 rosbag 录制并在回放中复现（P3.3）。
+冒烟测试：`tools/intervention_smoke_test.sh`（也注册为 `intervention_smoke`）。
+
 ## 5. 命令参数
 
 ### 5.1 decision_main

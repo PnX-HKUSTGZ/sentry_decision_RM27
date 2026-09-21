@@ -569,8 +569,30 @@ Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> I
 - 回调只做**校验 + 入队**，不触碰 `WorldState` 与行为树；
 - tick 开始时按固定顺序应用本拍命令，保证确定性；
 - 应用成功的干预记 `ACT`（来源、字段、lease、原因），并发布到 `/decision/intervention` 以便录制与回放；
-- `DebugCommand.list_state` 返回世界状态、模块开关、活跃 Intent 与逐字段胜负的 JSON，
-  供网页面板自动生成表单（§10.4）。
+- `IntentArbiter::resolve` 的结果新增逐字段胜者 `winners`，供 action 反馈与 `list_state` 使用。
+
+**action `ManualOverride`**（goal / result / feedback）：
+
+| goal 字段 | 说明 |
+| --- | --- |
+| `field` | `FIELD_NAV_GOAL` / `FIELD_CHASSIS_VEL` / `FIELD_RESOURCE_REQUEST` / `FIELD_TACTICAL_MODE`，与 `core::IntentField` 一致 |
+| `value` | 类型化文本（YAML/JSON）：`[x, y, yaw]` / `[vx, vy, wz]` / `{ammo, hp, revive}` / 模式名或 0-6 |
+| `lease_sec` | 生效时长，`0` 表示不过期；goal 保持执行态直到失效或被取消 |
+| `reason` | 记入日志与 `/decision/intervention` |
+
+result 返回是否接受；feedback 每 tick 给出该字段的 `effective` 与 `overridden_by`。
+
+**service `DebugCommand`**（`command` + `args`，args 为 YAML/JSON 文本）：
+
+| command | args | 作用 |
+| --- | --- | --- |
+| `set_intent` | `{field, value, lease_sec, reason}` | 同 ManualOverride，但同步返回 |
+| `clear_intent` | `{field}` | 撤销某字段注入 |
+| `set_world` | `{field, value}` | 覆盖世界数值 |
+| `clear_world` | `{field}` 或省略 | 清除覆盖 |
+| `set_module` | `{module, enabled}` | 运行期模块开关 |
+| `clear_all` | — | 清空全部干预 |
+| `list_state` | — | 返回 `world / intents / winners / modules / world_overrides / safety_emergency` 的 JSON 快照，供网页面板自动生成表单（§10.4） |
 
 ### 14.4 裁判仿真与场景脚本
 

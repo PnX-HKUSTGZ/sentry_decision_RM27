@@ -9,6 +9,10 @@ void InterventionController::inject(Intent intent, TimePoint now) {
   intents_[intent.field] = intent;
 }
 
+void InterventionController::clear_intent(IntentField field) {
+  intents_.erase(field);
+}
+
 void InterventionController::set_world_override(WorldField field, double value) {
   world_overrides_[field] = value;
 }
