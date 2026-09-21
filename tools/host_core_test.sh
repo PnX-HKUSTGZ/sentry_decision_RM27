@@ -11,7 +11,7 @@ CORE_SOURCES=("$CORE/src/arbiter.cpp" "$CORE/src/logging.cpp" "$CORE/src/referee
   "$CORE/src/replay.cpp" "$CORE/src/world_model.cpp")
 SIM_SOURCES=("$SIM/src/referee_simulator.cpp" "$SIM/src/nav_simulator.cpp")
 
-for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay; do
+for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay test_config; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "${CORE_SOURCES[@]}" \
     "$CORE/test/$test.cpp" -o "$OUT/$test"
   "$OUT/$test"

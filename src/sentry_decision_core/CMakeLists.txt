@@ -18,6 +18,8 @@ add_library(${PROJECT_NAME}
   src/referee_protocol.cpp
   src/replay.cpp
   src/world_model.cpp)
+# core 以静态库被 nodes 等共享库链接，必须编译为位置无关代码。
+set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -50,6 +52,10 @@ if(BUILD_TESTING)
   add_executable(test_replay test/test_replay.cpp)
   target_link_libraries(test_replay ${PROJECT_NAME})
   add_test(NAME test_replay COMMAND test_replay)
+
+  add_executable(test_config test/test_config.cpp)
+  target_link_libraries(test_config ${PROJECT_NAME})
+  add_test(NAME test_config COMMAND test_config)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
