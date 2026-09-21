@@ -33,12 +33,15 @@ void test_priority() {
 
   WorldState world = make_world();
   CHECK(policy.decide(world).mode == TacticalMode::kAttack);
+  CHECK(policy.decide(world).stance == SentryStance::kAttack);
 
   world.referee.self_hp = 50;
   CHECK(policy.decide(world).mode == TacticalMode::kRetreat);
+  CHECK(policy.decide(world).stance == SentryStance::kMove);
 
   world.referee.self_hp = 0;
   CHECK(policy.decide(world).mode == TacticalMode::kRespawn);
+  CHECK(policy.decide(world).stance == SentryStance::kMove);
 
   world = make_world();
   world.referee.self_ammo = 10;
@@ -47,6 +50,7 @@ void test_priority() {
   world = make_world();
   world.referee.our_outpost_hp = 0;
   CHECK(policy.decide(world).mode == TacticalMode::kDefend);
+  CHECK(policy.decide(world).stance == SentryStance::kDefense);
 
   world = make_world();
   world.referee.enemy_outpost_hp = 0;
@@ -59,6 +63,7 @@ void test_priority() {
   world = make_world();
   world.referee.valid = false;
   CHECK(policy.decide(world).mode == TacticalMode::kUnknown);
+  CHECK(policy.decide(world).stance == SentryStance::kUnknown);
 }
 
 void test_from_config() {

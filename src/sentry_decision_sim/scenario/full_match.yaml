@@ -19,6 +19,7 @@ timeline:
   - at: 2.0
     expect:
       tactical_mode: patrol
+      stance: move
       has_nav_goal: true
       nav_goal_x: 0.0
       nav_goal_y: 1.1
@@ -30,6 +31,7 @@ timeline:
   - at: 4.5
     expect:
       tactical_mode: attack
+      stance: attack
       nav_goal_x: 1.1
       nav_goal_y: 1.1
 
@@ -40,6 +42,7 @@ timeline:
   - at: 7.5
     expect:
       tactical_mode: retreat
+      stance: move
       nav_goal_x: -5.0
       nav_goal_y: 3.0
 
@@ -50,4 +53,5 @@ timeline:
   - at: 10.5
     expect:
       tactical_mode: respawn
+      stance: move
       has_nav_goal: false

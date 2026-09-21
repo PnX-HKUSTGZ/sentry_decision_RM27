@@ -30,6 +30,7 @@
 - `sentry_decision_core`：`referee_protocol` 按 2026 规则 / 通信协议补齐——`EventCode` 覆盖场地事件全字段，`SentryInfo2` 增加姿态，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState` 增 `info3`
 - `sentry_decision_io`：`sentry_bridge` 解码 `sentry_info_3`
 - `sentry_decision_sim`：`SimWorld` 支持 `sentry_info_3` 场景字段
+- 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
 
 ## [v0.2.0]
 
@@ -73,10 +74,6 @@
 ### Changed
 
 - 行为树源文件迁移到仓库根目录 `tree/`；bringup 构建、安装与测试路径同步，运行路径不变
-
-### Removed
-
-- 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
 
 ### Fixed
 

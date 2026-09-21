@@ -39,7 +39,7 @@
 ### 已锁定决策
 
 - 战略层：纯 C++ `StrategicPolicy` 接口（输入 `WorldState`，输出 `StrategicDecision`），在树 tick 前求值写入 `DecisionContext.strategy`；不是 BT 子树。
-- 删除「姿态」（stance）：P2 验收输出为 `nav_goal` / `tactical_mode` / `resource` / `cmd_vel`，不含姿态。
+- 姿态（stance）：2026 规则 §5.6.4 为有效机制；已恢复接入（`SentryStance` / `IntentField::kStance` / `DecisionOutput.stance`），由战略层按战术模式映射并随仲裁输出。
 - 弃用 `/set_bool`（`Reloading` / `ifreload`）：P2 不迁移该行为。
 - 树结构：任务 / 技能 / 条件分层为多棵小树，避免旧仓库一整棵大树；`tree/` 按层建 `mission/`、`skill/`、`condition/`，相似树可再分子目录、零散的直接放层根。
 - 命名：条件节点 / 子树 `If*`；任务子树 `Mission*`；技能子树 `<Verb><Object>`；发 Intent 叶子 `Emit*`；写状态叶子 `Set*`；请求叶子 `Request*`。

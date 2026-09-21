@@ -6,6 +6,21 @@
 namespace sentry_decision_sim {
 namespace {
 
+bool parse_stance_name(const std::string& name, int* out) {
+  if (name == "unknown") {
+    *out = 0;
+  } else if (name == "attack") {
+    *out = 1;
+  } else if (name == "defense" || name == "defence") {
+    *out = 2;
+  } else if (name == "move") {
+    *out = 3;
+  } else {
+    return false;
+  }
+  return true;
+}
+
 bool parse_tactical_mode(const std::string& name, int* out) {
   if (name == "unknown") {
     *out = 0;
@@ -81,6 +96,16 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
     world->sentry_info_2 = as_int;
   } else if (field == "sentry_info_3") {
     world->sentry_info_3 = static_cast<std::uint64_t>(number);
+  } else if (field == "stance") {
+    // 语义字段：写入 sentry_info_2 的 bit 12-13。
+    const int value = as_int & 0x3;
+    world->sentry_info_2 = (world->sentry_info_2 & ~(0x3 << 12)) | (value << 12);
+  } else if (field == "stance_enhanced") {
+    if (number != 0.0) {
+      world->sentry_info_2 |= (1 << 15);
+    } else {
+      world->sentry_info_2 &= ~(1 << 15);
+    }
   } else if (field == "base_hp") {
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {
@@ -119,6 +144,22 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
     if (view.tactical_mode != want) {
       *error = "期望 tactical_mode=" + std::to_string(want) +
                "，实际=" + std::to_string(view.tactical_mode);
+      return false;
+    }
+    return true;
+  }
+  if (field == "stance") {
+    int want = 0;
+    if (expected.type == ScenarioValue::Type::kString) {
+      if (!parse_stance_name(expected.text, &want)) {
+        *error = "未知姿态: " + expected.text;
+        return false;
+      }
+    } else {
+      want = static_cast<int>(expected_number);
+    }
+    if (view.stance != want) {
+      *error = "期望 stance=" + std::to_string(want) + "，实际=" + std::to_string(view.stance);
       return false;
     }
     return true;

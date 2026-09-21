@@ -18,6 +18,7 @@ enum class IntentField {
   kChassisVel,
   kResourceRequest,
   kTacticalMode,
+  kStance,
 };
 
 // 意图来源。枚举顺序也用于同优先级、同时间戳时的确定性 tie-break。
@@ -40,6 +41,15 @@ enum class Priority : int {
 };
 
 enum class TacticalMode { kUnknown, kPatrol, kAttack, kDefend, kRetreat, kHeal, kRespawn };
+
+// 哨兵物理姿态（2026 规则 5.6.4）。取值与裁判 SentryInfo2.stance 位段一致：
+// 1 进攻 / 2 防御 / 3 移动；0 表示未知（消息未给或不在比赛中）。
+enum class SentryStance : std::uint8_t {
+  kUnknown = 0,
+  kAttack = 1,
+  kDefense = 2,
+  kMove = 3,
+};
 
 struct Point2D {
   double x = 0.0;
@@ -68,7 +78,8 @@ struct ResourceRequest {
 };
 
 // 意图载荷；具体用哪一项由 Intent::field 决定。
-using IntentValue = std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest>;
+using IntentValue =
+    std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest, SentryStance>;
 
 // 意图：一次请求，不保证最终生效。
 struct Intent {
@@ -87,6 +98,7 @@ struct DecisionOutput {
   std::optional<Twist> cmd_vel;
   ResourceRequest resource{};
   TacticalMode tactical_mode = TacticalMode::kUnknown;
+  SentryStance stance = SentryStance::kUnknown;
   TimePoint stamp{};
 };
 

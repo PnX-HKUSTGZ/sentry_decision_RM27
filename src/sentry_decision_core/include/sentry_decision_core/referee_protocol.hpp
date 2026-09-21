@@ -51,13 +51,13 @@ struct SentryInfo1 {
 };
 
 // SentryInfoOnline.sentry_info_2：脱战、可兑换弹量、姿态与能量机关。
-// 姿态为 2026 规则的有效机制（见规则 5.6.4）；决策当前不使用，仅做协议完整解码与观测。
+// 姿态为 2026 规则 5.6.4 的有效机制，决策据此选择并输出 SentryStance。
 struct SentryInfo2 {
-  bool disengaged = false;                    // bit 0：脱战状态
-  std::uint16_t remaining_ammo_exchange = 0;  // bit 1-11：17mm 剩余可兑换发弹量
-  std::uint8_t stance = 0;                    // bit 12-13：1 进攻 / 2 防御 / 3 移动
-  bool can_activate_energy = false;           // bit 14：能否进入能量机关激活状态
-  bool stance_enhanced = false;               // bit 15：是否强化姿态
+  bool disengaged = false;                       // bit 0：脱战状态
+  std::uint16_t remaining_ammo_exchange = 0;     // bit 1-11：17mm 剩余可兑换发弹量
+  SentryStance stance = SentryStance::kUnknown;  // bit 12-13：1 进攻 / 2 防御 / 3 移动
+  bool can_activate_energy = false;              // bit 14：能否进入能量机关激活状态
+  bool stance_enhanced = false;                  // bit 15：是否强化姿态
 };
 
 // SentryInfoOnline.sentry_info_3：各姿态剩余可持续时长（秒）。
@@ -71,6 +71,8 @@ struct SentryInfo3 {
 };
 
 GameStatus decode_game_status(std::uint8_t raw);
+// 裁判姿态位段 -> 具名姿态（1 进攻 / 2 防御 / 3 移动，其余 kUnknown）。
+SentryStance decode_stance(std::uint8_t raw);
 EventCode decode_event_code(std::uint32_t raw);
 SentryInfo1 decode_sentry_info1(std::uint32_t raw);
 SentryInfo2 decode_sentry_info2(std::uint16_t raw);

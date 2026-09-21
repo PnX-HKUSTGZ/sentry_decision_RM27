@@ -212,6 +212,7 @@ class RefereeSimNode : public rclcpp::Node {
   void on_decision(const sentry_decision_msgs::msg::DecisionState& msg) {
     DecisionView view;
     view.tactical_mode = msg.output.tactical_mode;
+    view.stance = msg.output.stance;
     view.has_nav_goal = msg.output.has_nav_goal;
     view.nav_goal_x = msg.output.nav_goal.x;
     view.nav_goal_y = msg.output.nav_goal.y;

@@ -59,7 +59,7 @@ flowchart TD
 
 意图层分三层，接口逐层收窄，每层只产出一层数据：
 
-- **战术 / 战略层**：只回答「现在是什么战术模式（`TacticalMode`）+ 目标（`Objective`）」。
+- **战术 / 战略层**：只回答「现在是什么战术模式（`TacticalMode`）、以什么姿态（`SentryStance`）执行 + 目标（`Objective`）」。
   定义为 `StrategicPolicy` 接口（输入 `WorldState`，输出 `StrategicDecision`），是**纯 C++ 组件**，
   在行为树 tick 之前求值，结果写入 `DecisionContext.strategy` 供任务层读取。
   当前用状态机实现；将来替换为效用打分 / 学习模型只是换一个实现，不影响下层。
@@ -112,7 +112,7 @@ struct WorldState {
 | `GameInfo` | `RefereeState` | 阶段 / 时间 / 金币 / 场地事件 / 手动点 / 建筑血量 |
 | `TeamInformation` | `RefereeState` + `WorldState.allies` | 己方建筑血量、队友状态 |
 | `RadarInfo` | `EnemyState.enemies` + `RefereeState` | 敌方列表、敌方经济、前哨感知 |
-| `SentryInfoOnline` | `RefereeState`（自身）+ `SentryInfo1/2` | 血量 / 弹量 / 热量 / 姿态 / 兑换 |
+| `SentryInfoOnline` | `RefereeState`（自身）+ `SentryInfo1/2/3` | 血量 / 弹量 / 热量 / 姿态 / 兑换 |
 | `SentryInfoOffline` | `EnemyState`（锁定）+ `RefereeState` | 目标锁定、升降、变形、电容、隧道对齐 |
 
 下行指令的语义（待通信包确定后落地）：
@@ -124,7 +124,7 @@ IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用�
 
 ```cpp
 // 意图：请求，不代表最终生效
-enum class IntentField { NavGoal, ChassisVel, ResourceRequest, TacticalMode };
+enum class IntentField { NavGoal, ChassisVel, ResourceRequest, TacticalMode, Stance };
 
 struct Intent {
   IntentField field;
@@ -142,6 +142,8 @@ struct DecisionOutput {
   std::optional<Point2D> nav_goal;
   std::optional<Twist>   safe_cmd_vel;
   ResourceRequest        resource;
+  TacticalMode           tactical_mode;
+  SentryStance           stance;   // 期望物理姿态（2026 规则 §5.6.4）
   TimePoint              stamp;
   // 各字段的 owner 与默认值见第 9 节
 };
@@ -351,6 +353,8 @@ safety(急停 / 看门狗) > intervention(人工干预 / 调试注入) > recover
 | `nav_goal` | 导航决策模块 | safety、intervention |
 | `safe_cmd_vel` | recovery（仅接管时） | safety（急停） |
 | `resource` | 资源模块 | intervention |
+| `tactical_mode` | 战略层 | intervention |
+| `stance` | 战略层 | safety、intervention |
 
 - 非 owner 提交该字段记 `WARN`；
 - 同优先级多来源冲突按显式 tie-break 解决并告警；
@@ -576,7 +580,7 @@ Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> I
 
 | goal 字段 | 说明 |
 | --- | --- |
-| `field` | `FIELD_NAV_GOAL` / `FIELD_CHASSIS_VEL` / `FIELD_RESOURCE_REQUEST` / `FIELD_TACTICAL_MODE`，与 `core::IntentField` 一致 |
+| `field` | `FIELD_NAV_GOAL` / `FIELD_CHASSIS_VEL` / `FIELD_RESOURCE_REQUEST` / `FIELD_TACTICAL_MODE` / `FIELD_STANCE`，与 `core::IntentField` 一致 |
 | `value` | 类型化文本（YAML/JSON）：`[x, y, yaw]` / `[vx, vy, wz]` / `{ammo, hp, revive}` / 模式名或 0-6 |
 | `lease_sec` | 生效时长，`0` 表示不过期；goal 保持执行态直到失效或被取消 |
 | `reason` | 记入日志与 `/decision/intervention` |

@@ -17,6 +17,7 @@ using sentry_decision::Intent;
 using sentry_decision::IntentField;
 using sentry_decision::Point2D;
 using sentry_decision::ResourceRequest;
+using sentry_decision::SentryStance;
 using sentry_decision::TacticalMode;
 using sentry_decision::Twist;
 using sentry_decision::WorldField;
@@ -30,6 +31,8 @@ bool field_from_name(const std::string& name, IntentField* out) {
     *out = IntentField::kResourceRequest;
   } else if (name == "tactical_mode") {
     *out = IntentField::kTacticalMode;
+  } else if (name == "stance") {
+    *out = IntentField::kStance;
   } else {
     return false;
   }
@@ -129,6 +132,35 @@ bool parse_tactical_mode(const YAML::Node& node, TacticalMode* out) {
   }
 }
 
+bool parse_stance(const YAML::Node& node, SentryStance* out) {
+  if (!node.IsScalar()) {
+    return false;
+  }
+  const std::string text = node.Scalar();
+  if (text == "attack") {
+    *out = SentryStance::kAttack;
+    return true;
+  }
+  if (text == "defense" || text == "defence") {
+    *out = SentryStance::kDefense;
+    return true;
+  }
+  if (text == "move") {
+    *out = SentryStance::kMove;
+    return true;
+  }
+  try {
+    const int value = node.as<int>();
+    if (value < 0 || value > 3) {
+      return false;
+    }
+    *out = static_cast<SentryStance>(value);
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
 bool parse_value_node(IntentField field, const YAML::Node& node, Intent* out, std::string* error) {
   switch (field) {
     case IntentField::kNavGoal: {
@@ -167,6 +199,15 @@ bool parse_value_node(IntentField field, const YAML::Node& node, Intent* out, st
       out->value = mode;
       return true;
     }
+    case IntentField::kStance: {
+      SentryStance stance;
+      if (!parse_stance(node, &stance)) {
+        *error = "stance 需要名称（attack/defense/move）或 1-3";
+        return false;
+      }
+      out->value = stance;
+      return true;
+    }
   }
   *error = "未知意图字段";
   return false;
@@ -191,6 +232,9 @@ bool parse_intent_field(std::uint8_t value, IntentField* out) {
       return true;
     case 3:
       *out = IntentField::kTacticalMode;
+      return true;
+    case 4:
+      *out = IntentField::kStance;
       return true;
     default:
       return false;
@@ -226,6 +270,8 @@ const char* intent_field_name(IntentField field) {
       return "resource_request";
     case IntentField::kTacticalMode:
       return "tactical_mode";
+    case IntentField::kStance:
+      return "stance";
   }
   return "unknown";
 }

@@ -3,6 +3,7 @@
 
 export const NODE_STATUS = ['IDLE', 'RUNNING', 'SUCCESS', 'FAILURE', 'SKIPPED'];
 export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
+export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 
 export function nodeStatusName(status) {
   return NODE_STATUS[status] || '#' + status;
@@ -10,6 +11,10 @@ export function nodeStatusName(status) {
 
 export function tacticalModeName(mode) {
   return TACTICAL_MODES[mode] || '#' + mode;
+}
+
+export function stanceName(stance) {
+  return STANCES[stance] || '#' + stance;
 }
 
 export function treeStatusToView(msg) {
@@ -45,6 +50,8 @@ export function worldStateToView(msg) {
     enemyBaseHp: msg.enemy_base_hp,
     canRebuild: msg.can_rebuild_outpost,
     refereeValid: msg.referee_valid,
+    stance: msg.stance || 0,
+    stanceName: stanceName(msg.stance || 0),
     posX: msg.pos_x,
     posY: msg.pos_y,
     yaw: msg.yaw,
@@ -70,6 +77,8 @@ export function decisionToView(msg) {
     tick: msg.tick,
     mode: mode,
     modeName: tacticalModeName(mode),
+    stance: out.stance || 0,
+    stanceName: stanceName(out.stance || 0),
     hasNavGoal: !!out.has_nav_goal,
     navGoalX: (out.nav_goal && out.nav_goal.x) || 0,
     navGoalY: (out.nav_goal && out.nav_goal.y) || 0,

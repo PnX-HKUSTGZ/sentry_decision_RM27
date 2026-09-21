@@ -84,16 +84,24 @@ void test_decode_sentry_info2() {
   const SentryInfo2 info = decode_sentry_info2(raw);
   CHECK(info.disengaged);
   CHECK(info.remaining_ammo_exchange == 0x7FF);
-  CHECK(info.stance == 2);
+  CHECK(info.stance == SentryStance::kDefense);
   CHECK(info.can_activate_energy);
   CHECK(info.stance_enhanced);
 
   const SentryInfo2 none = decode_sentry_info2(0);
   CHECK(!none.disengaged);
   CHECK(none.remaining_ammo_exchange == 0);
-  CHECK(none.stance == 0);
+  CHECK(none.stance == SentryStance::kUnknown);
   CHECK(!none.can_activate_energy);
   CHECK(!none.stance_enhanced);
+}
+
+void test_decode_stance() {
+  CHECK(decode_stance(1) == SentryStance::kAttack);
+  CHECK(decode_stance(2) == SentryStance::kDefense);
+  CHECK(decode_stance(3) == SentryStance::kMove);
+  CHECK(decode_stance(0) == SentryStance::kUnknown);
+  CHECK(decode_stance(9) == SentryStance::kUnknown);
 }
 
 void test_decode_sentry_info3() {
@@ -123,6 +131,7 @@ int main() {
   test_decode_event_code();
   test_decode_sentry_info1();
   test_decode_sentry_info2();
+  test_decode_stance();
   test_decode_sentry_info3();
   if (g_failures == 0) {
     std::printf("all core referee_protocol tests passed\n");

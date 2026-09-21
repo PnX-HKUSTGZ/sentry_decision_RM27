@@ -61,8 +61,11 @@ void test_check_expect() {
   view.has_nav_goal = true;
   view.nav_goal_x = -5.0;
   view.nav_goal_y = 3.0;
+  view.stance = 2;
 
   std::string error;
+  CHECK(check_expect(view, "stance", text("defense"), 0.05, &error));
+  CHECK(!check_expect(view, "stance", text("attack"), 0.05, &error));
   CHECK(check_expect(view, "tactical_mode", text("retreat"), 0.05, &error));
   CHECK(check_expect(view, "tactical_mode", number(4), 0.05, &error));
   CHECK(!check_expect(view, "tactical_mode", number(2), 0.05, &error));

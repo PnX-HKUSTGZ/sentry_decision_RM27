@@ -16,6 +16,7 @@ export function createWorldPanel(el) {
       }
       let html = '<table>';
       html += row('模式', d ? d.modeName : '-');
+      html += row('期望 / 当前姿态', (d ? d.stanceName : '-') + ' / ' + w.stanceName);
       html += row('血量 / 弹量', w.selfHp + ' / ' + w.selfAmmo);
       html += row('金币', w.coins);
       html += row('己方基地 / 前哨', w.baseHp + ' / ' + w.ourOutpostHp);

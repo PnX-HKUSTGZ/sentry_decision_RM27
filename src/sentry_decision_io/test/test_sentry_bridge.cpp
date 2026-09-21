@@ -75,7 +75,7 @@ void test_apply_online_decodes_bitfields() {
   CHECK(state.info1.can_free_resurrect);
   CHECK(state.info2.disengaged);
   CHECK(state.info2.remaining_ammo_exchange == 0x7FF);
-  CHECK(state.info2.stance == 2);
+  CHECK(state.info2.stance == SentryStance::kDefense);
   CHECK(state.info2.can_activate_energy);
   CHECK(state.info2.stance_enhanced);
   CHECK(state.info3.attack_stance_remaining_s == 5);

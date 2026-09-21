@@ -10,6 +10,9 @@ geometry_msgs/Twist cmd_vel
 # TacticalMode: 0 unknown / 1 patrol / 2 attack / 3 defend / 4 retreat / 5 heal / 6 respawn
 uint8 tactical_mode
 
+# SentryStance: 0 unknown / 1 attack / 2 defense / 3 move
+uint8 stance
+
 # ResourceRequest
 uint16 resource_ammo
 uint16 resource_hp

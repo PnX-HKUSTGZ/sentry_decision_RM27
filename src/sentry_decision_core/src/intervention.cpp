@@ -40,6 +40,8 @@ const char* InterventionController::module_for_field(IntentField field) {
       return "resource";
     case IntentField::kTacticalMode:
       return "strategic";
+    case IntentField::kStance:
+      return "strategic";
   }
   return "";
 }

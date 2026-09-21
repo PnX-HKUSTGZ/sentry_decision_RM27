@@ -29,6 +29,19 @@ GameStatus decode_game_status(std::uint8_t raw) {
   }
 }
 
+SentryStance decode_stance(std::uint8_t raw) {
+  switch (raw) {
+    case 1:
+      return SentryStance::kAttack;
+    case 2:
+      return SentryStance::kDefense;
+    case 3:
+      return SentryStance::kMove;
+    default:
+      return SentryStance::kUnknown;
+  }
+}
+
 EventCode decode_event_code(std::uint32_t raw) {
   EventCode out;
   out.supply_zone_occupied = bits(raw, 0, 1) != 0;
@@ -61,7 +74,7 @@ SentryInfo2 decode_sentry_info2(std::uint16_t raw) {
   SentryInfo2 out;
   out.disengaged = bits(raw, 0, 1) != 0;
   out.remaining_ammo_exchange = static_cast<std::uint16_t>(bits(raw, 1, 11));
-  out.stance = static_cast<std::uint8_t>(bits(raw, 12, 2));
+  out.stance = decode_stance(static_cast<std::uint8_t>(bits(raw, 12, 2)));
   out.can_activate_energy = bits(raw, 14, 1) != 0;
   out.stance_enhanced = bits(raw, 15, 1) != 0;
   return out;

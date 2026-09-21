@@ -48,6 +48,12 @@ void test_manual_override() {
   CHECK(parse_manual_override(3, "4", 1.0, "", &command, &error));
   CHECK(std::get<TacticalMode>(command.intent.value) == TacticalMode::kRetreat);
 
+  CHECK(parse_manual_override(4, "attack", 1.0, "", &command, &error));
+  CHECK(std::get<SentryStance>(command.intent.value) == SentryStance::kAttack);
+  CHECK(parse_manual_override(4, "2", 1.0, "", &command, &error));
+  CHECK(std::get<SentryStance>(command.intent.value) == SentryStance::kDefense);
+  CHECK(!parse_manual_override(4, "bogus", 1.0, "", &command, &error));
+
   CHECK(!parse_manual_override(9, "1", 1.0, "", &command, &error));
   CHECK(!parse_manual_override(0, "not_a_point", 1.0, "", &command, &error));
   CHECK(!parse_manual_override(2, "{ammo: x}", 1.0, "", &command, &error));

@@ -5,6 +5,7 @@ import {
   escapeHtml,
   nodeStatusName,
   parseListState,
+  stanceName,
   tacticalModeName,
   treeStatusToView,
   worldStateToView,
@@ -24,6 +25,7 @@ check(nodeStatusName(1) === 'RUNNING', 'nodeStatusName');
 check(nodeStatusName(9) === '#9', 'nodeStatusName unknown');
 check(tacticalModeName(4) === 'retreat', 'tacticalModeName');
 check(tacticalModeName(42) === '#42', 'tacticalModeName unknown');
+check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
 
 const tree = treeStatusToView({
   tick: 3,
@@ -56,6 +58,8 @@ const world = worldStateToView({
 check(world.posX === 1 && world.navGoalY === 4, 'world view');
 const decision = decisionToView({ output: { tactical_mode: 4, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
 check(decision.modeName === 'retreat', 'decision mode');
+const decisionMapped = decisionToView({ output: { tactical_mode: 2, stance: 1 } });
+check(decisionMapped.stanceName === 'attack', 'decision stance');
 
 const model = battlefieldModel(world, decision);
 check(model.self.x === 1 && model.self.y === 2, 'battlefield self');

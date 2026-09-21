@@ -97,6 +97,30 @@ void test_type_mismatch() {
   CHECK(!result.warnings.empty());
 }
 
+void test_stance_field() {
+  const TimePoint t0{};
+  IntentArbiter arbiter;
+  Intent stance;
+  stance.field = IntentField::kStance;
+  stance.source = SourceId::kStrategic;
+  stance.priority = Priority::kTactical;
+  stance.stamp = t0;
+  stance.value = SentryStance::kDefense;
+  arbiter.submit(stance);
+  const ArbiterResult result = arbiter.resolve(t0);
+  CHECK(result.output.stance == SentryStance::kDefense);
+  CHECK(result.winners.at(IntentField::kStance) == SourceId::kStrategic);
+
+  Intent override_stance;
+  override_stance.field = IntentField::kStance;
+  override_stance.source = SourceId::kIntervention;
+  override_stance.priority = Priority::kIntervention;
+  override_stance.stamp = t0;
+  override_stance.value = SentryStance::kMove;
+  arbiter.submit(override_stance);
+  CHECK(arbiter.resolve(t0).output.stance == SentryStance::kMove);
+}
+
 void test_fresher_wins_on_tie() {
   const TimePoint t0{};
   IntentArbiter arbiter;
@@ -115,6 +139,7 @@ int main() {
   test_non_owner_warning();
   test_clear_source();
   test_type_mismatch();
+  test_stance_field();
   test_fresher_wins_on_tie();
   if (g_failures == 0) {
     std::printf("all core arbiter tests passed\n");

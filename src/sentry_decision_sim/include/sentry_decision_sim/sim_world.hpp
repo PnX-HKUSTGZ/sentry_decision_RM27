@@ -55,6 +55,7 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
 // 决策输出的纯视图，供 expect 断言，避免依赖 ROS 消息。
 struct DecisionView {
   int tactical_mode = 0;
+  int stance = 0;
   bool has_nav_goal = false;
   double nav_goal_x = 0.0;
   double nav_goal_y = 0.0;
