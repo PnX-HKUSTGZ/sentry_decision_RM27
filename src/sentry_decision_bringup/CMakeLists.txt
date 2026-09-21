@@ -109,6 +109,16 @@ if(BUILD_TESTING)
   add_test(NAME mission_nav
     COMMAND test_mission_nav ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml)
 
+  add_executable(test_preemption test/test_preemption.cpp)
+  target_link_libraries(test_preemption
+    sentry_decision_core::sentry_decision_core
+    sentry_decision_nodes::sentry_decision_common
+    sentry_decision_nodes::sentry_decision_nav
+    sentry_decision_nodes::sentry_decision_strategic
+    behaviortree_cpp::behaviortree_cpp)
+  add_test(NAME preemption
+    COMMAND test_preemption ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml)
+
   add_executable(test_replay_determinism test/test_replay_determinism.cpp)
   target_link_libraries(test_replay_determinism
     sentry_decision_core::sentry_decision_core

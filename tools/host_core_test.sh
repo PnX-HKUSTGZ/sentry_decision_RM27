@@ -9,12 +9,12 @@ OUT="$(mktemp -d)"
 
 NODES="$ROOT/src/sentry_decision_nodes"
 CORE_SOURCES=("$CORE/src/action_dispatcher.cpp" "$CORE/src/arbiter.cpp" "$CORE/src/intervention.cpp"
-  "$CORE/src/logging.cpp" "$CORE/src/referee_protocol.cpp" "$CORE/src/replay.cpp"
-  "$CORE/src/safety_supervisor.cpp" "$CORE/src/world_model.cpp")
+  "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/referee_protocol.cpp"
+  "$CORE/src/replay.cpp" "$CORE/src/safety_supervisor.cpp" "$CORE/src/world_model.cpp")
 SIM_SOURCES=("$SIM/src/referee_simulator.cpp" "$SIM/src/nav_simulator.cpp"
   "$SIM/src/decision_actuator_sim.cpp")
 
-for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay test_config test_action_dispatcher test_safety_supervisor test_intervention; do
+for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay test_config test_action_dispatcher test_safety_supervisor test_intervention test_nav_goal_tracker; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "${CORE_SOURCES[@]}" \
     "$CORE/test/$test.cpp" -o "$OUT/$test"
   "$OUT/$test"

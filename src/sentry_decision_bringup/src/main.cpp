@@ -16,6 +16,7 @@
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_core/nav_goal_tracker.hpp"
 #include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
@@ -153,7 +154,7 @@ int main(int argc, char** argv) {
   sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
   const TimePoint epoch = SteadyClock::now();
-  std::optional<sentry_decision::Point2D> last_goal;
+  sentry_decision::NavGoalTracker nav_tracker;
   bool safety_emergency = false;
 
   for (int tick = 0; tick < options.ticks; ++tick) {
@@ -188,17 +189,14 @@ int main(int argc, char** argv) {
     sentry_decision::ArbiterResult safe_result = result;
     safe_result.output = safe.output;
 
-    // 用仲裁后的目标驱动伪导航；做边沿检测，避免每 tick 重发导致无法到达。
-    if (safe_result.output.nav_goal.has_value()) {
-      const sentry_decision::Point2D& goal = *safe_result.output.nav_goal;
-      if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y ||
-          last_goal->yaw != goal.yaw) {
-        navigation.send_goal(goal);
-        last_goal = goal;
-      }
-    } else if (last_goal.has_value()) {
+    // 用仲裁后的目标驱动伪导航；NavGoalTracker 负责边沿 / 取消契约。
+    const sentry_decision::NavGoalTracker::Step nav_step =
+        nav_tracker.update(safe_result.output.nav_goal);
+    if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kSend &&
+        nav_step.goal.has_value()) {
+      navigation.send_goal(*nav_step.goal);
+    } else if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kCancel) {
       navigation.cancel_goal();
-      last_goal.reset();
     }
 
     // 决策动作：本地模拟执行端回执，离线跑通 one-shot / ack 闭环。

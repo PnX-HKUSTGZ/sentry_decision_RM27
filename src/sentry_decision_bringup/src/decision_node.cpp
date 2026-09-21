@@ -17,6 +17,7 @@
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_core/nav_goal_tracker.hpp"
 #include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_io/decision_state_publisher.hpp"
@@ -171,18 +172,14 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
-  // 导航目标边沿检测：只有目标变化时才下发，避免每 tick 重发导致无法到达。
+  // 导航目标跟随：用 NavGoalTracker 做边沿 / 取消契约，避免每 tick 重发。
   void apply_nav(const sentry_decision::ArbiterResult& result) {
-    if (result.output.nav_goal.has_value()) {
-      const sentry_decision::Point2D& goal = *result.output.nav_goal;
-      if (!last_goal_.has_value() || last_goal_->x != goal.x || last_goal_->y != goal.y ||
-          last_goal_->yaw != goal.yaw) {
-        io_->send_goal(goal);
-        last_goal_ = goal;
-      }
-    } else if (last_goal_.has_value()) {
+    const sentry_decision::NavGoalTracker::Step step = nav_tracker_.update(result.output.nav_goal);
+    if (step.decision == sentry_decision::NavGoalTracker::Decision::kSend &&
+        step.goal.has_value()) {
+      io_->send_goal(*step.goal);
+    } else if (step.decision == sentry_decision::NavGoalTracker::Decision::kCancel) {
       io_->cancel_goal();
-      last_goal_.reset();
     }
   }
 
@@ -208,7 +205,7 @@ class DecisionNode : public rclcpp::Node {
   sentry_decision_io::DecisionStatePublisher state_publisher_;
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
-  std::optional<sentry_decision::Point2D> last_goal_;
+  sentry_decision::NavGoalTracker nav_tracker_;
   bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;

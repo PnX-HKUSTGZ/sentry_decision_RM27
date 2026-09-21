@@ -53,8 +53,12 @@
   - core `SafetySupervisor`：仲裁后最终限幅 + 数据失效急停（撤销导航目标、速度清零）；在两个入口接入并按状态变化记日志。
   - core `InterventionController`：意图注入（统一 `kIntervention` 来源 / 优先级 + lease）、世界状态覆盖（类型化 `WorldField`）、模块开关；走同一仲裁，不能绕过安全。
   - 验证：`test_safety_supervisor` / `test_intervention`；容器 7 包 / 26 测试 0 失败。
-- 待办：P2.3b 串口字节层；`resource` 模块；intervention 的 ROS action / service（P3）。
-- 下一步：P2.5 回归——抢占 / halt 契约测试、场景脚本、差异报告。
+- **P2.5 回归完成（本地）**：
+  - core `NavGoalTracker`：把导航目标的「发送 / 取消 / 不变」边沿契约显式化，接入 `decision_node` / `decision_main`。
+  - `test_preemption`：进攻 -> 低血抢占撤退 -> 恢复进攻，断言目标改派 / 不重发 / 撤销取消，且每 tick 至多一个 nav_goal。
+  - 回归：回放确定性、表驱动 golden、抢占契约；容器 7 包 / 28 测试 0 失败。
+- 待办：P2.3b 串口字节层；`resource` 模块；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
+- P2 主体已完成（本地范围）；下一步进入 P3 可视化与仿真，或补 `resource` 模块。
 
 ### 历史（P1 / P2 接口）
 

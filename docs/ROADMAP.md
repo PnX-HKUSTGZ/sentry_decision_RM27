@@ -71,7 +71,7 @@
 | P2.3a 动作派发与 ack（已完成） | `ActionDispatcher`（one-shot / polled / ack 状态机）、资源请求→动作提交、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks` | one-shot 只发一次、polled 按间隔重发、ack 清除、超时 WARN 有单测；离线 ack 闭环通过 |
 | P2.3b 串口适配（待协议） | auto-aim 侧 `DecisionCommand` → 串口帧、`code` 取值表、`detect_color` | 与电控 / MCU 联调；本阶段不实现 |
 | P2.4 安全与干预（core 侧已完成） | `SafetySupervisor` 限幅 / 急停；`InterventionController` 意图注入、世界覆盖、模块开关（ROS action / service 留 P3） | 安全压过 intervention / tactical；急停与 lease 有宿主单测 |
-| P2.5 回归 | 场景脚本、抢占 / halt 契约测试、差异报告、文档 | 抢占 / halt 用例通过；回放确定性；文档同步 |
+| P2.5 回归（已完成，本地范围） | `NavGoalTracker` 目标边沿 / 取消契约、抢占契约测试、回放确定性、表驱动 golden；差异报告待旧 bag | 抢占 / halt 用例通过；回放确定性；文档同步 |
 
 > P2.0 已完成（本地范围）：分层树骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析。
 > P2.1 战略层已完成：`StrategicPolicy` 接口、规则状态机、`apply_strategy` 接入。
@@ -79,7 +79,8 @@
 > P2.3a 动作派发与 ack 已完成：`ActionDispatcher` + `DecisionActuatorSim` 离线闭环。
 > 功能域 `.so` 拆分（`common` / `nav` / `strategic`）与 `module.yaml` provides / consumes 校验已完成。
 > P2.4 core 侧已完成：`SafetySupervisor` 与 `InterventionController` 已接入两个入口。
-> P2.3b（串口字节层）与 `resource` 模块仍待办。
+> P2.5 回归已完成（本地）：`NavGoalTracker` 契约 + 抢占测试 + 回放确定性。
+> 仍待办：P2.3b 串口字节层（待电控 / MCU）、`resource` 模块、旧 bag 差异报告。
 
 交付物：
 
@@ -144,5 +145,6 @@
   - 已完成（本地）：P2.3a 动作派发与 ack——`ActionDispatcher`（one-shot / polled / ack / 超时）、资源请求→动作、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks`；容器 23 测试通过。
   - 已完成（本地）：功能域 `.so` 拆分——`common` / `nav` / `strategic` 独立库、`tree_manifest.yaml` 按 `library` 加载、`module.yaml` provides / consumes 启动校验；容器 24 测试通过。
   - 已完成（本地）：P2.4 core 侧安全与干预——`SafetySupervisor`（限幅 / 急停）、`InterventionController`（意图注入 lease、世界覆盖、模块开关），已接入 `decision_node` / `decision_main`；容器 26 测试通过。
-  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；`resource` 模块；intervention 的 ROS action / service（P3）。
-  - 下一步：P2.5 回归——抢占 / halt 契约测试、场景脚本、差异报告。
+  - 已完成（本地）：P2.5 回归——`NavGoalTracker` 目标边沿 / 取消契约（接入两个入口）、抢占契约测试、回放确定性；容器 28 测试通过。
+  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；`resource` 模块；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
+  - P2 主体已完成（本地范围），下一步进入 P3 可视化与仿真，或补 `resource` 模块。

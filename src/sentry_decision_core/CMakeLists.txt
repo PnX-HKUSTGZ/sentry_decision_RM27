@@ -17,6 +17,7 @@ add_library(${PROJECT_NAME}
   src/arbiter.cpp
   src/intervention.cpp
   src/logging.cpp
+  src/nav_goal_tracker.cpp
   src/referee_protocol.cpp
   src/replay.cpp
   src/safety_supervisor.cpp
@@ -71,6 +72,10 @@ if(BUILD_TESTING)
   add_executable(test_intervention test/test_intervention.cpp)
   target_link_libraries(test_intervention ${PROJECT_NAME})
   add_test(NAME test_intervention COMMAND test_intervention)
+
+  add_executable(test_nav_goal_tracker test/test_nav_goal_tracker.cpp)
+  target_link_libraries(test_nav_goal_tracker ${PROJECT_NAME})
+  add_test(NAME test_nav_goal_tracker COMMAND test_nav_goal_tracker)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
