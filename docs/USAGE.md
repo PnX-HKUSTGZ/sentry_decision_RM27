@@ -2,6 +2,39 @@
 
 > 面向使用者的命令速查与参数说明。架构见 `docs/ARCHITECTURE.md`，开发规范见 `docs/CONVENTIONS.md`。
 
+## TL;DR
+
+```bash
+# 构建镜像（含 rosbridge，供网页面板）
+docker build -f docker/Dockerfile -t sentry_decision_rm27:jazzy .
+
+# 构建 + 全部测试（容器内）
+docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy test
+
+# 进入交互容器（后续命令都在容器内；先 source）
+docker run -it --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy shell
+source .docker-build/install/setup.bash
+```
+
+容器内常用命令：
+
+| 想做什么 | 命令 |
+| --- | --- |
+| 本地最小闭环（无需 MCU / 导航） | `ros2 run sentry_decision_bringup decision_main` |
+| 真实 IO 决策闭环 | `ros2 run sentry_decision_bringup decision_node` |
+| 裁判仿真（持续发布世界状态） | `ros2 run sentry_decision_sim referee_sim_node` |
+| 跑一个场景 | `ros2 run sentry_decision_sim referee_sim_node --scenario "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/full_match.yaml"` |
+| 网页面板（rosbridge :9090 + 页面 :8080） | `ros2 launch sentry_decision_viz viz.launch.py` |
+| 离线回放 | `ros2 run sentry_decision_bringup replay_main --bag <bag>` |
+| 查看决策状态 | `ros2 topic echo /decision/state`（或 `/decision/tree_status`、`/decision/world_state`） |
+| 查询干预 / 模块状态 | `ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand "{command: 'list_state', args: ''}"` |
+| 宿主纯逻辑测试 | `tools/host_core_test.sh` |
+| 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
+| 格式检查 | `tools/format.sh --check` |
+
+> 网页面板需要镜像含 `ros-jazzy-rosbridge-suite`；仓库 `docker/Dockerfile` 已包含，重建镜像即可。
+> 各功能的完整说明见下文对应章节。
+
 ## 1. 前置条件
 
 - Docker；
