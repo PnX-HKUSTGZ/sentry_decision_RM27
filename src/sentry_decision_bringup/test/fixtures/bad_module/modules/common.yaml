@@ -1,0 +1,6 @@
+name: common
+provides:
+  - intent.tactical_mode
+consumes:
+  - world.referee
+  - missing.field

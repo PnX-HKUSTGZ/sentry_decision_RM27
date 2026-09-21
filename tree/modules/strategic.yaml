@@ -1,0 +1,6 @@
+# strategic 模块元数据（C++ 战略策略，非 BT 插件）。
+name: strategic
+provides:
+  - context.strategy
+consumes:
+  - world.referee

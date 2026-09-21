@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!-- 负例：模块消费字段无提供者，启动校验必须失败。 -->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <EmitNavGoal x="0.0" y="0.0"/>
+  </BehaviorTree>
+</root>

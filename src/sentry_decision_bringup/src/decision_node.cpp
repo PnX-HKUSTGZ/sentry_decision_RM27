@@ -28,6 +28,9 @@
 #ifndef DEFAULT_CONFIG_PATH
 #define DEFAULT_CONFIG_PATH "config/profiles.yaml"
 #endif
+#ifndef DEFAULT_MODULE_LIB_DIR
+#define DEFAULT_MODULE_LIB_DIR ""
+#endif
 
 namespace {
 
@@ -115,7 +118,7 @@ class DecisionNode : public rclcpp::Node {
       factory_.registerFromPlugin(plugin);
     }
     if (!sentry_decision_bringup::setup_tree_factory(factory_, tree_path, context_.config, &errors,
-                                                     plugin.empty())) {
+                                                     DEFAULT_MODULE_LIB_DIR, plugin.empty())) {
       throw std::runtime_error("行为树校验失败: " + join_errors(errors));
     }
     auto blackboard = BT::Blackboard::create();

@@ -1,0 +1,6 @@
+root: root.xml
+modules:
+  common:
+    enabled: true
+    builtin: true
+    manifest: common.yaml

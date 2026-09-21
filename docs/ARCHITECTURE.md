@@ -207,8 +207,9 @@ flowchart TD
   3. 每个消费字段都有生产者；配置里的 key 均存在。
 - 新增 / 删除 / 开关模块 = 增删一个库 + 改一行配置，不碰核心代码。
 
-这样才真正实现「独立开关模块而不影响其他模块」。P2 首批模块：`common`（条件）、`nav`（导航技能）、
-`resource`（资源技能）、`intervention`（干预，默认关）、`strategic`（C++ 策略，非 BT 插件）。
+这样才真正实现「独立开关模块而不影响其他模块」。已拆分的模块：`common`（条件）、`nav`（导航技能）、
+`strategic`（C++ 策略，非 BT 插件）；`resource`、`intervention` 待补。模块库由 `tree_manifest.yaml` 的
+`library` 指定、经 `registerFromPlugin` 加载，`module.yaml` 的 provides / consumes 在启动时校验。
 
 ## 7. 行为树规范
 

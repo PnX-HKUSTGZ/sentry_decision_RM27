@@ -1,0 +1,6 @@
+# nav 模块元数据（导航技能节点）。
+name: nav
+provides:
+  - intent.nav_goal
+consumes:
+  - config.points

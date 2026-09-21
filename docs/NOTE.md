@@ -38,7 +38,11 @@
   - 条件节点：`IfTacticalMode`（读战略模式）、`IfEnemyOutpostDead`；技能 `GotoNamedPoint` 由任务传命名点。
   - `nav_executor` 回写 `NavState`（current_goal / reached / failed）已有，经 `WorldModel` 生效。
   - 验证：`test_mission_nav` 表驱动 6 场景；容器 7 包 / 21 测试 0 失败。
-- 待补：功能域 `.so` 拆分与 `module.yaml`（provides / consumes 校验）——当前启用/禁用已由 `tree_manifest.yaml` + 启动校验承担，`.so` 分离属编译期整理，优先级低于策略迁移。
+- **功能域 `.so` 拆分完成（本地）**：
+  - `sentry_decision_nodes` 拆为 `sentry_decision_common` / `sentry_decision_nav` / `sentry_decision_strategic` 三个独立库，各自 `BT_REGISTER_NODES` 自注册（strategic 为非 BT 插件）。
+  - `tree_manifest.yaml` 按 `library` 加载模块；库目录由 `sentry_decision_nodes_DIR` 在配置期回推（`DEFAULT_MODULE_LIB_DIR`）。
+  - `tree/modules/*.yaml` 声明 provides / consumes；启动校验「消费字段有提供者」「provides 不重复」，配负例测试。
+  - 验证：容器 7 包 / 24 测试 0 失败。
 - **P2.3a 动作派发与 ack 完成（本地）**：
   - core `ActionDispatcher`：one-shot 由无到有只发一次、polled 按 interval 重发、ack 按 `request_id` 清除、超时 WARN；纯逻辑，宿主单测。
   - `submit_resource_requests` 把 `ResourceRequest` 转成动作；`RosIoNode::take_acks` 把 `DecisionAck` 转 ROS 无关 `ActionAck` 供决策线程消费。

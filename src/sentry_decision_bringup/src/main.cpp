@@ -28,6 +28,9 @@
 #ifndef DEFAULT_CONFIG_PATH
 #define DEFAULT_CONFIG_PATH "config/profiles.yaml"
 #endif
+#ifndef DEFAULT_MODULE_LIB_DIR
+#define DEFAULT_MODULE_LIB_DIR ""
+#endif
 
 namespace {
 
@@ -120,6 +123,7 @@ int main(int argc, char** argv) {
     factory.registerFromPlugin(options.plugin);
   }
   if (!sentry_decision_bringup::setup_tree_factory(factory, options.tree, &loaded.config, &errors,
+                                                   DEFAULT_MODULE_LIB_DIR,
                                                    options.plugin.empty())) {
     std::cerr << "行为树校验失败: " << options.tree << "\n";
     for (const auto& error : errors) {
