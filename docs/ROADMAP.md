@@ -105,7 +105,7 @@
 
 | 子阶段 | 内容 | 验收 |
 | --- | --- | --- |
-| P3.0 观测底座（进行中） | `TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（节点状态 + active path）、Groot2 可选 hook | `/decision/tree_status` 状态与 active path 正确；容器测试通过 |
+| P3.0 观测底座（已完成） | `TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（节点状态 + active path）、Groot2 可选 hook | `/decision/tree_status` 状态与 active path 正确；容器测试通过 |
 | P3.1 裁判仿真 + 场景脚本 | `referee_sim_node`（发 `/sentry/*` + odom、导航 action server、动作回执）+ 场景 YAML 时间轴与断言 | 脚本驱动完整对局（巡逻→进攻→撤退→复活）并通过断言 |
 | P3.2 干预 ROS 接口 | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
 | P3.3 干预回放 | `ReplayData` 增干预通道、`ReplaySource` / `load_replay_data` 支持 | 含干预的回放逐 tick 确定，干预在原时刻复现 |
@@ -163,5 +163,5 @@
   - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；旧 bag 逐 tick 差异报告。
 - **P3 进行中**：
   - 设计已对齐（本地）：新增 `sentry_decision_viz`、树状态消息与 `/decision/tree_status`、Groot2 可选、干预 action / service（线程安全队列、tick 边界应用）、`referee_sim_node` 与场景脚本、干预回放、无构建网页面板；见 `docs/ARCHITECTURE.md` §14。
-  - 进行中（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus`、`TreeStatePublisher`、Groot2 可选 hook。
+  - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过。
   - P2 主体已完成（本地范围）。

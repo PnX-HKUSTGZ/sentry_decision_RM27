@@ -548,7 +548,8 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
   `status`（与 `BT::NodeStatus` 1:1：IDLE 0 / RUNNING 1 / SUCCESS 2 / FAILURE 3 / SKIPPED 4）。
 - `sentry_decision_msgs/msg/TreeStatus`：`header`、`tick`、`tick_ms`、
   `TreeNodeStatus[] nodes`、`string[] active_path`。
-- **active path** = 所有 `RUNNING` 节点及其祖先链，前端据此高亮当前执行分支。
+- **active path** = 所有 `RUNNING` 节点的 `full_path`：BT 中运行中节点的祖先必然也在运行，
+  因此等价于「RUNNING 及祖先链」。前端据此高亮当前执行分支。
 - 话题 `/decision/tree_status`，QoS 使用 transient local，保证后到订阅者能拿到最近一帧。
 
 发布与 `DecisionState` 同一节拍（默认 20 Hz）且在 tick 末尾，因此树状态与当拍输出一致。

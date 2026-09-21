@@ -10,7 +10,7 @@
 - 分支 `p3-viz-sim`（基于 `p2-strategy` @ `5e39311`），上游 `origin/p3-viz-sim` 已设置。
 - 子阶段：P3.0 观测底座 → P3.1 裁判仿真 + 场景脚本 → P3.2 干预 ROS 接口 → P3.3 干预回放 → P3.4 网页面板 → P3.5 文档与验收（详见 `docs/ROADMAP.md`）。
 - 包边界：新增 `sentry_decision_viz`（`TreeStatePublisher` + Groot2 桥 + 网页资产 + launch）；ROS 仿真节点 `referee_sim_node` 放 `sentry_decision_sim`（core 仿真库保持 ROS 无关）；`InterventionServer` 放 `sentry_decision_io`；干预 action / service 消息放 `sentry_decision_msgs`。
-- 树状态：`TreeStatus` / `TreeNodeStatus` 消息，`Tree::applyVisitor` 展平，active path = RUNNING 节点 + 祖先；`/decision/tree_status`（transient local）。
+- 树状态：`TreeStatus` / `TreeNodeStatus` 消息，`Tree::applyVisitor` 展平；active path 取 RUNNING 节点集合（运行中节点的祖先必然也在运行）；`/decision/tree_status`（transient local）。
 - Groot2：可选 `--groot2-port`（BT.CPP 4.9 已带 zmq），不作为 CI 验收。
 - 干预线程模型：service / action 回调只校验入队，tick 边界 drain 进 `InterventionController`；应用结果发 `/decision/intervention` 供录制回放。
 - 网页：vanilla JS + vendored `roslib.min.js`（锁版本、BSD-2），原生 ES modules 分层（bridge / store / panels / battlefield），无 npm 构建；为将来迁移 Vite + TS 留接缝。
@@ -20,7 +20,7 @@
 ### 进行中
 
 - 文档已同步：`ARCHITECTURE.md` §14（可视化与仿真）与 §5 / §10.6 / §12 / §17 引用；`ROADMAP.md` P3 子阶段与状态；`CHANGELOG.md` Unreleased。
-- 进行中（本地）：P3.0 观测底座——消息、`sentry_decision_viz` 包、`TreeStatePublisher`、Groot2 可选 hook、接线与测试。
+- 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 包与 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过，`format.sh --check` 通过。
 
 ### 待办
 

@@ -1,24 +1,17 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>sentry_decision_bringup</name>
+  <name>sentry_decision_viz</name>
   <version>0.0.0</version>
-  <description>RM27 哨兵决策组合根：main、行为树与 launch。</description>
+  <description>RM27 哨兵决策可视化：行为树状态发布与可选 Groot2 桥。</description>
   <maintainer email="hluo262@connect.hkust-gz.edu.cn">Appleblue17</maintainer>
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>rclcpp</depend>
   <depend>behaviortree_cpp</depend>
-  <depend>sentry_decision_core</depend>
-  <depend>sentry_decision_nodes</depend>
-  <depend>sentry_decision_io</depend>
-  <depend>sentry_decision_sim</depend>
-  <depend>sentry_decision_viz</depend>
-  <depend>yaml-cpp</depend>
-
-  <exec_depend>launch</exec_depend>
-  <exec_depend>launch_ros</exec_depend>
+  <depend>sentry_decision_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

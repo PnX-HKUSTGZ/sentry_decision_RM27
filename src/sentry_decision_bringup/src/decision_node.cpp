@@ -24,6 +24,8 @@
 #include "sentry_decision_io/ros_io_node.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
 #include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
+#include "sentry_decision_viz/groot2_bridge.hpp"
+#include "sentry_decision_viz/tree_state_publisher.hpp"
 
 #ifndef DEFAULT_TREE_PATH
 #define DEFAULT_TREE_PATH "tree/root.xml"
@@ -47,6 +49,7 @@ struct Options {
   std::string tree = DEFAULT_TREE_PATH;
   std::string config = DEFAULT_CONFIG_PATH;
   std::string plugin;
+  int groot2_port = 0;  // >0 时开启 Groot2 桥
 };
 
 Options parse_options(int argc, char** argv) {
@@ -70,6 +73,8 @@ Options parse_options(int argc, char** argv) {
       options.config = next("--config");
     } else if (arg == "--plugin") {
       options.plugin = next("--plugin");
+    } else if (arg == "--groot2-port") {
+      options.groot2_port = std::stoi(next("--groot2-port"));
     } else {
       std::cerr << "未知参数: " << arg << "\n";
       std::exit(2);
@@ -77,6 +82,10 @@ Options parse_options(int argc, char** argv) {
   }
   if (!(options.rate_hz > 0.0) || options.rate_hz > 1000.0) {
     std::cerr << "参数 --rate 必须在 (0, 1000] Hz 之间\n";
+    std::exit(2);
+  }
+  if (options.groot2_port < 0 || options.groot2_port > 65535) {
+    std::cerr << "参数 --groot2-port 必须在 [0, 65535] 之间（0 表示关闭）\n";
     std::exit(2);
   }
   return options;
@@ -109,6 +118,12 @@ class DecisionNode : public rclcpp::Node {
       policy_ = sentry_decision::RuleBasedStrategicPolicy::from_config(*config);
     }
     build_tree(options.tree, options.plugin);
+    tree_publisher_.emplace(*this);
+    if (options.groot2_port > 0) {
+      groot2_ = std::make_unique<sentry_decision_viz::Groot2Bridge>(
+          *tree_, static_cast<unsigned>(options.groot2_port));
+      SD_LOG_ACT("viz", "Groot2 已监听端口 %d", options.groot2_port);
+    }
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -141,7 +156,10 @@ class DecisionNode : public rclcpp::Node {
     for (const auto& intent : intervention_.active_intents(now)) {
       context_.emit(intent);
     }
+    const TimePoint tick_begin = SteadyClock::now();
     tree_->tickOnce();
+    const double tick_ms =
+        std::chrono::duration<double, std::milli>(SteadyClock::now() - tick_begin).count();
 
     // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
@@ -174,7 +192,9 @@ class DecisionNode : public rclcpp::Node {
     }
     apply_actions(safe_result, now);
 
-    state_publisher_.publish(context_.world, safe_result, tick_count_++);
+    const std::uint32_t tick = tick_count_++;
+    state_publisher_.publish(context_.world, safe_result, tick);
+    tree_publisher_->publish(*tree_, tick, tick_ms);
 
     if (max_ticks_ > 0 && tick_count_ >= static_cast<std::uint32_t>(max_ticks_)) {
       rclcpp::shutdown();
@@ -218,6 +238,8 @@ class DecisionNode : public rclcpp::Node {
   bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
+  std::optional<sentry_decision_viz::TreeStatePublisher> tree_publisher_;
+  std::unique_ptr<sentry_decision_viz::Groot2Bridge> groot2_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

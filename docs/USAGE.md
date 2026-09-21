@@ -99,12 +99,13 @@ ros2 node info /sentry_decision_io
 | --- | --- | --- |
 | `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
 | `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
+| `/decision/tree_status` | `sentry_decision_msgs/TreeStatus` | 行为树节点状态与 active path（transient local） |
 
 ```bash
-ros2 bag record /decision/state /decision/world_state
+ros2 bag record /decision/state /decision/world_state /decision/tree_status
 ```
 
-该发布类待决策节点接线后生效（P1 后续）。
+`decision_node` 已接线以上发布；`decision_main` 无 ROS，不发布。
 
 ### 4.5 配置
 
@@ -149,6 +150,7 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | `--tree` | 安装后的 `tree/root.xml` | 行为树入口 XML 路径 |
 | `--config` | 安装后的 `config/profiles.yaml` | 配置入口 YAML 路径 |
 | `--plugin` | 空 | 节点插件 `.so` 路径 |
+| `--groot2-port` | `0` | Groot2 监听端口，`0` 表示关闭（范围 `[0, 65535]`） |
 
 ### 5.3 io_node 参数
 
