@@ -61,6 +61,12 @@
   - `sentry_decision_resource` 独立 `.so`：`IfCanFreeResurrect` / `IfLowAmmo` / `IfCoinsAtLeast` + `RequestFreeRevive` / `RequestHpExchange` / `RequestAmmoExchange`。
   - `tree/resource/root.xml` 与 `MissionRoot` 并行求值（`ForceSuccess` 包裹），输出 `kResourceRequest`，经字段级仲裁与导航目标合并。
   - 验证：`test_resource` + 容器 7 包 / 29 测试 0 失败。
+- **Copilot review 修复（本地）**：
+  - `decision_node` 把配置 `map_frame` 注入 `RosIoNode`，不再固定默认 frame。
+  - 任务树新增最高优先级 `MissionRespawn`（死亡不发导航目标），复活交给 `ResourceRoot`；补 HP=0 回归。
+  - `config_loader`：数值必须完整解析（拒绝 `50oops`）；map 形式点位强制要求 `x`/`y`。
+  - `InterventionController::allows`：运行期模块开关按字段过滤意图，接入两个决策循环。
+  - 验证：容器 7 包 / 31 测试 0 失败。
 - 待办：P2.3b 串口字节层；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
 - P2 主体已完成（本地范围）；下一步进入 P3 可视化与仿真。
 

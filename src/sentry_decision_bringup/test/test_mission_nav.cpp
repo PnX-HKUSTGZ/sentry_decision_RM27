@@ -75,6 +75,15 @@ std::optional<Point2D> run_goal(const std::string& tree_path, const PolicyConfig
   return result.output.nav_goal;
 }
 
+void expect_no_goal(const std::string& tree_path, const PolicyConfig& config,
+                    const WorldState& world, const char* label) {
+  const std::optional<Point2D> goal = run_goal(tree_path, config, world);
+  CHECK(!goal.has_value());
+  if (goal.has_value()) {
+    std::printf("  场景 [%s]: 期望无目标，实际 (%.2f, %.2f)\n", label, goal->x, goal->y);
+  }
+}
+
 void expect_goal(const std::string& tree_path, const PolicyConfig& config, const WorldState& world,
                  double x, double y, const char* label) {
   const std::optional<Point2D> goal = run_goal(tree_path, config, world);
@@ -123,6 +132,10 @@ int main(int argc, char** argv) {
   world = make_world();
   world.referee.game_time_remaining = 500;  // 超出进攻窗口
   expect_goal(tree_path, config, world, 0.0, 1.1, "超出进攻窗口 -> 巡逻");
+
+  world = make_world();
+  world.referee.self_hp = 0;  // 阵亡 -> 不发导航目标，复活交给 ResourceRoot
+  expect_no_goal(tree_path, config, world, "阵亡 -> 无导航目标");
 
   if (g_failures == 0) {
     std::printf("all mission nav tests passed\n");

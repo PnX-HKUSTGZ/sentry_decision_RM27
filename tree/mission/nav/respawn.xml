@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!--
+  任务：阵亡（战略模式 kRespawn）。
+  进入条件：战略模式 = kRespawn(6)。
+  退出条件：复活后模式变化。
+  抢占关系：最高优先级；只锁存状态、不发导航目标，复活动作由 ResourceRoot 负责。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionRespawn">
+  <BehaviorTree ID="MissionRespawn">
+    <IfTacticalMode mode="6"/>
+  </BehaviorTree>
+</root>

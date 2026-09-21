@@ -142,6 +142,9 @@ class DecisionNode : public rclcpp::Node {
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter_.clear_source(sentry_decision::SourceId::kSkill);
     for (const auto& intent : context_.intents) {
+      if (!intervention_.allows(intent.field)) {
+        continue;  // 运行期模块开关关闭时，丢弃该字段的意图
+      }
       arbiter_.submit(intent);
     }
     const sentry_decision::ArbiterResult result = arbiter_.resolve(now);
@@ -237,7 +240,9 @@ int main(int argc, char** argv) {
   }
   SD_LOG_ACT("config", "%s", sentry_decision_bringup::format_config(loaded.config).c_str());
 
-  auto io = std::make_shared<sentry_decision_io::RosIoNode>();
+  rclcpp::NodeOptions io_options;
+  io_options.append_parameter_override("map_frame", loaded.config.map_frame);
+  auto io = std::make_shared<sentry_decision_io::RosIoNode>(io_options);
   try {
     auto decision = std::make_shared<DecisionNode>(io, options, &loaded.config);
     rclcpp::executors::MultiThreadedExecutor executor;

@@ -36,6 +36,11 @@ class InterventionController {
   // 未显式设置时默认启用。
   bool module_enabled(const std::string& module) const;
 
+  // 意图字段 -> 产出模块；用于运行期模块开关过滤。
+  static const char* module_for_field(IntentField field);
+  // 该字段是否允许提交（对应模块未关闭）。未知字段默认允许。
+  bool allows(IntentField field) const;
+
   void clear();
 
   // 当前未过期的注入意图（lease 判定）。

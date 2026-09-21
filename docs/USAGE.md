@@ -119,6 +119,7 @@ config/
 
 XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
 启动时校验配置与行为树的引用一致性；缺失即启动报错并列出缺项，生效配置打印为 `ACT` 日志。
+`decision_node` 会把地图配置的 `frame_id` 注入 IO 节点的 `map_frame` 参数，保证 Nav2 目标坐标系一致。
 
 ## 5. 命令参数
 

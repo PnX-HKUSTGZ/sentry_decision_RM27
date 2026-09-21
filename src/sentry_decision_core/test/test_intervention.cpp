@@ -78,6 +78,23 @@ void test_module_switch() {
   CHECK(controller.module_enabled("nav"));
 }
 
+// 运行期模块开关按字段过滤意图。
+void test_module_switch_filters_intents() {
+  InterventionController controller;
+  CHECK(controller.allows(IntentField::kNavGoal));
+  CHECK(controller.allows(IntentField::kResourceRequest));
+
+  controller.set_module_enabled("nav", false);
+  CHECK(!controller.allows(IntentField::kNavGoal));
+  CHECK(controller.allows(IntentField::kResourceRequest));
+
+  controller.set_module_enabled("strategic", false);
+  CHECK(!controller.allows(IntentField::kTacticalMode));
+
+  controller.clear();
+  CHECK(controller.allows(IntentField::kNavGoal));
+}
+
 }  // namespace
 
 int main() {
@@ -85,6 +102,7 @@ int main() {
   test_inject_overrides_same_field();
   test_world_override();
   test_module_switch();
+  test_module_switch_filters_intents();
   if (g_failures == 0) {
     std::printf("all intervention tests passed\n");
     return 0;

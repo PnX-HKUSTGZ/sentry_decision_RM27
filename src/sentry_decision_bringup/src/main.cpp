@@ -172,6 +172,9 @@ int main(int argc, char** argv) {
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter.clear_source(sentry_decision::SourceId::kSkill);
     for (const auto& intent : context.intents) {
+      if (!intervention.allows(intent.field)) {
+        continue;  // 运行期模块开关关闭时，丢弃该字段的意图
+      }
       arbiter.submit(intent);
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);

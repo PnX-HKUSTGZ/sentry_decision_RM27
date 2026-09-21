@@ -2,6 +2,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <sstream>
@@ -40,8 +41,14 @@ void flatten_scalars(const YAML::Node& node, const std::string& prefix,
     return;
   }
   try {
-    const double value = std::stod(text);
-    if (std::isfinite(value)) {
+    std::size_t consumed = 0;
+    const double value = std::stod(text, &consumed);
+    // 只允许尾部空白：必须完整消费字符串，避免 "50oops" 被当作 50。
+    std::size_t tail = consumed;
+    while (tail < text.size() && std::isspace(static_cast<unsigned char>(text[tail])) != 0) {
+      ++tail;
+    }
+    if (tail == text.size() && std::isfinite(value)) {
       config->numbers[prefix] = value;
       return;
     }
@@ -63,8 +70,13 @@ bool load_point(const YAML::Node& node, const std::string& name, sentry_decision
       out->y = node[1].as<double>();
       out->yaw = node.size() == 3 ? node[2].as<double>() : 0.0;
     } else if (node.IsMap()) {
-      out->x = node["x"] ? node["x"].as<double>() : 0.0;
-      out->y = node["y"] ? node["y"].as<double>() : 0.0;
+      // 点位是外部输入：map 形式必须显式给出 x 与 y，缺失即报错，不静默落到原点。
+      if (!node["x"] || !node["y"]) {
+        errors->push_back("点位 " + name + " 的 map 形式必须包含 x 和 y");
+        return false;
+      }
+      out->x = node["x"].as<double>();
+      out->y = node["y"].as<double>();
       out->yaw = node["yaw"] ? node["yaw"].as<double>() : 0.0;
     } else {
       errors->push_back("点位 " + name + " 格式不支持");

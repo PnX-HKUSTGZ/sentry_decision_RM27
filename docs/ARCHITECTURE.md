@@ -389,7 +389,7 @@ BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
 | --- | --- | --- | --- |
 | 世界状态注入 | `WorldState` 字段（血量、弹量、阶段、敌方位置） | IO 的 Sim / Override 源 | 触发策略分支 |
 | 意图注入 | 直接加一条 `Intent` | `IntentArbiter` 的 intervention 来源 | 手动接管 / 加动作 |
-| 模块开关 | 启用 / 禁用插件或子树 | 组合根 / 仲裁器来源过滤 | 隔离测试 |
+| 模块开关 | 加载期禁用插件；运行期按字段过滤意图 | `tree_manifest.yaml` 的 `enabled`；`InterventionController::allows`（`kNavGoal→nav` 等） | 隔离测试 |
 
 ### 10.2 接口
 

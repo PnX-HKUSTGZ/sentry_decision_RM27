@@ -26,6 +26,25 @@ bool InterventionController::module_enabled(const std::string& module) const {
   return it == module_switches_.end() ? true : it->second;
 }
 
+const char* InterventionController::module_for_field(IntentField field) {
+  switch (field) {
+    case IntentField::kNavGoal:
+      return "nav";
+    case IntentField::kChassisVel:
+      return "recovery";
+    case IntentField::kResourceRequest:
+      return "resource";
+    case IntentField::kTacticalMode:
+      return "strategic";
+  }
+  return "";
+}
+
+bool InterventionController::allows(IntentField field) const {
+  const char* module = module_for_field(field);
+  return module[0] == '\0' ? true : module_enabled(module);
+}
+
 void InterventionController::clear() {
   intents_.clear();
   world_overrides_.clear();

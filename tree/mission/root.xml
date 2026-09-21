@@ -7,6 +7,7 @@
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionRoot">
   <include path="../skill/goto_named_point.xml"/>
+  <include path="nav/respawn.xml"/>
   <include path="nav/retreat.xml"/>
   <include path="nav/supply.xml"/>
   <include path="nav/defend.xml"/>
@@ -15,6 +16,7 @@
   <include path="nav/patrol.xml"/>
   <BehaviorTree ID="MissionRoot">
     <ReactiveFallback name="MissionPriority">
+      <SubTree ID="MissionRespawn"/>
       <SubTree ID="MissionRetreat"/>
       <SubTree ID="MissionSupply"/>
       <SubTree ID="MissionDefend"/>

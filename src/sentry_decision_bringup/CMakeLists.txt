@@ -95,6 +95,20 @@ if(BUILD_TESTING)
             --config ${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles.yaml)
   set_tests_properties(module_manifest_missing_provider PROPERTIES WILL_FAIL TRUE)
 
+  # 非法数值（"50oops"）必须启动失败。
+  add_test(NAME config_bad_number
+    COMMAND decision_main --ticks 1
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_number/profiles.yaml)
+  set_tests_properties(config_bad_number PROPERTIES WILL_FAIL TRUE)
+
+  # 点位缺 x/y 必须启动失败。
+  add_test(NAME config_bad_point
+    COMMAND decision_main --ticks 1
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_point/profiles.yaml)
+  set_tests_properties(config_bad_point PROPERTIES WILL_FAIL TRUE)
+
   add_test(NAME decision_node_boot
     COMMAND decision_node --ticks 5 --rate 200
             --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
