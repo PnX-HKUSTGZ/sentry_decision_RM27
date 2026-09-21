@@ -15,7 +15,9 @@
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
+#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_io/decision_state_publisher.hpp"
 #include "sentry_decision_io/ros_io_node.hpp"
@@ -128,9 +130,12 @@ class DecisionNode : public rclcpp::Node {
 
   void tick() {
     const TimePoint now = SteadyClock::now();
-    context_.world = world_model_.snapshot(now);
+    context_.world = intervention_.apply_world(world_model_.snapshot(now));
     context_.clear_intents();
     context_.apply_strategy(policy_.decide(context_.world));
+    for (const auto& intent : intervention_.active_intents(now)) {
+      context_.emit(intent);
+    }
     tree_->tickOnce();
 
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
@@ -140,13 +145,26 @@ class DecisionNode : public rclcpp::Node {
     }
     const sentry_decision::ArbiterResult result = arbiter_.resolve(now);
 
-    apply_nav(result);
-    if (result.output.cmd_vel.has_value()) {
-      io_->set_velocity(*result.output.cmd_vel);
+    // 安全监督：仲裁后做最终限幅与急停兜底。
+    const sentry_decision::SafetyResult safe = safety_.apply(context_.world, result.output);
+    if (safe.emergency != safety_emergency_) {
+      if (safe.emergency) {
+        SD_LOG_WARN("safety", "触发急停: %s", join_errors(safe.reasons).c_str());
+      } else {
+        SD_LOG_ACT("safety", "急停解除");
+      }
+      safety_emergency_ = safe.emergency;
     }
-    apply_actions(result, now);
+    sentry_decision::ArbiterResult safe_result = result;
+    safe_result.output = safe.output;
 
-    state_publisher_.publish(context_.world, result, tick_count_++);
+    apply_nav(safe_result);
+    if (safe_result.output.cmd_vel.has_value()) {
+      io_->set_velocity(*safe_result.output.cmd_vel);
+    }
+    apply_actions(safe_result, now);
+
+    state_publisher_.publish(context_.world, safe_result, tick_count_++);
 
     if (max_ticks_ > 0 && tick_count_ >= static_cast<std::uint32_t>(max_ticks_)) {
       rclcpp::shutdown();
@@ -184,11 +202,14 @@ class DecisionNode : public rclcpp::Node {
   sentry_decision::WorldModel world_model_;
   sentry_decision::IntentArbiter arbiter_;
   sentry_decision::ActionDispatcher dispatcher_;
+  sentry_decision::InterventionController intervention_;
+  sentry_decision::SafetySupervisor safety_;
   sentry_decision::RuleBasedStrategicPolicy policy_;
   sentry_decision_io::DecisionStatePublisher state_publisher_;
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
   std::optional<sentry_decision::Point2D> last_goal_;
+  bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
   rclcpp::TimerBase::SharedPtr timer_;

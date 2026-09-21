@@ -49,7 +49,12 @@
   - `DecisionActuatorSim` 模拟执行端延迟回执，`decision_main` 离线跑通 ack 闭环。
   - 验证：宿主 + 容器 7 包 / 23 测试 0 失败。
 - **P2.3b 待办（不实现）**：auto-aim 侧 `DecisionCommand` → 串口字节帧、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。
-- 下一步：P2.4 `SafeSupervisor` 与 `intervention` core 侧注入。
+- **P2.4 core 侧完成（本地）**：
+  - core `SafetySupervisor`：仲裁后最终限幅 + 数据失效急停（撤销导航目标、速度清零）；在两个入口接入并按状态变化记日志。
+  - core `InterventionController`：意图注入（统一 `kIntervention` 来源 / 优先级 + lease）、世界状态覆盖（类型化 `WorldField`）、模块开关；走同一仲裁，不能绕过安全。
+  - 验证：`test_safety_supervisor` / `test_intervention`；容器 7 包 / 26 测试 0 失败。
+- 待办：P2.3b 串口字节层；`resource` 模块；intervention 的 ROS action / service（P3）。
+- 下一步：P2.5 回归——抢占 / halt 契约测试、场景脚本、差异报告。
 
 ### 历史（P1 / P2 接口）
 

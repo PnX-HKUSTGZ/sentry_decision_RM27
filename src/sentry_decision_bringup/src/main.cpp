@@ -14,7 +14,9 @@
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
+#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
+#include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
 #include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
@@ -146,18 +148,24 @@ int main(int argc, char** argv) {
 
   sentry_decision::IntentArbiter arbiter;
   sentry_decision::ActionDispatcher dispatcher;
+  sentry_decision::InterventionController intervention;
+  sentry_decision::SafetySupervisor safety;
   sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
   const TimePoint epoch = SteadyClock::now();
   std::optional<sentry_decision::Point2D> last_goal;
+  bool safety_emergency = false;
 
   for (int tick = 0; tick < options.ticks; ++tick) {
     const TimePoint now = epoch + period * tick;
     referee.update(now);
     navigation.update(now);
-    context.world = world_model.snapshot(now);
+    context.world = intervention.apply_world(world_model.snapshot(now));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
+    for (const auto& intent : intervention.active_intents(now)) {
+      context.emit(intent);
+    }
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
@@ -167,9 +175,22 @@ int main(int argc, char** argv) {
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);
 
+    // 安全监督：仲裁后做最终限幅与急停兜底。
+    const sentry_decision::SafetyResult safe = safety.apply(context.world, result.output);
+    if (safe.emergency != safety_emergency) {
+      if (safe.emergency) {
+        SD_LOG_WARN("safety", "触发急停");
+      } else {
+        SD_LOG_ACT("safety", "急停解除");
+      }
+      safety_emergency = safe.emergency;
+    }
+    sentry_decision::ArbiterResult safe_result = result;
+    safe_result.output = safe.output;
+
     // 用仲裁后的目标驱动伪导航；做边沿检测，避免每 tick 重发导致无法到达。
-    if (result.output.nav_goal.has_value()) {
-      const sentry_decision::Point2D& goal = *result.output.nav_goal;
+    if (safe_result.output.nav_goal.has_value()) {
+      const sentry_decision::Point2D& goal = *safe_result.output.nav_goal;
       if (!last_goal.has_value() || last_goal->x != goal.x || last_goal->y != goal.y ||
           last_goal->yaw != goal.yaw) {
         navigation.send_goal(goal);
@@ -184,17 +205,17 @@ int main(int argc, char** argv) {
     for (const auto& ack : actuator.take_acks()) {
       dispatcher.on_ack(ack);
     }
-    sentry_decision::submit_resource_requests(dispatcher, result.output.resource);
+    sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
     for (const auto& action : dispatcher.poll(now)) {
       actuator.send_action(action);
     }
     actuator.update();
 
-    if (result.output.nav_goal.has_value()) {
+    if (safe_result.output.nav_goal.has_value()) {
       SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f) pos=(%.2f, %.2f)", tick,
-                 context.world.referee.self_hp, static_cast<int>(result.output.tactical_mode),
-                 result.output.nav_goal->x, result.output.nav_goal->y, navigation.pose().x,
-                 navigation.pose().y);
+                 context.world.referee.self_hp, static_cast<int>(safe_result.output.tactical_mode),
+                 safe_result.output.nav_goal->x, safe_result.output.nav_goal->y,
+                 navigation.pose().x, navigation.pose().y);
     } else {
       SD_LOG_ACT("bringup", "tick %d hp=%d 无导航目标", tick, context.world.referee.self_hp);
     }

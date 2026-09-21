@@ -70,7 +70,7 @@
 | P2.2 nav_policy + nav_executor（已完成） | `mission/nav/*`（撤退 / 补给 / 防守 / 高地 / 进攻 / 巡逻）+ `skill/goto_named_point`；战略模式驱动任务选择；`nav_executor` 回写 `NavState`；接仲裁 | 表驱动 `WorldState → nav_goal`，覆盖旧 `RMUC.xml` 分支 |
 | P2.3a 动作派发与 ack（已完成） | `ActionDispatcher`（one-shot / polled / ack 状态机）、资源请求→动作提交、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks` | one-shot 只发一次、polled 按间隔重发、ack 清除、超时 WARN 有单测；离线 ack 闭环通过 |
 | P2.3b 串口适配（待协议） | auto-aim 侧 `DecisionCommand` → 串口帧、`code` 取值表、`detect_color` | 与电控 / MCU 联调；本阶段不实现 |
-| P2.4 安全与干预 | `SafeSupervisor` 兜底；`intervention` core 侧注入与模块开关 | 安全压过 intervention / tactical；关闭模块行为可预期 |
+| P2.4 安全与干预（core 侧已完成） | `SafetySupervisor` 限幅 / 急停；`InterventionController` 意图注入、世界覆盖、模块开关（ROS action / service 留 P3） | 安全压过 intervention / tactical；急停与 lease 有宿主单测 |
 | P2.5 回归 | 场景脚本、抢占 / halt 契约测试、差异报告、文档 | 抢占 / halt 用例通过；回放确定性；文档同步 |
 
 > P2.0 已完成（本地范围）：分层树骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析。
@@ -78,7 +78,8 @@
 > P2.2 nav_policy + nav_executor 已完成：六个任务子树 + 战略模式驱动选择；`nav_executor` 状态回写。
 > P2.3a 动作派发与 ack 已完成：`ActionDispatcher` + `DecisionActuatorSim` 离线闭环。
 > 功能域 `.so` 拆分（`common` / `nav` / `strategic`）与 `module.yaml` provides / consumes 校验已完成。
-> P2.3b（串口字节层）仍待办。
+> P2.4 core 侧已完成：`SafetySupervisor` 与 `InterventionController` 已接入两个入口。
+> P2.3b（串口字节层）与 `resource` 模块仍待办。
 
 交付物：
 
@@ -142,5 +143,6 @@
   - 进行中：P2 策略迁移，设计已对齐——战略层为纯 C++ `StrategicPolicy` 接口、任务 / 技能实现为分层小树、配置外置、删除姿态、弃用 `/set_bool`（见 `docs/ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §14）。
   - 已完成（本地）：P2.3a 动作派发与 ack——`ActionDispatcher`（one-shot / polled / ack / 超时）、资源请求→动作、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks`；容器 23 测试通过。
   - 已完成（本地）：功能域 `.so` 拆分——`common` / `nav` / `strategic` 独立库、`tree_manifest.yaml` 按 `library` 加载、`module.yaml` provides / consumes 启动校验；容器 24 测试通过。
-  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；`resource` / `intervention` 模块。
-  - 下一步：P2.4 安全（SafeSupervisor）与 `intervention` core 侧注入。
+  - 已完成（本地）：P2.4 core 侧安全与干预——`SafetySupervisor`（限幅 / 急停）、`InterventionController`（意图注入 lease、世界覆盖、模块开关），已接入 `decision_node` / `decision_main`；容器 26 测试通过。
+  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；`resource` 模块；intervention 的 ROS action / service（P3）。
+  - 下一步：P2.5 回归——抢占 / halt 契约测试、场景脚本、差异报告。
