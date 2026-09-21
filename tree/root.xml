@@ -7,6 +7,6 @@
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <include path="mission/root.xml"/>
   <BehaviorTree ID="MainTree">
-    <SubTree ID="MissionRoot" __shared_blackboard="true"/>
+    <SubTree ID="MissionRoot"/>
   </BehaviorTree>
 </root>

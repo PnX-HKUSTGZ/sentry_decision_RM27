@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+  任务：弹药不足时回补给点（回家补给）。
+  进入条件：战略模式 = kHeal(5)。
+  退出条件：弹药恢复后模式变化。
+  抢占关系：低于撤退，高于防守。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionSupply">
+  <BehaviorTree ID="MissionSupply">
+    <Sequence name="SupplySequence">
+      <IfTacticalMode mode="5"/>
+      <SubTree ID="GotoNamedPoint" target_point="home"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

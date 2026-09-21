@@ -7,6 +7,6 @@
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionPatrol">
   <BehaviorTree ID="MissionPatrol">
-    <SubTree ID="GotoNamedPoint" target_point="patrol_a" __shared_blackboard="true"/>
+    <SubTree ID="GotoNamedPoint" target_point="patrol_a"/>
   </BehaviorTree>
 </root>

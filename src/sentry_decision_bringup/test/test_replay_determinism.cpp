@@ -30,8 +30,12 @@ void check(bool ok, const char* expr, const char* file, int line) {
 PolicyConfig make_config() {
   PolicyConfig config;
   config.points["home"] = Point2D{-5.0, 3.0, 0.0};
+  config.points["fort"] = Point2D{-5.0, 3.0, 0.0};
+  config.points["central_highland"] = Point2D{-1.1, -1.1, 0.0};
+  config.points["enemy_outpost"] = Point2D{1.1, 1.1, 0.0};
   config.points["patrol_a"] = Point2D{1.1, 1.1, 0.0};
   config.numbers["nav.retreat_hp"] = 50.0;
+  config.numbers["nav.low_ammo"] = 50.0;
   return config;
 }
 

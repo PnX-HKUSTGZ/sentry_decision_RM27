@@ -3,7 +3,7 @@ frame_id: map
 points:
   home:             [-5.0,  3.0, 0.0]
   healing:          [-6.0,  4.0, 0.0]
-  patrol_a:         [ 1.1,  1.1, 0.0]
+  patrol_a:         [ 0.0,  1.1, 0.0]
   patrol_b:         [-1.1, -1.1, 0.0]
   enemy_outpost:    [ 1.1,  1.1, 0.0]
   central_highland: [-1.1, -1.1, 0.0]

@@ -82,4 +82,40 @@ class EmitNavGoalFromPoint : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
+// =============================================================================
+// Node:         IfTacticalMode
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断本 tick 战略层给出的战术模式是否等于期望值，用于任务选择。
+// Inputs:       mode: int (端口, TacticalMode 枚举值)
+// Outputs:      -
+// Blackboard:   read: context(context.strategy.mode)  write: (none)
+// Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
+// Side Effects: none
+// See:          tree/mission/nav/retreat.xml
+// =============================================================================
+class IfTacticalMode : public BT::SyncActionNode {
+ public:
+  IfTacticalMode(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// =============================================================================
+// Node:         IfEnemyOutpostDead
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断敌方前哨是否已被击毁（用于转去中央高地）。
+// Inputs:       -
+// Outputs:      -
+// Blackboard:   read: context(world.referee.valid, enemy_outpost_hp)  write: (none)
+// Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
+// Side Effects: none
+// See:          tree/mission/nav/highland.xml
+// =============================================================================
+class IfEnemyOutpostDead : public BT::SyncActionNode {
+ public:
+  IfEnemyOutpostDead(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
 }  // namespace sentry_decision

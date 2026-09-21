@@ -33,7 +33,13 @@
   - `RuleBasedStrategicPolicy`（优先级：复活 > 撤退 > 补给 > 防守 > 进攻 > 巡逻），阈值可由 `nav.retreat_hp` / `nav.low_ammo` / `strategic.attack_window_*` 覆盖。
   - `decision_main` / `decision_node` 在树 tick 前求值；`DecisionOutput.tactical_mode` 由此产出。
   - 验证：宿主测试 + 容器 7 包 / 20 测试 0 失败。
-- 下一步：功能域 `.so` 拆分与 `module.yaml`（provides / consumes 校验）；随后 P2.2 `nav_policy` + `nav_executor`。
+- **P2.2 nav_policy + nav_executor 完成（本地）**：
+  - 任务树：`mission/nav/{retreat,supply,defend,highland,attack_outpost,patrol}.xml`，优先级撤退 > 补给 > 防守 > 高地 > 进攻 > 巡逻。
+  - 条件节点：`IfTacticalMode`（读战略模式）、`IfEnemyOutpostDead`；技能 `GotoNamedPoint` 由任务传命名点。
+  - `nav_executor` 回写 `NavState`（current_goal / reached / failed）已有，经 `WorldModel` 生效。
+  - 验证：`test_mission_nav` 表驱动 6 场景；容器 7 包 / 21 测试 0 失败。
+- 待补：功能域 `.so` 拆分与 `module.yaml`（provides / consumes 校验）——当前启用/禁用已由 `tree_manifest.yaml` + 启动校验承担，`.so` 分离属编译期整理，优先级低于策略迁移。
+- 下一步：P2.3 resource（复活 / 兑换，one-shot / polled 动作语义）。
 
 ### 历史（P1 / P2 接口）
 
