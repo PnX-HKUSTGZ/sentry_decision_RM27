@@ -108,7 +108,7 @@ ros2 bag record /decision/state /decision/world_state
 
 ### 4.5 配置
 
-配置采用「单一入口 + 按职责分文件」，详见 `docs/ARCHITECTURE.md` §14：
+配置采用「单一入口 + 按职责分文件」，详见 `docs/ARCHITECTURE.md` §15：
 
 ```text
 config/

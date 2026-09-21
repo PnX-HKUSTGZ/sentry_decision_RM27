@@ -3,7 +3,33 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（P2 策略迁移）
+## 当前 sprint（P3 可视化与仿真）
+
+### 已锁定决策
+
+- 分支 `p3-viz-sim`（基于 `p2-strategy` @ `5e39311`），上游 `origin/p3-viz-sim` 已设置。
+- 子阶段：P3.0 观测底座 → P3.1 裁判仿真 + 场景脚本 → P3.2 干预 ROS 接口 → P3.3 干预回放 → P3.4 网页面板 → P3.5 文档与验收（详见 `docs/ROADMAP.md`）。
+- 包边界：新增 `sentry_decision_viz`（`TreeStatePublisher` + Groot2 桥 + 网页资产 + launch）；ROS 仿真节点 `referee_sim_node` 放 `sentry_decision_sim`（core 仿真库保持 ROS 无关）；`InterventionServer` 放 `sentry_decision_io`；干预 action / service 消息放 `sentry_decision_msgs`。
+- 树状态：`TreeStatus` / `TreeNodeStatus` 消息，`Tree::applyVisitor` 展平，active path = RUNNING 节点 + 祖先；`/decision/tree_status`（transient local）。
+- Groot2：可选 `--groot2-port`（BT.CPP 4.9 已带 zmq），不作为 CI 验收。
+- 干预线程模型：service / action 回调只校验入队，tick 边界 drain 进 `InterventionController`；应用结果发 `/decision/intervention` 供录制回放。
+- 网页：vanilla JS + vendored `roslib.min.js`（锁版本、BSD-2），原生 ES modules 分层（bridge / store / panels / battlefield），无 npm 构建；为将来迁移 Vite + TS 留接缝。
+- P2.3b 串口字节层仍待 MCU 协议，排除在 P3 外。
+- 设计细节同步至 `docs/ARCHITECTURE.md` §14。
+
+### 进行中
+
+- 文档已同步：`ARCHITECTURE.md` §14（可视化与仿真）与 §5 / §10.6 / §12 / §17 引用；`ROADMAP.md` P3 子阶段与状态；`CHANGELOG.md` Unreleased。
+- 进行中（本地）：P3.0 观测底座——消息、`sentry_decision_viz` 包、`TreeStatePublisher`、Groot2 可选 hook、接线与测试。
+
+### 待办
+
+- P3.1 `referee_sim_node` 与场景脚本。
+- P3.2 干预 action / service 与 `InterventionServer`。
+- P3.3 干预回放通道。
+- P3.4 rosbridge 网页面板（需镜像加 `ros-jazzy-rosbridge-suite`）。
+
+## 历史（P2 策略迁移，已完成）
 
 ### 已锁定决策
 
@@ -20,7 +46,7 @@
 ### 进行中
 
 - 分支 `p2-strategy`（基于 `main` @ `4958c8b`）。
-- 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §14；`ROADMAP.md` P2 子阶段与状态。
+- 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §15；`ROADMAP.md` P2 子阶段与状态。
 - **P2.0 完成（本地）**：
   - `config/`：单一入口 `profiles.yaml` + `maps/RMUL26.yaml` + `policies/rmuc26.yaml`；core `PolicyConfig` 纯结构；bringup `config_loader` 用 yaml-cpp 加载并校验。
   - `tree/`：`root.xml` → `mission/root.xml`（优先级）→ `mission/nav/*` + `skill/goto_named_point.xml`；命名规范 `If*` / `Mission*` / `Emit*` 落地。
@@ -102,4 +128,4 @@
 - 当前无法上实车，一律以本地 PC 容器验证为准。
 - 不自动执行 Git 操作；不自动执行系统级操作。
 - 文档优先（docs-first），设计变更先改文档再改代码。
-- 未确定项集中记录在 `docs/ARCHITECTURE.md` 第 16 节。
+- 未确定项集中记录在 `docs/ARCHITECTURE.md` 第 17 节。

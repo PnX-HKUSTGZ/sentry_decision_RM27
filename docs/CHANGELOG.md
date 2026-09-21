@@ -9,6 +9,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增 `docs/ARCHITECTURE.md` §14「可视化与仿真」，以及 `docs/ROADMAP.md` P3 子阶段规划：树状态 `TreeStatus`、Groot2 可选接入、干预 action / service、裁判仿真与场景脚本、干预回放、rosbridge 网页面板。
+
 ## [v0.2.0]
 
 ### Added

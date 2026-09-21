@@ -155,12 +155,13 @@ struct DecisionOutput {
 | `sentry_decision_core` | 数据契约、裁判协议解码、信念融合、仲裁、几何、日志、配置。**不依赖 ROS** | 标准库 |
 | `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
 | `sentry_interfaces` | 与 auto-aim 的裁判上行 / 决策下行接口消息 | std_msgs、geometry_msgs |
-| `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关） | core |
-| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay） | core |
+| `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关）+ ROS 仿真节点 `referee_sim_node` | core、（节点）rclcpp |
+| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay）；干预服务端 `InterventionServer` | core、msgs |
 | `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
-| `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core |
+| `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core、viz |
+| `sentry_decision_viz` | 可视化：`TreeStatePublisher`、Groot2 桥、网页面板静态资产与 launch | core、msgs、behaviortree_cpp |
 
-后续按需增加：`sentry_decision_viz`（可视化）、`sentry_decision_test`（测试与回放工具）。`sentry_decision_msgs` 与 `sentry_decision_sim` 已落地；msgs 后续补充 action / service（干预、调试）。
+`sentry_decision_test`（测试与回放工具）按需再拆。`sentry_decision_msgs` 后续补充干预 / 调试的 action 与 service（见 §14.3）。
 
 ### 5.1 包与层的关系
 
@@ -172,6 +173,7 @@ struct DecisionOutput {
 | `sentry_decision_io` | 执行层（传输 / 下发）+ 信念层（原始解码） |
 | `sentry_decision_nodes` | 意图层（战略 / 任务 / 技能）+ `intervention` |
 | `sentry_decision_bringup` | 无（组合根） |
+| `sentry_decision_viz` | 可观测性（跨层只读：树状态、世界快照、意图） |
 
 `SafetySupervisor` 属于指令层，放在 `core` 且不可作为插件关闭；`nodes` 内部以模块（共享库）为真正边界。
 
@@ -462,7 +464,7 @@ string state_json
 所有干预记 `ACT` 日志并进回放；比赛模式下可关闭调试专用能力。
 
 P2 范围：先落地 core 侧的三类注入（意图注入、世界状态覆盖、模块开关）；结构化 action / service
-与网页面板留到 P3。
+与网页面板由 P3 落地，设计见 §14.3 与 §14.6。
 
 世界状态覆盖**只改数值、不提升 `referee.valid`**，因此不会绕过失效急停；模块开关分两级：加载期由
 `tree_manifest.yaml` 的 `enabled` 决定 .so 是否加载，运行期由 `InterventionController::allows` 按字段过滤意图。
@@ -497,7 +499,7 @@ P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/
 - 统一使用项目日志接口，禁止散落的 `std::cout` 与原始 `RCLCPP_*`；
 - 状态转移日志只在「上次状态 ≠ 本次状态」时打印，避免逐 tick 刷屏；
 - 高频回调禁止逐帧 INFO / DEBUG；
-- 发布 `DecisionState` / `WorldState` 到 `/decision/state`、`/decision/world_state`，供可视化与 rosbag 记录；`TreeStatus` / Groot2 后续（P3）接入。
+- 发布 `DecisionState` / `WorldState` 到 `/decision/state`、`/decision/world_state`，`TreeStatus` 到 `/decision/tree_status`，供可视化与 rosbag 记录；Groot2 为可选接入（见 §14）。
 
 ## 13. 回放与测试
 
@@ -519,7 +521,110 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 4. **回放回归**：录制的比赛数据离线重跑，与录制的决策输出逐 tick 对比，生成差异报告。
 5. **仿真集成**：与 Gazebo / 裁判仿真闭环联调。
 
-## 14. 配置
+## 14. 可视化与仿真
+
+目标：让决策过程可观测、可手动干预、可赛后回放（对应 `docs/ROADMAP.md` P3）。
+可视化只**读取**决策数据，干预只经受控通道写入，二者都不参与决策、不绕过安全。
+
+### 14.1 包与边界
+
+| 组件 | 包 | 职责 |
+| --- | --- | --- |
+| `TreeStatePublisher` | `sentry_decision_viz` | 采集 BT 节点状态并发布 `/decision/tree_status` |
+| Groot2 桥 | `sentry_decision_viz` | 可选地把行为树挂到 `BT::Groot2Publisher`，供 Groot2 实时连接 |
+| 网页面板 | `sentry_decision_viz/web` | 纯静态页：树状态、战场俯视图、WorldState / Intent、干预按钮 |
+| `referee_sim_node` | `sentry_decision_sim` | ROS 侧裁判仿真：发 `/sentry/*` 与 odom，跑导航 action server 与动作回执 |
+| `InterventionServer` | `sentry_decision_io` | 干预 action / service 服务端，转成线程安全命令队列 |
+
+`sentry_decision_viz` 依赖 `core`、`sentry_decision_msgs` 与 `behaviortree_cpp`，
+只读决策数据，不被决策主循环依赖。core 的仿真组件保持 ROS 无关，`referee_sim_node` 只是薄驱动。
+
+### 14.2 树状态（TreeStatus）
+
+行为树 tick 在单线程执行，可视化通过只读快照观察。BT.CPP v4 提供 `Tree::applyVisitor` 与
+`TreeNode::status()/fullPath()/registrationName()`，据此展平整棵树：
+
+- `sentry_decision_msgs/msg/TreeNodeStatus`：`full_path`、`registration_name`、`instance_name`、
+  `status`（与 `BT::NodeStatus` 1:1：IDLE 0 / RUNNING 1 / SUCCESS 2 / FAILURE 3 / SKIPPED 4）。
+- `sentry_decision_msgs/msg/TreeStatus`：`header`、`tick`、`tick_ms`、
+  `TreeNodeStatus[] nodes`、`string[] active_path`。
+- **active path** = 所有 `RUNNING` 节点及其祖先链，前端据此高亮当前执行分支。
+- 话题 `/decision/tree_status`，QoS 使用 transient local，保证后到订阅者能拿到最近一帧。
+
+发布与 `DecisionState` 同一节拍（默认 20 Hz）且在 tick 末尾，因此树状态与当拍输出一致。
+Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显式开启时附加
+`BT::Groot2Publisher`（BT.CPP 4.9 已带 zmq 支持），不作为 CI 验收项。
+
+### 14.3 干预接口（ROS）
+
+结构化 action / service 语义见 §10.2，消息落在 `sentry_decision_msgs`。这部分的关键是线程模型：
+BT tick 跑在定时器回调，而 action / service 回调在 `MultiThreadedExecutor` 的其他线程，
+不能直接共享 `InterventionController`：
+
+```text
+Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> InterventionController
+```
+
+- 回调只做**校验 + 入队**，不触碰 `WorldState` 与行为树；
+- tick 开始时按固定顺序应用本拍命令，保证确定性；
+- 应用成功的干预记 `ACT`（来源、字段、lease、原因），并发布到 `/decision/intervention` 以便录制与回放；
+- `DebugCommand.list_state` 返回世界状态、模块开关、活跃 Intent 与逐字段胜负的 JSON，
+  供网页面板自动生成表单（§10.4）。
+
+### 14.4 裁判仿真与场景脚本
+
+`referee_sim_node` 复用 core 中 ROS 无关的仿真组件，把本地仿真接到真实 IO 路径上：
+
+- 发布 `sentry_interfaces` 的五条上行消息与 odom，驱动 `decision_node`；
+- 内嵌 `NavSimulator` 作为 `NavigateToPose` action server，并在收到 `DecisionCommand` 后用
+  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+- 场景脚本 YAML 描述带时间轴的事件与断言：
+
+```yaml
+# scenario/retreat.yaml（片段）
+- at: 5.0
+  set_world: { self_hp: 20 }
+- at: 6.0
+  add_intent: { field: chassis_vel, value: [0, 0, 0], lease: 2.0 }
+- at: 8.0
+  disable: [nav]
+- at: 12.0
+  expect:  { tactical_mode: retreat, nav_goal: home }
+```
+
+场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state`
+在时刻 ± 容差内断言，等价于 §10.5 的「干预即测试用例」。
+
+### 14.5 干预回放
+
+干预是一路带时间戳的输入（§10.5），必须与信念输入一起录制、按原时刻重放：
+
+- `core::ReplayData` 增 `interventions` 通道，`ReplaySource` 暴露当前时刻生效的干预事件；
+- io 的 `load_replay_data` 从 `/decision/intervention` 读取；
+- 回放时干预事件在对应 tick 注入 `InterventionController`，因此含干预的回放仍逐 tick 确定。
+
+### 14.6 网页面板
+
+rosbridge + roslibjs 的纯静态页，**无 Node、无构建步骤**：
+
+- 左侧树状态（active path 高亮）、中间战场俯视图（己方 / 队友 / 敌方 / 当前目标，canvas 绘制）、
+  右侧 `WorldState` 与活跃 Intent 表、按钮组（强制撤退、去点位、切姿态、买弹、禁用模块、
+  清空手动意图、急停）；
+- 表单 / 表格由 `list_state` 的 schema 驱动，新增字段无需改前端；
+- 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `panels/*`（每个面板一个模块）/
+  `battlefield`（canvas）分层，使用浏览器原生 ES modules；
+- `roslib.min.js` 锁版本 vendor 进仓库（BSD-2），页面由 launch 的静态服务或
+  `python3 -m http.server` 托管，rosbridge 由 `viz.launch.py` 启动；
+- 不引入 npm 构建：当前规模的收益大于成本，且分层已为将来平滑迁移到 Vite + TS 留好接缝
+  （数据层与 bridge 可原样复用）。
+
+### 14.7 依赖
+
+- 镜像新增 `ros-jazzy-rosbridge-suite`；
+- Groot2 依赖已随 `ros-jazzy-behaviortree-cpp`（4.9.0）提供，无需额外系统包；
+- 网页面板仅新增一个 vendor 的 JS 文件，不引入前端工具链。
+
+## 15. 配置
 
 - 保留并强化 profile：地图 profile、策略 profile、赛前开关。
 - **单一入口 + 按职责分文件**：
@@ -536,7 +641,7 @@ config/
 - 所有 YAML 做必填 / 类型 / 范围校验：数值必须完整解析；已知数值键按类型表要求整数且非负。
   加载失败启动即报错并列出可用 key；启动时把生效配置打印为 `ACT` 日志 / 落盘，便于复盘。
 
-## 15. 运行环境与部署
+## 16. 运行环境与部署
 
 - 目标运行环境：Ubuntu 24.04 + ROS 2 Jazzy。
 - 开发宿主若非 24.04，统一通过 Docker 开发与测试。
@@ -547,10 +652,10 @@ config/
 - 采用 Docker Compose 与已验证的自定义 bridge 网络（不使用 host 网络），构建产物挂载到宿主避免重复编译。
 - 24.04 实车与容器使用同一套依赖描述，保证一致。
 
-## 16. 开放问题
+## 17. 开放问题
 
 - 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
 - 下位机通信包（上行 / 下行帧）的定义位置与字节协议；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
-- 可视化选型：Groot2 + rosbridge 战场页的组合细节。
+- 可视化选型已定：`TreeStatePublisher` + 可选 Groot2 + rosbridge 静态页（见 §14），细节随 P3 落地调整。
 - 回放文件格式与录制范围。
 - BT.CPP 在 Jazzy 镜像中的具体版本锁定与语义复验。

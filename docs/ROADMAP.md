@@ -101,18 +101,31 @@
 
 **目标**：决策过程可观测、可手动干预、可赛后回放。
 
+子阶段（每步可独立构建 / 测试）：
+
+| 子阶段 | 内容 | 验收 |
+| --- | --- | --- |
+| P3.0 观测底座（进行中） | `TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（节点状态 + active path）、Groot2 可选 hook | `/decision/tree_status` 状态与 active path 正确；容器测试通过 |
+| P3.1 裁判仿真 + 场景脚本 | `referee_sim_node`（发 `/sentry/*` + odom、导航 action server、动作回执）+ 场景 YAML 时间轴与断言 | 脚本驱动完整对局（巡逻→进攻→撤退→复活）并通过断言 |
+| P3.2 干预 ROS 接口 | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
+| P3.3 干预回放 | `ReplayData` 增干预通道、`ReplaySource` / `load_replay_data` 支持 | 含干预的回放逐 tick 确定，干预在原时刻复现 |
+| P3.4 网页面板 | rosbridge + roslibjs 静态页：树状态、战场俯视图、WorldState / Intent、按钮组 | 网页实时显示树状态与机器人 / 敌方位置；按钮生效 |
+| P3.5 文档与验收 | ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；完整对局录制 + 回放 | 三条验收闭环 |
+
 交付物：
 
-- `TreeStatePublisher`（节点状态 + active path）。
-- Groot2 实时连接。
+- `TreeStatePublisher`（节点状态 + active path）、Groot2 可选连接。
 - rosbridge 战场页：树状态、战场俯视图、WorldState / Intent 面板、干预按钮。
-- `referee_simulator` 与场景脚本。
+- `referee_sim_node` 与场景脚本。
+- 干预 action / service 与可回放记录。
 
 验收：
 
 - 网页实时显示树状态与机器人 / 敌方位置。
 - 裁判仿真能驱动完整对局。
 - 人工干预可记录并在回放中复现。
+
+设计细节见 `docs/ARCHITECTURE.md` §14。
 
 ## P4 切换与冻结
 
@@ -141,11 +154,14 @@
   - 已完成（本地）：P2.0 工程底座——`tree/` 分层骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析；容器 7 包 / 19 测试通过，宿主 core 测试通过。
   - 已完成（本地）：P2.1 战略层——`StrategicPolicy` 接口 + `RuleBasedStrategicPolicy` 规则状态机、`DecisionContext::apply_strategy`、两个入口接入、表驱动单测；容器 20 测试通过。
   - 已完成（本地）：P2.2 nav_policy + nav_executor——六个 nav 任务子树、`IfTacticalMode` / `IfEnemyOutpostDead` 条件、命名点驱动、`nav_executor` 状态回写；容器 21 测试通过。
-  - 进行中：P2 策略迁移，设计已对齐——战略层为纯 C++ `StrategicPolicy` 接口、任务 / 技能实现为分层小树、配置外置、删除姿态、弃用 `/set_bool`（见 `docs/ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §14）。
+  - 进行中：P2 策略迁移，设计已对齐——战略层为纯 C++ `StrategicPolicy` 接口、任务 / 技能实现为分层小树、配置外置、删除姿态、弃用 `/set_bool`（见 `docs/ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §15）。
   - 已完成（本地）：P2.3a 动作派发与 ack——`ActionDispatcher`（one-shot / polled / ack / 超时）、资源请求→动作、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks`；容器 23 测试通过。
   - 已完成（本地）：功能域 `.so` 拆分——`common` / `nav` / `strategic` 独立库、`tree_manifest.yaml` 按 `library` 加载、`module.yaml` provides / consumes 启动校验；容器 24 测试通过。
   - 已完成（本地）：P2.4 core 侧安全与干预——`SafetySupervisor`（限幅 / 急停）、`InterventionController`（意图注入 lease、世界覆盖、模块开关），已接入 `decision_node` / `decision_main`；容器 26 测试通过。
   - 已完成（本地）：P2.5 回归——`NavGoalTracker` 目标边沿 / 取消契约（接入两个入口）、抢占契约测试、回放确定性；容器 28 测试通过。
   - 已完成（本地）：`resource` 模块——资源 / 复活独立 `.so`、`tree/resource/root.xml` 与导航任务并行、经字段级仲裁合并；容器 29 测试通过。
-  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
-  - P2 主体已完成（本地范围），下一步进入 P3 可视化与仿真。
+  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；旧 bag 逐 tick 差异报告。
+- **P3 进行中**：
+  - 设计已对齐（本地）：新增 `sentry_decision_viz`、树状态消息与 `/decision/tree_status`、Groot2 可选、干预 action / service（线程安全队列、tick 边界应用）、`referee_sim_node` 与场景脚本、干预回放、无构建网页面板；见 `docs/ARCHITECTURE.md` §14。
+  - 进行中（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus`、`TreeStatePublisher`、Groot2 可选 hook。
+  - P2 主体已完成（本地范围）。
