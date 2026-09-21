@@ -61,18 +61,34 @@
 
 **目标**：按 `docs/ARCHITECTURE.md` 用新的分层与插件树复现旧仓库的决策。
 
+子阶段（每步可独立构建 / 测试）：
+
+| 子阶段 | 内容 | 验收 |
+| --- | --- | --- |
+| P2.0 工程底座（已完成） | `tree/` 骨架（mission / skill / condition）、`tree_manifest.yaml`、builtin 模块注册与启动校验、`PolicyConfig` 与 YAML 加载 | 容器构建 / 19 测试通过；缺失配置、树引用不存在 key 均启动即失败（负例用例覆盖） |
+| P2.1 战略层 + 模块拆分 | `StrategicPolicy` 接口 + 首个状态机实现 + 表驱动单测；接入 `DecisionContext`；功能域拆分为独立 `.so` 并读取 `module.yaml`（provides / consumes 字段校验） | 给定 `WorldState` → 期望 `TacticalMode` / `Objective` |
+| P2.2 nav_policy + nav_executor | `mission/nav/*` + `skill/goto_named_point` 等；命名点配置；`nav_executor` 回写 `NavState`；接仲裁 | 表驱动 `WorldState → nav_goal`，覆盖旧 `RMUC.xml` 三分支 |
+| P2.3 resource | 复活 / 兑换子树，one-shot / polled 动作语义 | `DecisionAction` 边沿 / 重发 / ack 契约测试 |
+| P2.4 安全与干预 | `SafeSupervisor` 兜底；`intervention` core 侧注入与模块开关 | 安全压过 intervention / tactical；关闭模块行为可预期 |
+| P2.5 回归 | 场景脚本、抢占 / halt 契约测试、差异报告、文档 | 抢占 / halt 用例通过；回放确定性；文档同步 |
+
+> P2.0 已完成（本地范围）：分层树骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析。
+> `module.yaml`（provides / consumes 字段校验）与各功能域独立 `.so` 随 P2.1 起逐步落地。
+
 交付物：
 
-- 行为树目录与 `tree_manifest.yaml`、插件加载与启动校验。
-- 战术 / 战略层（`StrategicPolicy` 接口 + 首个实现）。
-- 任务 / 技能模块，先 `nav`，再 `resource`、`tactical`。
+- 行为树目录与 `tree_manifest.yaml`、模块清单 `module.yaml`、插件加载与启动校验。
+- `StrategicPolicy` 接口 + 首个实现（纯 C++，非 BT 插件）。
+- 分层小树：`tree/mission/`（任务）+ `tree/skill/`（技能）+ `tree/condition/`（条件子树）。
+- 命名点与阈值配置外置（`config/`）。
 - `nav_executor` 与 `IntentArbiter` 接入，`SafeSupervisor` 兜底。
 - `intervention` 模块（意图注入、世界状态注入、模块开关）。
 
 验收：
 
-- 对同一组场景，新旧输出（导航目标、战术模式、姿态）一致，并有脚本化差异报告。
+- 对同一组场景，新旧输出（导航目标、战术模式、资源请求）一致，并有脚本化差异报告；姿态已废弃，不纳入比对。
 - 抢占与 `halt` 取消契约有测试覆盖。
+- 无旧 rosbag 前，先用表驱动 golden 用例（`WorldState → DecisionOutput`）承载旧行为基准。
 
 ## P3 可视化与仿真
 
@@ -113,5 +129,8 @@
   - 已交付：裁判协议位段解码、`WorldState` 契约按 `ros_interfaces` 对齐、`sentry_decision_msgs` 与 `DecisionStatePublisher`、core 确定性回放 `ReplaySource`、rosbag 读取 `load_replay_data`、本地仿真 `sentry_decision_sim`。
   - 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
   - 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无可用旧 bag，待提供样本）。
-- **P2 进行中**：上位机接口重构——`sentry_interfaces` 契约与 `docs/INTERFACES.md`（5 上行 + `DecisionAck` + `DecisionCommand`）已落地，决策侧与 auto-aim 侧已迁移；新增 `decision_node` 把真实 IO、行为树、仲裁与状态发布闭环。
-- **下一步：P2 策略迁移**——行为树目录与插件清单、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
+- **P2 进行中**：
+  - 已完成：上位机接口重构（`sentry_interfaces` + `docs/INTERFACES.md`；决策侧 `RosIoNode`；auto-aim 侧桥；`decision_node` 真实 IO 闭环），已合入 `main`。
+  - 已完成（本地）：P2.0 工程底座——`tree/` 分层骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析；容器 7 包 / 19 测试通过，宿主 core 测试通过。
+  - 进行中：P2 策略迁移，设计已对齐——战略层为纯 C++ `StrategicPolicy` 接口、任务 / 技能实现为分层小树、配置外置、删除姿态、弃用 `/set_bool`（见 `docs/ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §14）。
+  - 下一步：P2.1 战略层 `StrategicPolicy` + 功能域模块拆分与 `module.yaml`。

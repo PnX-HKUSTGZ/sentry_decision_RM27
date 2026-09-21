@@ -3,20 +3,43 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（P2 上位机接口重构）
+## 当前 sprint（P2 策略迁移）
 
-- P1 已完成（本地范围）：裁判协议解码、`WorldState` 契约对齐、`sentry_decision_msgs` + `DecisionStatePublisher`、core 回放 `ReplaySource`、rosbag 读取、本地仿真 `sentry_decision_sim`。
-- 回归：core 回放确定性单测 + 树级 `replay_determinism`（同一份回放两次输出逐 tick 一致）。
-- 暂缓：真实下位机通信包 io 接线（包定义待定，本地开发用仿真）；旧 rosbag 字段一致性对比（暂无样本）。
-- 已移除：`sentry_info_3`（姿态剩余强化时间）解码，疑似临时规则，待协议明确。
-- 已确认（暂缓落地）：下位机通信包动作分 `kOneShot` / `kPolled`，配置时显式选择，`kPolled` 带轮询间隔，见 `docs/ARCHITECTURE.md` §4.1。
-- 已同步：stance（姿态）为旧规则已废弃，删除相关类型 / 逻辑 / 消息 / 文档；行为树迁移到仓库根目录 `tree/`。
-- 已修复 Copilot PR 审阅 4 条意见（`--rate` 校验、目标 yaw 检测、回放二分查找、rosbag 录制时刻）及 `NavSimulator` 两处小问题。
-- P2 进行中：上位机接口重构已打通（`sentry_interfaces` + 决策侧 `RosIoNode` + auto-aim 桥）；新增 `decision_node` 实现真实 IO 闭环（IO + 行为树 + 仲裁 + 状态发布）。
-- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 的串口帧——均待与电控/MCU 确认协议。
-- P2 重点：行为树目录与插件清单（`tree/`）、战术 / 技能模块、`nav_policy` + `nav_executor`、`intervention` 模块。
-- 待决策：`sentry_decision_msgs` 的 action / service 字段；回放差异报告格式。
-- 阶段、顺序与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
+### 已锁定决策
+
+- 战略层：纯 C++ `StrategicPolicy` 接口（输入 `WorldState`，输出 `StrategicDecision`），在树 tick 前求值写入 `DecisionContext.strategy`；不是 BT 子树。
+- 删除「姿态」（stance）：P2 验收输出为 `nav_goal` / `tactical_mode` / `resource` / `cmd_vel`，不含姿态。
+- 弃用 `/set_bool`（`Reloading` / `ifreload`）：P2 不迁移该行为。
+- 树结构：任务 / 技能 / 条件分层为多棵小树，避免旧仓库一整棵大树；`tree/` 按层建 `mission/`、`skill/`、`condition/`，相似树可再分子目录、零散的直接放层根。
+- 命名：条件节点 / 子树 `If*`；任务子树 `Mission*`；技能子树 `<Verb><Object>`；发 Intent 叶子 `Emit*`；写状态叶子 `Set*`；请求叶子 `Request*`。
+- 配置：单一入口 `config/profiles.yaml` + `config/maps/*.yaml` + `config/policies/*.yaml`；core 只定义纯结构，bringup 用 `yaml-cpp` 加载；XML 不写数值。
+- 迁移基准：结构借鉴 `navi_minco_bit/bt_manager`，行为以旧 `sentry_DecisionMaking/RMUC.xml` + 参考仓库启用分支为准，先最小可用。
+- 模块粒度（P2）：`common` / `nav` / `resource` + `strategic`（C++）+ `intervention`（默认关）。
+- P2 暂不做 zones（区域判定），只用命名点与距离。
+
+### 进行中
+
+- 分支 `p2-strategy`（基于 `main` @ `4958c8b`）。
+- 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §14；`ROADMAP.md` P2 子阶段与状态。
+- **P2.0 完成（本地）**：
+  - `config/`：单一入口 `profiles.yaml` + `maps/RMUL26.yaml` + `policies/rmuc26.yaml`；core `PolicyConfig` 纯结构；bringup `config_loader` 用 yaml-cpp 加载并校验。
+  - `tree/`：`root.xml` → `mission/root.xml`（优先级）→ `mission/nav/*` + `skill/goto_named_point.xml`；命名规范 `If*` / `Mission*` / `Emit*` 落地。
+  - `tree_manifest.yaml` + `tree_loader`：builtin 模块注册、`*_key` / `*point` 引用的配置启动校验。
+  - 节点：`CheckLowHp` → `IfLowHp`（`hp_key`），新增 `EmitNavGoalFromPoint`（命名点）；删除 `demo_tree.xml`。
+  - 修复：core 静态库补 `POSITION_INDEPENDENT_CODE`（被 `nodes.so` 链接本来会失败）；子树独立黑板，节点统一从根黑板取 `context`。
+  - 验证：容器 7 包构建通过、`colcon test` 19 测试 0 失败；宿主 `host_core_test.sh` 全通过；`format.sh --check` 通过。
+- 下一步 P2.1：`StrategicPolicy` 接口 + 首个实现；功能域拆分为独立 `.so` 并读取 `module.yaml`。
+
+### 历史（P1 / P2 接口）
+
+- P1 已完成（本地范围）：裁判协议解码、`WorldState` 契约对齐、`sentry_decision_msgs` + `DecisionStatePublisher`、core 回放 `ReplaySource`、rosbag 读取、本地仿真。
+- 回归：core 回放确定性单测 + 树级 `replay_determinism`。
+- 暂缓：真实下位机通信包 io 接线；旧 rosbag 字段一致性对比（暂无样本）。
+- 已移除：`sentry_info_3` 解码（疑似临时规则）。
+- 已确认：下位机动作分 `kOneShot` / `kPolled`，`kPolled` 带轮询间隔，见 `ARCHITECTURE.md` §4.1。
+- P2 上位机接口重构已合入 `main`：`sentry_interfaces` + `decision_node` 真实 IO 闭环。
+- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 串口帧——待与电控/MCU 确认协议。
+- 阶段与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
 ## P0 已完成
 
