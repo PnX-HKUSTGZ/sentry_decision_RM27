@@ -5,8 +5,10 @@
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/u_int16.hpp>
 #include <string>
+#include <variant>
 
 #include "sentry_decision_io/rosbag_replay.hpp"
+#include "sentry_decision_msgs/msg/intervention_event.hpp"
 
 using namespace sentry_decision;
 using namespace sentry_decision_io;
@@ -42,6 +44,7 @@ void test_round_trip() {
     create_topic(writer, "/ifhealth", "std_msgs/msg/UInt16");
     create_topic(writer, "/remain_ammo", "std_msgs/msg/UInt16");
     create_topic(writer, "/can_rebuild_outpost", "std_msgs/msg/Bool");
+    create_topic(writer, "/decision/intervention", "sentry_decision_msgs/msg/InterventionEvent");
 
     std_msgs::msg::UInt16 hp;
     hp.data = 400;
@@ -54,6 +57,14 @@ void test_round_trip() {
     std_msgs::msg::Bool rebuild;
     rebuild.data = true;
     writer.write(rebuild, "/can_rebuild_outpost", rclcpp::Time(0, 200000000u));
+
+    sentry_decision_msgs::msg::InterventionEvent event;
+    event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_INTENT;
+    event.field = 0;
+    event.value = "[1.0, 2.0]";
+    event.lease_sec = 3.0;
+    event.reason = "test";
+    writer.write(event, "/decision/intervention", rclcpp::Time(0, 300000000u));
     writer.close();
   }
 
@@ -70,6 +81,18 @@ void test_round_trip() {
     CHECK(data.referee[2].value.valid);
   }
   CHECK(data.odometry.empty());
+
+  CHECK(data.interventions.size() == 1);
+  if (data.interventions.size() == 1) {
+    const InterventionCommand& command = data.interventions[0].value;
+    CHECK(data.interventions[0].at == Duration{300});
+    CHECK(command.kind == InterventionCommand::Kind::kIntent);
+    CHECK(command.intent.field == IntentField::kNavGoal);
+    CHECK(std::get<Point2D>(command.intent.value).x == 1.0);
+    CHECK(std::get<Point2D>(command.intent.value).y == 2.0);
+    CHECK(command.intent.lease == Duration{3000});
+    CHECK(command.reason == "test");
+  }
 
   std::filesystem::remove_all(dir);
 }

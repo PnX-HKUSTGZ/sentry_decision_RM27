@@ -19,6 +19,30 @@ enum class WorldField {
   kCoins,
 };
 
+// 一条干预命令：意图注入 / 世界覆盖 / 模块开关 / 清空。
+// 同时用作 ROS 服务端的入队单元与回放数据的一路输入（core 不依赖 ROS）。
+struct InterventionCommand {
+  enum class Kind {
+    kIntent,
+    kClearIntent,
+    kWorldOverride,
+    kClearWorld,
+    kModuleSwitch,
+    kClearAll,
+  };
+
+  Kind kind = Kind::kIntent;
+  Intent intent;  // kIntent：field / value / lease 已填
+  IntentField intent_field = IntentField::kNavGoal;
+  WorldField world_field = WorldField::kSelfHp;
+  double world_value = 0.0;
+  // 原始取值文本（kIntent），用于发布 InterventionEvent 与回放重建。
+  std::string value_text;
+  std::string module;
+  bool enabled = true;
+  std::string reason;
+};
+
 // 人工干预（P2 core 侧）：意图注入 + 世界状态覆盖 + 模块开关。
 // 结构化 action / service 与网页面板留 P3；本类只提供纯逻辑入口，可宿主单测。
 //
@@ -51,7 +75,7 @@ class InterventionController {
   // 把世界覆盖应用到副本（不修改入参）。
   WorldState apply_world(const WorldState& world) const;
 
-  // 只读视图，供 list_state / 可视化展示。
+  // 供 list_state / 可视化展示。
   const std::map<std::string, bool>& module_switches() const {
     return module_switches_;
   }
@@ -64,5 +88,9 @@ class InterventionController {
   std::map<WorldField, double> world_overrides_;
   std::map<std::string, bool> module_switches_;
 };
+
+// 把一条命令应用到控制器（供实时 tick 与回放共用，保证两条路径语义一致）。
+void apply_intervention(InterventionController* controller, const InterventionCommand& command,
+                        TimePoint now);
 
 }  // namespace sentry_decision

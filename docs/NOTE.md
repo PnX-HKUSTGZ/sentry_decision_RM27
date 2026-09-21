@@ -23,10 +23,10 @@
 - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 包与 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过，`format.sh --check` 通过。
 - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。
 - 已完成（本地）：P3.2 干预 ROS 接口——`sentry_decision_msgs` 新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；io 新增 `InterventionServer`（action / service 只入队，tick 边界应用）与取值解析（yaml-cpp）；core `IntentArbiter` 新增逐字段 `winners`、`InterventionController` 支持按字段清除；`decision_node` 发布 `/decision/intervention` 并提供 `list_state` JSON；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
+- 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData.interventions` + `ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；core / bringup / io 测试覆盖干预通道与含干预的回放确定性。
 
 ### 待办
 
-- P3.3 干预回放通道。
 - P3.4 rosbridge 网页面板（需镜像加 `ros-jazzy-rosbridge-suite`）。
 
 ## 历史（P2 策略迁移，已完成）

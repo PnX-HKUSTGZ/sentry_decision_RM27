@@ -15,6 +15,8 @@ struct ReplayTopics {
   std::string enemy_outpost_hp = "/enemy_outpost_health";
   std::string can_rebuild_outpost = "/can_rebuild_outpost";
   std::string odometry = "/odom";
+  // 人工干预记录（sentry_decision_msgs/InterventionEvent），P3.2 起由决策节点发布。
+  std::string interventions = "/decision/intervention";
 };
 
 // 读取 rosbag2，把已知话题的消息转成 core 的 ReplayData。

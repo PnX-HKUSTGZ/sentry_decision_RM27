@@ -6,6 +6,7 @@
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/config.hpp"
 #include "sentry_decision_core/context.hpp"
+#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/replay.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
@@ -76,6 +77,15 @@ ReplayData make_data() {
   NavState nav;
   nav.valid = true;
   data.navigation.push_back({Duration{0}, nav});
+
+  // 2500ms 起人工接管导航目标，用于验证「含干预的回放」可复现且在原时刻生效。
+  InterventionCommand override_goal;
+  override_goal.kind = InterventionCommand::Kind::kIntent;
+  override_goal.intent.field = IntentField::kNavGoal;
+  override_goal.intent.value = Point2D{9.0, 9.0, 0.0};
+  override_goal.value_text = "[9.0, 9.0]";
+  override_goal.reason = "replay_test";
+  data.interventions.push_back({Duration{2500}, override_goal});
   return data;
 }
 
@@ -94,18 +104,29 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
   BT::Tree tree = factory.createTreeFromFile(tree_path, blackboard);
 
   IntentArbiter arbiter;
+  InterventionController intervention;
   std::vector<StepResult> steps;
   const Duration period{50};
   for (int tick = 0; tick < 60; ++tick) {
     replay.step(period);
-    context.world = model.snapshot(replay.stamp());
+    for (const auto& command : replay.interventions()) {
+      apply_intervention(&intervention, command, replay.stamp());
+    }
+    context.world = intervention.apply_world(model.snapshot(replay.stamp()));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
+    for (const auto& intent : intervention.active_intents(replay.stamp())) {
+      context.emit(intent);
+    }
     tree.tickOnce();
 
     arbiter.clear_source(SourceId::kStrategic);
     arbiter.clear_source(SourceId::kSkill);
+    arbiter.clear_source(SourceId::kIntervention);
     for (const auto& intent : context.intents) {
+      if (!intervention.allows(intent.field)) {
+        continue;
+      }
       arbiter.submit(intent);
     }
     const ArbiterResult result = arbiter.resolve(replay.stamp());
@@ -148,6 +169,11 @@ void test_replay_is_deterministic(const std::string& tree_path) {
   CHECK(first[19].has_goal);
   CHECK(first[19].goal_x == -5.0);
   CHECK(first[19].goal_y == 3.0);
+
+  // 2500ms 的人工接管：2450ms 仍为巡逻点，2500ms 起被干预目标覆盖。
+  CHECK(first[48].goal_x == 1.1);
+  CHECK(first[49].goal_x == 9.0);
+  CHECK(first[49].goal_y == 9.0);
 }
 
 }  // namespace

@@ -100,9 +100,10 @@ ros2 node info /sentry_decision_io
 | `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
 | `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
 | `/decision/tree_status` | `sentry_decision_msgs/TreeStatus` | 行为树节点状态与 active path（transient local） |
+| `/decision/intervention` | `sentry_decision_msgs/InterventionEvent` | 已应用的人工干预（可回放，见 §4.7） |
 
 ```bash
-ros2 bag record /decision/state /decision/world_state /decision/tree_status
+ros2 bag record /decision/state /decision/world_state /decision/tree_status /decision/intervention
 ```
 
 `decision_node` 已接线以上发布；`decision_main` 无 ROS，不发布。

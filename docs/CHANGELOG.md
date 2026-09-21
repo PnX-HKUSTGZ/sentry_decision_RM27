@@ -22,6 +22,8 @@
 - `sentry_decision_io`：新增 `InterventionServer`（干预 action / service 服务端与线程安全命令队列）及取值解析
 - `decision_node`：接入干预服务端，发布 `/decision/intervention`，`list_state` 返回 JSON 快照
 - 新增 `tools/intervention_smoke_test.sh` 干预冒烟测试
+- `sentry_decision_core`：`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData` 增干预通道，`ReplaySource::interventions()` 按时刻返回
+- `sentry_decision_io`：`load_replay_data` 读取 `/decision/intervention` 并重建干预命令
 
 ## [v0.2.0]
 

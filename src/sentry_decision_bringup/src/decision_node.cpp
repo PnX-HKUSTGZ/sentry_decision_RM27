@@ -228,12 +228,13 @@ class DecisionNode : public rclcpp::Node {
   void apply_intervention_command(const sentry_decision_io::InterventionCommand& command,
                                   TimePoint now) {
     using CommandKind = sentry_decision_io::InterventionCommand::Kind;
+    // 应用逻辑与回放共用 core::apply_intervention，这里只负责事件与日志。
+    sentry_decision::apply_intervention(&intervention_, command, now);
     sentry_decision_msgs::msg::InterventionEvent event;
     event.header.stamp = this->now();
     event.reason = command.reason;
     switch (command.kind) {
       case CommandKind::kIntent:
-        intervention_.inject(command.intent, now);
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_INTENT;
         event.field = static_cast<std::uint8_t>(command.intent.field);
         event.value = command.value_text;
@@ -242,13 +243,11 @@ class DecisionNode : public rclcpp::Node {
                    static_cast<int>(command.intent.field), command.reason.c_str());
         break;
       case CommandKind::kClearIntent:
-        intervention_.clear_intent(command.intent_field);
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_INTENT;
         event.field = static_cast<std::uint8_t>(command.intent_field);
         SD_LOG_ACT("intervention", "清除意图 field=%d", static_cast<int>(command.intent_field));
         break;
       case CommandKind::kWorldOverride:
-        intervention_.set_world_override(command.world_field, command.world_value);
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_WORLD_OVERRIDE;
         event.field = static_cast<std::uint8_t>(command.world_field);
         event.value = std::to_string(command.world_value);
@@ -256,12 +255,10 @@ class DecisionNode : public rclcpp::Node {
                    sentry_decision_io::world_field_name(command.world_field), command.world_value);
         break;
       case CommandKind::kClearWorld:
-        intervention_.clear_world_override(command.world_field);
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_WORLD;
         event.field = static_cast<std::uint8_t>(command.world_field);
         break;
       case CommandKind::kModuleSwitch:
-        intervention_.set_module_enabled(command.module, command.enabled);
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_MODULE_SWITCH;
         event.module = command.module;
         event.enabled = command.enabled;
@@ -269,7 +266,6 @@ class DecisionNode : public rclcpp::Node {
                    command.enabled ? "启用" : "禁用");
         break;
       case CommandKind::kClearAll:
-        intervention_.clear();
         event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_ALL;
         SD_LOG_ACT("intervention", "清空全部干预");
         break;

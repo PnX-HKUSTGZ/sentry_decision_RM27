@@ -66,6 +66,33 @@ std::vector<Intent> InterventionController::active_intents(TimePoint now) const 
   return active;
 }
 
+void apply_intervention(InterventionController* controller, const InterventionCommand& command,
+                        TimePoint now) {
+  if (controller == nullptr) {
+    return;
+  }
+  switch (command.kind) {
+    case InterventionCommand::Kind::kIntent:
+      controller->inject(command.intent, now);
+      break;
+    case InterventionCommand::Kind::kClearIntent:
+      controller->clear_intent(command.intent_field);
+      break;
+    case InterventionCommand::Kind::kWorldOverride:
+      controller->set_world_override(command.world_field, command.world_value);
+      break;
+    case InterventionCommand::Kind::kClearWorld:
+      controller->clear_world_override(command.world_field);
+      break;
+    case InterventionCommand::Kind::kModuleSwitch:
+      controller->set_module_enabled(command.module, command.enabled);
+      break;
+    case InterventionCommand::Kind::kClearAll:
+      controller->clear();
+      break;
+  }
+}
+
 WorldState InterventionController::apply_world(const WorldState& world) const {
   WorldState out = world;
   for (const auto& entry : world_overrides_) {
