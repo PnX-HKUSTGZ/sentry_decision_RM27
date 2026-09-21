@@ -67,13 +67,13 @@ WorldState InterventionController::apply_world(const WorldState& world) const {
   for (const auto& entry : world_overrides_) {
     const double value = entry.second;
     switch (entry.first) {
+      // 注意：世界覆盖只改数值，不提升 referee.valid——否则会绕过 SafetySupervisor
+      // 的裁判失效急停。失效态仍由原始输入决定。
       case WorldField::kSelfHp:
         out.referee.self_hp = static_cast<int>(value);
-        out.referee.valid = true;
         break;
       case WorldField::kSelfAmmo:
         out.referee.self_ammo = static_cast<int>(value);
-        out.referee.valid = true;
         break;
       case WorldField::kOurOutpostHp:
         out.referee.our_outpost_hp = static_cast<int>(value);

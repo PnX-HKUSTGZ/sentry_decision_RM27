@@ -67,6 +67,12 @@
   - `config_loader`：数值必须完整解析（拒绝 `50oops`）；map 形式点位强制要求 `x`/`y`。
   - `InterventionController::allows`：运行期模块开关按字段过滤意图，接入两个决策循环。
   - 验证：容器 7 包 / 31 测试 0 失败。
+- **Copilot review 第二轮修复（本地）**：
+  - 世界覆盖不再提升 `referee.valid`，避免绕过裁判失效急停。
+  - `config_loader` 增加已知数值键的整数 / 非负校验（配负例）。
+  - 两个决策循环每 tick 清 `kIntervention` 来源，模块关闭后旧干预意图不再残留。
+  - `--plugin` 改为真覆盖：`TreeSetupOptions.load_modules=false`，不再叠加 manifest 模块。
+  - 验证：容器 7 包 / 33 测试 0 失败。
 - 待办：P2.3b 串口字节层；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
 - P2 主体已完成（本地范围）；下一步进入 P3 可视化与仿真。
 

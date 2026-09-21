@@ -60,10 +60,16 @@ void test_world_override() {
   controller.set_world_override(WorldField::kSelfHp, 20);
   const WorldState overridden = controller.apply_world(world);
   CHECK(overridden.referee.self_hp == 20);
-  CHECK(overridden.referee.valid);
+  // 覆盖不提升有效性，避免绕过安全急停。
+  CHECK(!overridden.referee.valid);
   // 原世界状态不变。
   CHECK(world.referee.self_hp == 400);
   CHECK(!world.referee.valid);
+
+  // 入参本来有效时保持有效。
+  WorldState valid_world = world;
+  valid_world.referee.valid = true;
+  CHECK(controller.apply_world(valid_world).referee.valid);
 
   controller.clear_world_override(WorldField::kSelfHp);
   CHECK(controller.apply_world(world).referee.self_hp == 400);

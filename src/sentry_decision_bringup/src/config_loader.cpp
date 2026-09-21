@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <map>
 #include <sstream>
 
 namespace sentry_decision_bringup {
@@ -14,6 +15,47 @@ namespace fs = std::filesystem;
 
 std::string join_key(const std::string& prefix, const std::string& key) {
   return prefix.empty() ? key : prefix + "." + key;
+}
+
+// 已知数值键的类型约束：是否为整数键、是否必须非负。未知键不做限制。
+struct NumericRule {
+  bool integral = false;
+  bool non_negative = false;
+};
+
+const std::map<std::string, NumericRule>& numeric_rules() {
+  static const std::map<std::string, NumericRule> rules = {
+      {"nav.retreat_hp", {true, true}},
+      {"nav.recovery_hp", {true, true}},
+      {"nav.low_ammo", {true, true}},
+      {"nav.supply_ammo", {true, true}},
+      {"nav.patrol_dwell_s", {false, true}},
+      {"resource.exchange_ammo_step", {true, true}},
+      {"resource.exchange_hp_step", {true, true}},
+      {"resource.hp_exchange_threshold", {true, true}},
+      {"resource.min_coins", {true, true}},
+      {"strategic.attack_window_min_remaining", {true, true}},
+      {"strategic.attack_window_max_remaining", {true, true}},
+  };
+  return rules;
+}
+
+// 返回 false 并记录错误表示取值不合法。
+bool check_numeric_rule(const std::string& key, double value, std::vector<std::string>* errors) {
+  const auto it = numeric_rules().find(key);
+  if (it == numeric_rules().end()) {
+    return true;
+  }
+  const NumericRule& rule = it->second;
+  if (rule.integral && std::floor(value) != value) {
+    errors->push_back("配置项 " + key + " 必须为整数，实际为 " + std::to_string(value));
+    return false;
+  }
+  if (rule.non_negative && value < 0.0) {
+    errors->push_back("配置项 " + key + " 不能为负数，实际为 " + std::to_string(value));
+    return false;
+  }
+  return true;
 }
 
 // 把嵌套 map 的标量叶子展开成点分 key；布尔进 flags，数值进 numbers。
@@ -49,7 +91,9 @@ void flatten_scalars(const YAML::Node& node, const std::string& prefix,
       ++tail;
     }
     if (tail == text.size() && std::isfinite(value)) {
-      config->numbers[prefix] = value;
+      if (check_numeric_rule(prefix, value, errors)) {
+        config->numbers[prefix] = value;
+      }
       return;
     }
   } catch (const std::exception&) {

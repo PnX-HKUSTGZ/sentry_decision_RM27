@@ -125,9 +125,12 @@ int main(int argc, char** argv) {
   if (!options.plugin.empty()) {
     factory.registerFromPlugin(options.plugin);
   }
+  sentry_decision_bringup::TreeSetupOptions tree_options;
+  tree_options.module_lib_dir = DEFAULT_MODULE_LIB_DIR;
+  tree_options.load_modules = options.plugin.empty();
+  tree_options.register_builtin = options.plugin.empty();
   if (!sentry_decision_bringup::setup_tree_factory(factory, options.tree, &loaded.config, &errors,
-                                                   DEFAULT_MODULE_LIB_DIR,
-                                                   options.plugin.empty())) {
+                                                   tree_options)) {
     std::cerr << "行为树校验失败: " << options.tree << "\n";
     for (const auto& error : errors) {
       std::cerr << "  - " << error << "\n";
@@ -169,8 +172,10 @@ int main(int argc, char** argv) {
     }
     tree.tickOnce();
 
+    // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter.clear_source(sentry_decision::SourceId::kSkill);
+    arbiter.clear_source(sentry_decision::SourceId::kIntervention);
     for (const auto& intent : context.intents) {
       if (!intervention.allows(intent.field)) {
         continue;  // 运行期模块开关关闭时，丢弃该字段的意图

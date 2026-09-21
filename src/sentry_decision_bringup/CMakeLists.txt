@@ -109,6 +109,20 @@ if(BUILD_TESTING)
             --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_point/profiles.yaml)
   set_tests_properties(config_bad_point PROPERTIES WILL_FAIL TRUE)
 
+  # 已知数值键为负必须启动失败。
+  add_test(NAME config_bad_negative
+    COMMAND decision_main --ticks 1
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_negative/profiles.yaml)
+  set_tests_properties(config_bad_negative PROPERTIES WILL_FAIL TRUE)
+
+  # 整数键给出小数必须启动失败。
+  add_test(NAME config_bad_fractional
+    COMMAND decision_main --ticks 1
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_fractional/profiles.yaml)
+  set_tests_properties(config_bad_fractional PROPERTIES WILL_FAIL TRUE)
+
   add_test(NAME decision_node_boot
     COMMAND decision_node --ticks 5 --rate 200
             --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml

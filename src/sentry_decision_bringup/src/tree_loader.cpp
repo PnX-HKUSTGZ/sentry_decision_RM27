@@ -235,8 +235,7 @@ void validate_module_manifests(const std::string& tree_dir, const TreeManifest& 
 
 bool setup_tree_factory(BT::BehaviorTreeFactory& factory, const std::string& tree_path,
                         const sentry_decision::PolicyConfig* config,
-                        std::vector<std::string>* errors, const std::string& module_lib_dir,
-                        bool register_builtin) {
+                        std::vector<std::string>* errors, const TreeSetupOptions& options) {
   const fs::path root(tree_path);
   const fs::path tree_dir = root.parent_path();
   const fs::path manifest_path = tree_dir / "tree_manifest.yaml";
@@ -244,14 +243,17 @@ bool setup_tree_factory(BT::BehaviorTreeFactory& factory, const std::string& tre
   if (fs::exists(manifest_path)) {
     const TreeManifest manifest = load_tree_manifest(manifest_path.string(), errors);
     validate_module_manifests(tree_dir.string(), manifest, errors);
-    register_manifest_modules(factory, manifest, module_lib_dir, register_builtin, errors);
+    if (options.load_modules) {
+      register_manifest_modules(factory, manifest, options.module_lib_dir, options.register_builtin,
+                                errors);
+    }
     if (!manifest.root.empty()) {
       const fs::path manifest_root = tree_dir / manifest.root;
       if (!fs::exists(manifest_root)) {
         errors->push_back("tree_manifest.yaml 的 root 不存在: " + manifest_root.string());
       }
     }
-  } else if (register_builtin) {
+  } else if (options.register_builtin) {
     sentry_decision::register_common_nodes(factory);
     sentry_decision::register_nav_nodes(factory);
     sentry_decision::register_resource_nodes(factory);

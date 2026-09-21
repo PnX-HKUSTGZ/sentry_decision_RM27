@@ -120,8 +120,12 @@ class DecisionNode : public rclcpp::Node {
     if (!plugin.empty()) {
       factory_.registerFromPlugin(plugin);
     }
+    sentry_decision_bringup::TreeSetupOptions tree_options;
+    tree_options.module_lib_dir = DEFAULT_MODULE_LIB_DIR;
+    tree_options.load_modules = plugin.empty();
+    tree_options.register_builtin = plugin.empty();
     if (!sentry_decision_bringup::setup_tree_factory(factory_, tree_path, context_.config, &errors,
-                                                     DEFAULT_MODULE_LIB_DIR, plugin.empty())) {
+                                                     tree_options)) {
       throw std::runtime_error("行为树校验失败: " + join_errors(errors));
     }
     auto blackboard = BT::Blackboard::create();
@@ -139,8 +143,10 @@ class DecisionNode : public rclcpp::Node {
     }
     tree_->tickOnce();
 
+    // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter_.clear_source(sentry_decision::SourceId::kSkill);
+    arbiter_.clear_source(sentry_decision::SourceId::kIntervention);
     for (const auto& intent : context_.intents) {
       if (!intervention_.allows(intent.field)) {
         continue;  // 运行期模块开关关闭时，丢弃该字段的意图

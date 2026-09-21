@@ -44,10 +44,15 @@ void validate_tree_config(const std::string& tree_dir, const sentry_decision::Po
 void validate_module_manifests(const std::string& tree_dir, const TreeManifest& manifest,
                                std::vector<std::string>* errors);
 
+struct TreeSetupOptions {
+  std::string module_lib_dir;  // 模块库目录；空则用 manifest 的值
+  bool load_modules = true;    // 是否按 manifest 加载模块（显式 --plugin 时为 false）
+  bool register_builtin = true;  // 无 manifest 或 builtin 模块时是否注册已链接节点
+};
+
 // 组合步骤：读 manifest / 注册模块 / 校验树与配置。完成后再 createTreeFromFile。
 bool setup_tree_factory(BT::BehaviorTreeFactory& factory, const std::string& tree_path,
                         const sentry_decision::PolicyConfig* config,
-                        std::vector<std::string>* errors, const std::string& module_lib_dir = "",
-                        bool register_builtin = true);
+                        std::vector<std::string>* errors, const TreeSetupOptions& options = {});
 
 }  // namespace sentry_decision_bringup
