@@ -28,7 +28,12 @@
   - 节点：`CheckLowHp` → `IfLowHp`（`hp_key`），新增 `EmitNavGoalFromPoint`（命名点）；删除 `demo_tree.xml`。
   - 修复：core 静态库补 `POSITION_INDEPENDENT_CODE`（被 `nodes.so` 链接本来会失败）；子树独立黑板，节点统一从根黑板取 `context`。
   - 验证：容器 7 包构建通过、`colcon test` 19 测试 0 失败；宿主 `host_core_test.sh` 全通过；`format.sh --check` 通过。
-- 下一步 P2.1：`StrategicPolicy` 接口 + 首个实现；功能域拆分为独立 `.so` 并读取 `module.yaml`。
+- **P2.1 战略层完成（本地）**：
+  - core `StrategicPolicy` 接口 + `StrategicDecision{TacticalMode}`；`DecisionContext::apply_strategy` 写策略并提交 `kTacticalMode` 意图。
+  - `RuleBasedStrategicPolicy`（优先级：复活 > 撤退 > 补给 > 防守 > 进攻 > 巡逻），阈值可由 `nav.retreat_hp` / `nav.low_ammo` / `strategic.attack_window_*` 覆盖。
+  - `decision_main` / `decision_node` 在树 tick 前求值；`DecisionOutput.tactical_mode` 由此产出。
+  - 验证：宿主测试 + 容器 7 包 / 20 测试 0 失败。
+- 下一步：功能域 `.so` 拆分与 `module.yaml`（provides / consumes 校验）；随后 P2.2 `nav_policy` + `nav_executor`。
 
 ### 历史（P1 / P2 接口）
 

@@ -16,6 +16,7 @@
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
+#include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/referee_simulator.hpp"
 
@@ -102,6 +103,8 @@ int main(int argc, char** argv) {
 
   sentry_decision::DecisionContext context;
   context.config = &loaded.config;
+  const sentry_decision::RuleBasedStrategicPolicy policy =
+      sentry_decision::RuleBasedStrategicPolicy::from_config(loaded.config);
 
   sentry_decision_sim::RefereeSimulator referee;
   sentry_decision_sim::NavSimulator navigation(2.0, 0.2);
@@ -146,6 +149,7 @@ int main(int argc, char** argv) {
     navigation.update(now);
     context.world = world_model.snapshot(now);
     context.clear_intents();
+    context.apply_strategy(policy.decide(context.world));
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);

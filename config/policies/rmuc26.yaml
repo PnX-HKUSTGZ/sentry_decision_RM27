@@ -8,3 +8,6 @@ nav:
 resource:
   exchange_ammo_step: 50
   min_coins: 100
+strategic:
+  attack_window_min_remaining: 0
+  attack_window_max_remaining: 420

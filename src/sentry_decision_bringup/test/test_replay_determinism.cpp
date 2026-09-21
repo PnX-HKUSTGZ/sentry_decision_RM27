@@ -9,6 +9,7 @@
 #include "sentry_decision_core/replay.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
+#include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
 
 using namespace sentry_decision;
 
@@ -55,6 +56,9 @@ ReplayData make_data() {
   referee.valid = true;
   referee.self_hp = 400;
   referee.self_ammo = 100;
+  referee.our_outpost_hp = 1500;
+  referee.enemy_outpost_hp = 1500;
+  referee.game_time_remaining = 420;
   data.referee.push_back({Duration{0}, referee});
 
   RefereeState hurt = referee;
@@ -79,6 +83,7 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
   register_sentry_nodes(factory);
   auto blackboard = BT::Blackboard::create();
   PolicyConfig config = make_config();
+  const RuleBasedStrategicPolicy policy = RuleBasedStrategicPolicy::from_config(config);
   DecisionContext context;
   context.config = &config;
   blackboard->set("context", &context);
@@ -91,6 +96,7 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
     replay.step(period);
     context.world = model.snapshot(replay.stamp());
     context.clear_intents();
+    context.apply_strategy(policy.decide(context.world));
     tree.tickOnce();
 
     arbiter.clear_source(SourceId::kStrategic);
@@ -123,16 +129,18 @@ void test_replay_is_deterministic(const std::string& tree_path) {
   CHECK(first.size() == 60);
   CHECK(first == second);
 
-  // 表驱动：0~950ms 巡逻去 patrol_a，1000ms 起低血撤退去 home。
-  // P2.0 尚无 StrategicPolicy，战术模式保持 kUnknown。
+  // 表驱动：0~950ms 满血、去 patrol_a；1000ms 起低血撤退、去 home。
+  // 前若干 tick 裁判数据尚未在有效期内（stale），战略层输出 kUnknown；
+  // 数据有效后满血双方前哨在场 -> 进攻。
   for (std::size_t i = 0; i < 19; ++i) {
     CHECK(first[i].hp == 400);
-    CHECK(first[i].mode == TacticalMode::kUnknown);
     CHECK(first[i].has_goal);
     CHECK(first[i].goal_x == 1.1);
     CHECK(first[i].goal_y == 1.1);
   }
+  CHECK(first[0].mode == TacticalMode::kAttack);
   CHECK(first[19].hp == 50);
+  CHECK(first[19].mode == TacticalMode::kRetreat);
   CHECK(first[19].has_goal);
   CHECK(first[19].goal_x == -5.0);
   CHECK(first[19].goal_y == 3.0);

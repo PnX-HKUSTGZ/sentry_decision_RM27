@@ -10,7 +10,9 @@ find_package(ament_cmake REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(sentry_decision_core REQUIRED)
 
-add_library(${PROJECT_NAME} SHARED src/nodes.cpp)
+add_library(${PROJECT_NAME} SHARED
+  src/nodes.cpp
+  src/rule_based_strategic_policy.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -30,6 +32,10 @@ if(BUILD_TESTING)
   add_executable(test_nodes test/test_nodes.cpp)
   target_link_libraries(test_nodes ${PROJECT_NAME})
   add_test(NAME test_nodes COMMAND test_nodes)
+
+  add_executable(test_strategic_policy test/test_strategic_policy.cpp)
+  target_link_libraries(test_strategic_policy ${PROJECT_NAME})
+  add_test(NAME test_strategic_policy COMMAND test_strategic_policy)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

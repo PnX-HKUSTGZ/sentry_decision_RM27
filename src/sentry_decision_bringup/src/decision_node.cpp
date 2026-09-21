@@ -19,6 +19,7 @@
 #include "sentry_decision_io/decision_state_publisher.hpp"
 #include "sentry_decision_io/ros_io_node.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
+#include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
 
 #ifndef DEFAULT_TREE_PATH
 #define DEFAULT_TREE_PATH "tree/root.xml"
@@ -97,6 +98,9 @@ class DecisionNode : public rclcpp::Node {
         state_publisher_(*this),
         max_ticks_(options.ticks) {
     context_.config = config;
+    if (config != nullptr) {
+      policy_ = sentry_decision::RuleBasedStrategicPolicy::from_config(*config);
+    }
     build_tree(options.tree, options.plugin);
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
@@ -122,6 +126,7 @@ class DecisionNode : public rclcpp::Node {
     const TimePoint now = SteadyClock::now();
     context_.world = world_model_.snapshot(now);
     context_.clear_intents();
+    context_.apply_strategy(policy_.decide(context_.world));
     tree_->tickOnce();
 
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
@@ -185,6 +190,7 @@ class DecisionNode : public rclcpp::Node {
   sentry_decision::DecisionContext context_;
   sentry_decision::WorldModel world_model_;
   sentry_decision::IntentArbiter arbiter_;
+  sentry_decision::RuleBasedStrategicPolicy policy_;
   sentry_decision_io::DecisionStatePublisher state_publisher_;
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
