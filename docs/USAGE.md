@@ -188,6 +188,27 @@ ros2 action send_goal /decision/manual_override \
 所有已应用的干预发布到 `/decision/intervention`，可随 rosbag 录制并在回放中复现（P3.3）。
 冒烟测试：`tools/intervention_smoke_test.sh`（也注册为 `intervention_smoke`）。
 
+### 4.8 网页面板（rosbridge）
+
+`decision_node`（配合 `referee_sim_node` 或真实 IO）运行后，用 `viz.launch.py` 启动 rosbridge 与静态页：
+
+```bash
+ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8080
+```
+
+浏览器打开 `http://<host>:8080/`，点「连接」连到 `ws://<host>:9090`。页面显示：
+
+- 左侧行为树（`/decision/tree_status`，active path 高亮）；
+- 中间战场俯视图（己方位姿、导航目标、敌方位置）；
+- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者（每秒轮询 `list_state`）；
+- 底部干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+
+需要镜像包含 `ros-jazzy-rosbridge-suite`（见 `docker/Dockerfile`）。纯逻辑单测：
+```bash
+node src/sentry_decision_viz/web/test/format.test.mjs
+```
+端到端冒烟：`tools/viz_smoke_test.sh`（也注册为 `viz_smoke`；未装 rosbridge 时跳过）。
+
 ## 5. 命令参数
 
 ### 5.1 decision_main

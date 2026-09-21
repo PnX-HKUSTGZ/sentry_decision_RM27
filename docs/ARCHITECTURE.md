@@ -617,8 +617,8 @@ timeline:
     expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
 ```
 
-P3.1 支持 `set_world` / `expect`；`add_intent` / `disable` 依赖 §10.5 的干预通道，
-待 P3.2 落地后接入。场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，
+P3.1 支持 `set_world` / `expect`；`add_intent` / `disable` 所需的干预通道已在 P3.2 就绪，
+场景脚本接入留待后续。场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，
 订阅 `/decision/state` 在事件时刻断言，等价于 §10.5 的「干预即测试用例」。
 
 ### 14.5 干预回放
@@ -631,18 +631,22 @@ P3.1 支持 `set_world` / `expect`；`add_intent` / `disable` 依赖 §10.5 的�
 
 ### 14.6 网页面板
 
-rosbridge + roslibjs 的纯静态页，**无 Node、无构建步骤**：
+rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅用于纯逻辑单测）：
 
-- 左侧树状态（active path 高亮）、中间战场俯视图（己方 / 队友 / 敌方 / 当前目标，canvas 绘制）、
-  右侧 `WorldState` 与活跃 Intent 表、按钮组（强制撤退、去点位、切姿态、买弹、禁用模块、
-  清空手动意图、急停）；
-- 表单 / 表格由 `list_state` 的 schema 驱动，新增字段无需改前端；
-- 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `panels/*`（每个面板一个模块）/
-  `battlefield`（canvas）分层，使用浏览器原生 ES modules；
-- `roslib.min.js` 锁版本 vendor 进仓库（BSD-2），页面由 launch 的静态服务或
-  `python3 -m http.server` 托管，rosbridge 由 `viz.launch.py` 启动；
-- 不引入 npm 构建：当前规模的收益大于成本，且分层已为将来平滑迁移到 Vite + TS 留好接缝
-  （数据层与 bridge 可原样复用）。
+- 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（己方 / 导航目标 /
+  敌方，canvas 绘制）、右侧 `WorldState` 与模块 / Intent 面板；
+- 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
+  分别调用 `/decision/debug`（service）与 `/decision/manual_override`（action）；
+- 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/
+  `panels/*`（每个面板一个模块）/ `battlefield`（canvas）分层，使用浏览器原生 ES modules；
+- `web/vendor/roslib.min.js` 锁版本 vendor（BSD-2，1.4.1）；`web/package.json` 仅声明
+  `type: module` 供 `node` 单测使用，无依赖；
+- `viz.launch.py` 启动 `rosbridge_websocket`（默认 9090）与 `python3 -m http.server`
+  （默认 8080，指向安装后的 `share/sentry_decision_viz/web`）；
+- 纯逻辑（消息 → 视图模型、坐标变换）在 `web/test/format.test.mjs` 用 `node` 单测；
+  `tools/viz_smoke_test.sh` 校验静态资源、rosbridge 端口与决策话题数据通路（未装 rosbridge 时跳过）；
+- 不引入打包器：当前规模的收益大于成本，且分层已为将来平滑迁移到 Vite + TS 留好接缝；
+- 说明：`WorldState` 目前只带单个敌方位置与队友数量，战场页暂不画队友；「急停」无独立接口，留待 P4。
 
 ### 14.7 依赖
 

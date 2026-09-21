@@ -26,6 +26,13 @@ jobs:
       - name: 宿主 core 纯逻辑测试
         run: tools/host_core_test.sh
 
+  viz-js-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: 网页面板纯逻辑单测（node，无依赖）
+        run: node src/sentry_decision_viz/web/test/format.test.mjs
+
   jazzy:
     runs-on: ubuntu-24.04
     container: ros:jazzy-ros-base

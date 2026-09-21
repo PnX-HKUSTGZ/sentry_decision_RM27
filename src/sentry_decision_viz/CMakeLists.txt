@@ -29,6 +29,8 @@ install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
+install(DIRECTORY web/ DESTINATION share/${PROJECT_NAME}/web)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
@@ -38,6 +40,13 @@ if(BUILD_TESTING)
   add_executable(test_tree_state test/test_tree_state.cpp)
   target_link_libraries(test_tree_state ${PROJECT_NAME})
   add_test(NAME test_tree_state COMMAND test_tree_state)
+
+  # 网页面板端到端冒烟；未安装 rosbridge_server 时脚本自行跳过。
+  add_test(NAME viz_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/viz_smoke_test.sh)
+  set_tests_properties(viz_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 120)
 endif()
 
 ament_package()

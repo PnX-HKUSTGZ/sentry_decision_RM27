@@ -24,6 +24,9 @@
 - 新增 `tools/intervention_smoke_test.sh` 干预冒烟测试
 - `sentry_decision_core`：`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData` 增干预通道，`ReplaySource::interventions()` 按时刻返回
 - `sentry_decision_io`：`load_replay_data` 读取 `/decision/intervention` 并重建干预命令
+- `sentry_decision_viz`：新增 rosbridge 网页面板（`web/` 静态页、vendored `roslib.min.js`、`viz.launch.py`），含树状态 / 战场 / 世界状态 / 模块与干预面板及干预按钮
+- 新增 `web/test/format.test.mjs`（node 纯逻辑单测，CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`
+- `docker/Dockerfile`：新增 `ros-jazzy-rosbridge-suite`
 
 ## [v0.2.0]
 

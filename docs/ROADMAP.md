@@ -109,7 +109,7 @@
 | P3.1 裁判仿真 + 场景脚本（已完成） | `referee_sim_node`（发 `/sentry/*` + odom、导航 action server、动作回执）+ 场景 YAML 时间轴与断言 | 脚本驱动完整对局（巡逻→进攻→撤退→复活）并通过断言 |
 | P3.2 干预 ROS 接口（已完成） | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
 | P3.3 干预回放（已完成） | `ReplayData` 增干预通道、`ReplaySource` / `load_replay_data` 支持 | 含干预的回放逐 tick 确定，干预在原时刻复现 |
-| P3.4 网页面板 | rosbridge + roslibjs 静态页：树状态、战场俯视图、WorldState / Intent、按钮组 | 网页实时显示树状态与机器人 / 敌方位置；按钮生效 |
+| P3.4 网页面板（已完成） | rosbridge + roslibjs 静态页：树状态、战场俯视图、WorldState / Intent、按钮组 | 网页实时显示树状态与机器人 / 敌方位置；按钮生效 |
 | P3.5 文档与验收 | ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；完整对局录制 + 回放 | 三条验收闭环 |
 
 交付物：
@@ -167,4 +167,5 @@
   - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（五条上行 + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与场景 YAML（`set_world` / `expect`）；`scenario/full_match.yaml` 端到端跑通巡逻→进攻→撤退→复活（12/12 断言）；容器 8 包 / 37 测试通过。
   - 已完成（本地）：P3.2 干预 ROS 接口——`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`、`InterventionServer`（线程安全队列、tick 边界应用、action 生命周期反馈）、仲裁逐字段 `winners`、`/decision/intervention` 记录；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
   - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core 并由实时 / 回放共用 `apply_intervention`；`ReplayData` 增干预通道、`ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；回放确定性测试含人工接管。
+  - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web`（vendored `roslib.min.js`、原生 ES modules、无打包）× `viz.launch.py`（rosbridge + 静态服务）；树状态 / 战场 / 世界状态 / 模块与干预面板 + 干预按钮；纯逻辑 node 单测与 `viz_smoke`；镜像新增 `ros-jazzy-rosbridge-suite`。
   - P2 主体已完成（本地范围）。
