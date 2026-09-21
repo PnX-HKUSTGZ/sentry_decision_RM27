@@ -12,7 +12,9 @@ docker build -f docker/Dockerfile -t sentry_decision_rm27:jazzy .
 docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy test
 
 # 进入交互容器（后续命令都在容器内；先 source）
-docker run -it --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy shell
+# -p 8080:8080 / 9090:9090 仅网页面板需要，映射到宿主浏览器
+docker run -it --rm -p 8080:8080 -p 9090:9090 \
+  -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy shell
 source .docker-build/install/setup.bash
 ```
 
@@ -240,7 +242,10 @@ ros2 action send_goal /decision/manual_override \
 ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8080
 ```
 
-浏览器打开 `http://<host>:8080/`，点「连接」连到 `ws://<host>:9090`。页面显示：
+> 容器运行时需把端口映射到宿主：`docker run -p 8080:8080 -p 9090:9090 ...`；
+> `docker/compose.yaml` 已配置这两个端口。否则宿主浏览器访问不到容器内的服务。
+
+浏览器打开 `http://<宿主>:8080/`，点「连接」连到 `ws://<宿主>:9090`。页面显示：
 
 - 左侧行为树（`/decision/tree_status`，active path 高亮）；
 - 中间战场俯视图（己方位姿、导航目标、敌方位置）；

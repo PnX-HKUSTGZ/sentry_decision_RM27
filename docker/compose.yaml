@@ -14,6 +14,10 @@ services:
       - DISPLAY=${DISPLAY:-}
     stdin_open: true
     tty: true
+    # 网页面板：rosbridge websocket（9090）与静态页（8080）映射到宿主。
+    ports:
+      - "8080:8080"
+      - "9090:9090"
     networks:
       - rm27net
 
