@@ -28,6 +28,7 @@ target_link_libraries(bringup_loader PUBLIC
   sentry_decision_core::sentry_decision_core
   sentry_decision_nodes::sentry_decision_common
   sentry_decision_nodes::sentry_decision_nav
+  sentry_decision_nodes::sentry_decision_resource
   behaviortree_cpp::behaviortree_cpp
   yaml-cpp::yaml-cpp)
 
@@ -104,6 +105,7 @@ if(BUILD_TESTING)
     sentry_decision_core::sentry_decision_core
     sentry_decision_nodes::sentry_decision_common
     sentry_decision_nodes::sentry_decision_nav
+    sentry_decision_nodes::sentry_decision_resource
     sentry_decision_nodes::sentry_decision_strategic
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME mission_nav
@@ -114,6 +116,7 @@ if(BUILD_TESTING)
     sentry_decision_core::sentry_decision_core
     sentry_decision_nodes::sentry_decision_common
     sentry_decision_nodes::sentry_decision_nav
+    sentry_decision_nodes::sentry_decision_resource
     sentry_decision_nodes::sentry_decision_strategic
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME preemption
@@ -124,6 +127,7 @@ if(BUILD_TESTING)
     sentry_decision_core::sentry_decision_core
     sentry_decision_nodes::sentry_decision_common
     sentry_decision_nodes::sentry_decision_nav
+    sentry_decision_nodes::sentry_decision_resource
     sentry_decision_nodes::sentry_decision_strategic
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME replay_determinism

@@ -7,6 +7,8 @@ nav:
   patrol_dwell_s: 5.0
 resource:
   exchange_ammo_step: 50
+  exchange_hp_step: 50
+  hp_exchange_threshold: 50
   min_coins: 100
 strategic:
   attack_window_min_remaining: 0

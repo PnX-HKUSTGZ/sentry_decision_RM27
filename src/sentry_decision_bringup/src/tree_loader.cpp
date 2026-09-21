@@ -11,6 +11,7 @@
 
 #include "sentry_decision_nodes/common_nodes.hpp"
 #include "sentry_decision_nodes/nav_nodes.hpp"
+#include "sentry_decision_nodes/resource_nodes.hpp"
 
 namespace sentry_decision_bringup {
 namespace {
@@ -45,6 +46,8 @@ void register_builtin_module(const std::string& name, BT::BehaviorTreeFactory& f
     sentry_decision::register_common_nodes(factory);
   } else if (name == "nav") {
     sentry_decision::register_nav_nodes(factory);
+  } else if (name == "resource") {
+    sentry_decision::register_resource_nodes(factory);
   } else if (name == "strategic") {
     // 非 BT 插件：由组合根链接，无需注册到工厂。
   } else {
@@ -251,6 +254,7 @@ bool setup_tree_factory(BT::BehaviorTreeFactory& factory, const std::string& tre
   } else if (register_builtin) {
     sentry_decision::register_common_nodes(factory);
     sentry_decision::register_nav_nodes(factory);
+    sentry_decision::register_resource_nodes(factory);
   }
 
   if (config != nullptr) {

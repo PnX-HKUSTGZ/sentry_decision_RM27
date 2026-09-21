@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  资源 / 复活任务（与导航任务并行求值，输出 kResourceRequest 意图）。
+  进入条件：每 tick；退出条件：-。
+  优先级：免费复活 > 兑换血量 > 兑换发弹量。
+-->
+<root BTCPP_format="4" main_tree_to_execute="ResourceRoot">
+  <BehaviorTree ID="ResourceRoot">
+    <ReactiveFallback name="ResourcePriority">
+      <Sequence name="Revive">
+        <IfCanFreeResurrect/>
+        <RequestFreeRevive/>
+      </Sequence>
+      <Sequence name="HpExchange">
+        <IfLowHp hp_key="resource.hp_exchange_threshold"/>
+        <IfCoinsAtLeast coins_key="resource.min_coins"/>
+        <RequestHpExchange amount_key="resource.exchange_hp_step"/>
+      </Sequence>
+      <Sequence name="AmmoExchange">
+        <IfLowAmmo ammo_key="nav.low_ammo"/>
+        <IfCoinsAtLeast coins_key="resource.min_coins"/>
+        <RequestAmmoExchange amount_key="resource.exchange_ammo_step"/>
+      </Sequence>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

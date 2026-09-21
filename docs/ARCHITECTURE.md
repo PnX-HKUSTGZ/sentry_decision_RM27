@@ -208,8 +208,9 @@ flowchart TD
 - 新增 / 删除 / 开关模块 = 增删一个库 + 改一行配置，不碰核心代码。
 
 这样才真正实现「独立开关模块而不影响其他模块」。已拆分的模块：`common`（条件）、`nav`（导航技能）、
-`strategic`（C++ 策略，非 BT 插件）；`resource`、`intervention` 待补。模块库由 `tree_manifest.yaml` 的
-`library` 指定、经 `registerFromPlugin` 加载，`module.yaml` 的 provides / consumes 在启动时校验。
+`resource`（资源 / 复活）、`strategic`（C++ 策略，非 BT 插件）；`intervention` 的 ROS 动作留 P3。
+模块库由 `tree_manifest.yaml` 的 `library` 指定、经 `registerFromPlugin` 加载，
+`module.yaml` 的 provides / consumes 在启动时校验。
 
 ## 7. 行为树规范
 

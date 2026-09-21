@@ -31,6 +31,16 @@ target_link_libraries(sentry_decision_nav PUBLIC
   behaviortree_cpp::behaviortree_cpp)
 target_compile_definitions(sentry_decision_nav PRIVATE BT_PLUGIN_EXPORT)
 
+# resource：资源 / 复活技能节点。
+add_library(sentry_decision_resource SHARED src/resource_nodes.cpp)
+target_include_directories(sentry_decision_resource PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>")
+target_link_libraries(sentry_decision_resource PUBLIC
+  sentry_decision_core::sentry_decision_core
+  behaviortree_cpp::behaviortree_cpp)
+target_compile_definitions(sentry_decision_resource PRIVATE BT_PLUGIN_EXPORT)
+
 # strategic：战略策略实现（纯 C++，非 BT 插件）。
 add_library(sentry_decision_strategic SHARED src/rule_based_strategic_policy.cpp)
 target_include_directories(sentry_decision_strategic PUBLIC
@@ -42,6 +52,7 @@ target_link_libraries(sentry_decision_strategic PUBLIC
 install(TARGETS
   sentry_decision_common
   sentry_decision_nav
+  sentry_decision_resource
   sentry_decision_strategic
   EXPORT export_${PROJECT_NAME}
   LIBRARY DESTINATION lib
@@ -54,8 +65,16 @@ if(BUILD_TESTING)
   target_link_libraries(test_nodes
     sentry_decision_common
     sentry_decision_nav
+    sentry_decision_resource
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME test_nodes COMMAND test_nodes)
+
+  add_executable(test_resource test/test_resource.cpp)
+  target_link_libraries(test_resource
+    sentry_decision_common
+    sentry_decision_resource
+    behaviortree_cpp::behaviortree_cpp)
+  add_test(NAME test_resource COMMAND test_resource)
 
   add_executable(test_strategic_policy test/test_strategic_policy.cpp)
   target_link_libraries(test_strategic_policy sentry_decision_strategic)

@@ -24,8 +24,10 @@ modules:
     type: policy
     manifest: strategic.yaml
   resource:
-    enabled: false
-    builtin: true                           # P2.3：资源技能
+    enabled: true
+    library: libsentry_decision_resource.so  # 资源 / 复活技能节点
+    type: bt
+    manifest: resource.yaml
   intervention:
     enabled: false
     builtin: true                           # P2.4

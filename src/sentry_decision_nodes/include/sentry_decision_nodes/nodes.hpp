@@ -2,6 +2,7 @@
 
 #include "sentry_decision_nodes/common_nodes.hpp"
 #include "sentry_decision_nodes/nav_nodes.hpp"
+#include "sentry_decision_nodes/resource_nodes.hpp"
 
 namespace sentry_decision {
 
@@ -9,6 +10,7 @@ namespace sentry_decision {
 inline void register_sentry_nodes(BT::BehaviorTreeFactory& factory) {
   register_common_nodes(factory);
   register_nav_nodes(factory);
+  register_resource_nodes(factory);
 }
 
 }  // namespace sentry_decision

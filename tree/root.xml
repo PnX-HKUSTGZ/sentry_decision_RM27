@@ -1,12 +1,18 @@
 <?xml version="1.0"?>
 <!--
   组合根：只做阶段组合，不含业务逻辑。
+  资源 / 复活与导航任务并行求值，由字段级仲裁合并。
   进入条件：进程启动；退出条件：进程结束。
-  抢占关系：无（只调用 MissionRoot）。
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <include path="mission/root.xml"/>
+  <include path="resource/root.xml"/>
   <BehaviorTree ID="MainTree">
-    <SubTree ID="MissionRoot"/>
+    <Sequence name="RootSequence">
+      <ForceSuccess>
+        <SubTree ID="ResourceRoot"/>
+      </ForceSuccess>
+      <SubTree ID="MissionRoot"/>
+    </Sequence>
   </BehaviorTree>
 </root>

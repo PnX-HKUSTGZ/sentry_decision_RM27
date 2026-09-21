@@ -57,8 +57,12 @@
   - core `NavGoalTracker`：把导航目标的「发送 / 取消 / 不变」边沿契约显式化，接入 `decision_node` / `decision_main`。
   - `test_preemption`：进攻 -> 低血抢占撤退 -> 恢复进攻，断言目标改派 / 不重发 / 撤销取消，且每 tick 至多一个 nav_goal。
   - 回归：回放确定性、表驱动 golden、抢占契约；容器 7 包 / 28 测试 0 失败。
-- 待办：P2.3b 串口字节层；`resource` 模块；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
-- P2 主体已完成（本地范围）；下一步进入 P3 可视化与仿真，或补 `resource` 模块。
+- **`resource` 模块完成（本地）**：
+  - `sentry_decision_resource` 独立 `.so`：`IfCanFreeResurrect` / `IfLowAmmo` / `IfCoinsAtLeast` + `RequestFreeRevive` / `RequestHpExchange` / `RequestAmmoExchange`。
+  - `tree/resource/root.xml` 与 `MissionRoot` 并行求值（`ForceSuccess` 包裹），输出 `kResourceRequest`，经字段级仲裁与导航目标合并。
+  - 验证：`test_resource` + 容器 7 包 / 29 测试 0 失败。
+- 待办：P2.3b 串口字节层；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
+- P2 主体已完成（本地范围）；下一步进入 P3 可视化与仿真。
 
 ### 历史（P1 / P2 接口）
 

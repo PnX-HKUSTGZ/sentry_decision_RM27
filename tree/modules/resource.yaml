@@ -1,0 +1,7 @@
+# resource 模块元数据（资源 / 复活）。
+name: resource
+provides:
+  - intent.resource_request
+consumes:
+  - world.referee
+  - config.numbers

@@ -80,7 +80,7 @@
 > 功能域 `.so` 拆分（`common` / `nav` / `strategic`）与 `module.yaml` provides / consumes 校验已完成。
 > P2.4 core 侧已完成：`SafetySupervisor` 与 `InterventionController` 已接入两个入口。
 > P2.5 回归已完成（本地）：`NavGoalTracker` 契约 + 抢占测试 + 回放确定性。
-> 仍待办：P2.3b 串口字节层（待电控 / MCU）、`resource` 模块、旧 bag 差异报告。
+> `resource` 模块已拆分并接入；仍待办：P2.3b 串口字节层（待电控 / MCU）、旧 bag 差异报告。
 
 交付物：
 
@@ -146,5 +146,6 @@
   - 已完成（本地）：功能域 `.so` 拆分——`common` / `nav` / `strategic` 独立库、`tree_manifest.yaml` 按 `library` 加载、`module.yaml` provides / consumes 启动校验；容器 24 测试通过。
   - 已完成（本地）：P2.4 core 侧安全与干预——`SafetySupervisor`（限幅 / 急停）、`InterventionController`（意图注入 lease、世界覆盖、模块开关），已接入 `decision_node` / `decision_main`；容器 26 测试通过。
   - 已完成（本地）：P2.5 回归——`NavGoalTracker` 目标边沿 / 取消契约（接入两个入口）、抢占契约测试、回放确定性；容器 28 测试通过。
-  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；`resource` 模块；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
-  - P2 主体已完成（本地范围），下一步进入 P3 可视化与仿真，或补 `resource` 模块。
+  - 已完成（本地）：`resource` 模块——资源 / 复活独立 `.so`、`tree/resource/root.xml` 与导航任务并行、经字段级仲裁合并；容器 29 测试通过。
+  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；intervention 的 ROS action / service（P3）；旧 bag 逐 tick 差异报告。
+  - P2 主体已完成（本地范围），下一步进入 P3 可视化与仿真。
