@@ -93,9 +93,10 @@ struct WorldState {
 };
 ```
 
-裁判消息中「未解码」的原始整数（`event_code`、`sentry_info_1/2`）不直接进决策，而是先经
-`core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2`），再写入 `RefereeState`。
-`sentry_info_3`（各姿态剩余强化时间）对应的规则疑似为临时规则，暂不解码，待协议明确后再补。
+裁判消息中「未解码」的原始整数（`event_code`、`sentry_info_1/2/3`）不直接进决策，而是先经
+`core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2/3`），再写入 `RefereeState`。
+位段依据 2026 比赛规则手册 V2.2.0 与通信协议 V2.0.0；姿态（`info2.stance` / `info3` 剩余时长）为规则
+5.6.4 的有效机制，决策当前不使用，仅做完整解码与观测。
 位段定义集中在这一处，协议变更只改这里，并配套 `test/test_referee_protocol.cpp` 单测；io 适配器只负责
 把消息字段喂给解码函数，不内联位运算。
 

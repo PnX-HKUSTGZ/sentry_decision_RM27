@@ -24,12 +24,13 @@
 - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。
 - 已完成（本地）：P3.2 干预 ROS 接口——`sentry_decision_msgs` 新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；io 新增 `InterventionServer`（action / service 只入队，tick 边界应用）与取值解析（yaml-cpp）；core `IntentArbiter` 新增逐字段 `winners`、`InterventionController` 支持按字段清除；`decision_node` 发布 `/decision/intervention` 并提供 `list_state` JSON；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
 - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData.interventions` + `ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；core / bringup / io 测试覆盖干预通道与含干预的回放确定性。
+- 已完成（本地）：裁判协议补全——`EventCode` 覆盖 0x0101 全字段；`SentryInfo2` 增加 `stance` / `stance_enhanced`，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState.info3`、io 合并与 sim `sentry_info_3` 同步；单测覆盖。
 - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web` 纯静态页（vendored `roslib.min.js` 1.4.1、原生 ES modules、`web/package.json` 仅声明 `type: module`）；`bridge` / `store` / `format` / `panels/*` / `battlefield` 分层；`viz.launch.py` 起 rosbridge + 静态服务；`web/test/format.test.mjs` node 单测（CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`；`docker/Dockerfile` 加 `ros-jazzy-rosbridge-suite`。
 
 ### 待办
 
 - P3.5 收尾（本地）：文档已同步，三条验收由集成测试覆盖；实际 rosbag 录制演示待实机。
-- 参考文档 `refs/26UC`（已抽取到 `refs/26UC/_text/`）可补齐 `referee_protocol` 的 `event_code` / `detect_color` / `sentry_info_3`。
+- 已完成：参考文档 `refs/26UC`（抽取到 `refs/26UC/_text/`）补齐 `referee_protocol` 的 `event_code` 全字段与 `sentry_info_3`；`detect_color` 为视觉字段、文档未定义，仍待 auto-aim 确认。
 - 场景脚本 `add_intent` / `disable` 接入（干预通道已就绪）。
 - P4：实车 / 仿真跑通、旧仓库归档、迁移报告。
 

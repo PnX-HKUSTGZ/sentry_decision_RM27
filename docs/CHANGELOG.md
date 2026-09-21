@@ -27,6 +27,9 @@
 - `sentry_decision_viz`：新增 rosbridge 网页面板（`web/` 静态页、vendored `roslib.min.js`、`viz.launch.py`），含树状态 / 战场 / 世界状态 / 模块与干预面板及干预按钮
 - 新增 `web/test/format.test.mjs`（node 纯逻辑单测，CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`
 - `docker/Dockerfile`：新增 `ros-jazzy-rosbridge-suite`
+- `sentry_decision_core`：`referee_protocol` 按 2026 规则 / 通信协议补齐——`EventCode` 覆盖场地事件全字段，`SentryInfo2` 增加姿态，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState` 增 `info3`
+- `sentry_decision_io`：`sentry_bridge` 解码 `sentry_info_3`
+- `sentry_decision_sim`：`SimWorld` 支持 `sentry_info_3` 场景字段
 
 ## [v0.2.0]
 

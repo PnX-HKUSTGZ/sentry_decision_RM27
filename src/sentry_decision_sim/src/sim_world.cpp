@@ -79,6 +79,8 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
     world->sentry_info_1 = static_cast<unsigned int>(as_int);
   } else if (field == "sentry_info_2") {
     world->sentry_info_2 = as_int;
+  } else if (field == "sentry_info_3") {
+    world->sentry_info_3 = static_cast<std::uint64_t>(number);
   } else if (field == "base_hp") {
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {

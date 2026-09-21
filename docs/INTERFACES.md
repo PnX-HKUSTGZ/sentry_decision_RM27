@@ -61,8 +61,9 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 | `/sentry/radar_info` | `RadarInfo` | `enemies[6]`、敌方经济、前哨感知 | 雷达 |
 | `/sentry/decision_ack` | `DecisionAck` | `request_id`、`accepted`、`code`、`detail` | MCU 回执 |
 
-`sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用 `core/referee_protocol.hpp` 解码。
-`detect_color` 编码待确认，当前留空。
+`sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用 `core/referee_protocol.hpp` 解码
+（已按 2026 规则 / 通信协议补齐：场地事件全字段、兑换与复活、姿态与姿态剩余时长）。
+`detect_color` 为视觉/MCU 字段，裁判与通信协议文档中未定义编码，仍待 auto-aim 确认，当前留空。
 
 ## 5. 下行 ROS 消息（决策发布）
 

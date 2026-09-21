@@ -291,6 +291,7 @@ class RefereeSimNode : public rclcpp::Node {
     online.speed_monitor_angle = static_cast<float>(world_.speed_monitor_angle);
     online.sentry_info_1 = world_.sentry_info_1;
     online.sentry_info_2 = static_cast<std::uint16_t>(world_.sentry_info_2);
+    online.sentry_info_3 = world_.sentry_info_3;
     online.energy_ratio = static_cast<std::uint8_t>(world_.energy_ratio);
     online_info_pub_->publish(online);
 

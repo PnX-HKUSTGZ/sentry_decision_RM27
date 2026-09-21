@@ -56,6 +56,7 @@ struct RefereeState {
   EventCode event{};
   SentryInfo1 info1{};
   SentryInfo2 info2{};
+  SentryInfo3 info3{};
 };
 
 struct SelfState {
