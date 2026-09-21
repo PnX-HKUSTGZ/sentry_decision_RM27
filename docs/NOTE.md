@@ -28,9 +28,10 @@
 
 ### 待办
 
-- P3.5 收尾：完整对局录制 + 回放演示、文档最终同步。
+- P3.5 收尾（本地）：文档已同步，三条验收由集成测试覆盖；实际 rosbag 录制演示待实机。
 - 参考文档 `refs/26UC`（已抽取到 `refs/26UC/_text/`）可补齐 `referee_protocol` 的 `event_code` / `detect_color` / `sentry_info_3`。
 - 场景脚本 `add_intent` / `disable` 接入（干预通道已就绪）。
+- P4：实车 / 仿真跑通、旧仓库归档、迁移报告。
 
 ## 历史（P2 策略迁移，已完成）
 

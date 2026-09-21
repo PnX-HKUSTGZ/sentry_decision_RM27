@@ -110,7 +110,7 @@
 | P3.2 干预 ROS 接口（已完成） | `ManualOverride.action` + `DebugCommand.srv`、`InterventionServer`（线程安全队列、tick 边界应用）、`/decision/intervention` | 接口可注入并看到逐字段胜负；模块开关生效 |
 | P3.3 干预回放（已完成） | `ReplayData` 增干预通道、`ReplaySource` / `load_replay_data` 支持 | 含干预的回放逐 tick 确定，干预在原时刻复现 |
 | P3.4 网页面板（已完成） | rosbridge + roslibjs 静态页：树状态、战场俯视图、WorldState / Intent、按钮组 | 网页实时显示树状态与机器人 / 敌方位置；按钮生效 |
-| P3.5 文档与验收 | ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；完整对局录制 + 回放 | 三条验收闭环 |
+| P3.5 文档与验收（已完成） | ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；完整对局录制 + 回放 | 三条验收闭环 |
 
 交付物：
 
@@ -161,11 +161,12 @@
   - 已完成（本地）：P2.5 回归——`NavGoalTracker` 目标边沿 / 取消契约（接入两个入口）、抢占契约测试、回放确定性；容器 28 测试通过。
   - 已完成（本地）：`resource` 模块——资源 / 复活独立 `.so`、`tree/resource/root.xml` 与导航任务并行、经字段级仲裁合并；容器 29 测试通过。
   - 待办：P2.3b 串口字节层（待电控 / MCU 协议）；旧 bag 逐 tick 差异报告。
-- **P3 进行中**：
+- **P3 已完成（本地范围）**：
   - 设计已对齐（本地）：新增 `sentry_decision_viz`、树状态消息与 `/decision/tree_status`、Groot2 可选、干预 action / service（线程安全队列、tick 边界应用）、`referee_sim_node` 与场景脚本、干预回放、无构建网页面板；见 `docs/ARCHITECTURE.md` §14。
   - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过。
   - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（五条上行 + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与场景 YAML（`set_world` / `expect`）；`scenario/full_match.yaml` 端到端跑通巡逻→进攻→撤退→复活（12/12 断言）；容器 8 包 / 37 测试通过。
   - 已完成（本地）：P3.2 干预 ROS 接口——`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`、`InterventionServer`（线程安全队列、tick 边界应用、action 生命周期反馈）、仲裁逐字段 `winners`、`/decision/intervention` 记录；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
   - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core 并由实时 / 回放共用 `apply_intervention`；`ReplayData` 增干预通道、`ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；回放确定性测试含人工接管。
   - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web`（vendored `roslib.min.js`、原生 ES modules、无打包）× `viz.launch.py`（rosbridge + 静态服务）；树状态 / 战场 / 世界状态 / 模块与干预面板 + 干预按钮；纯逻辑 node 单测与 `viz_smoke`；镜像新增 `ros-jazzy-rosbridge-suite`。
+  - 已完成（本地）：P3.5 文档与验收——ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；三条验收由 `scenario_full_match`（完整对局）、`replay_determinism`（含干预回放）、`viz_smoke` + 前端 node 单测覆盖；实际 rosbag 录制演示待实机 / P4。
   - P2 主体已完成（本地范围）。
