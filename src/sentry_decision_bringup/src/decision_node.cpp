@@ -12,6 +12,7 @@
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_bringup/config_loader.hpp"
 #include "sentry_decision_bringup/tree_loader.hpp"
+#include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/logging.hpp"
@@ -140,7 +141,7 @@ class DecisionNode : public rclcpp::Node {
     if (result.output.cmd_vel.has_value()) {
       io_->set_velocity(*result.output.cmd_vel);
     }
-    apply_resource(result.output.resource);
+    apply_actions(result, now);
 
     state_publisher_.publish(context_.world, result, tick_count_++);
 
@@ -164,39 +165,27 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
-  // 资源请求 -> 一次性决策动作：只在请求变化时发送，避免逐 tick 重复兑换。
-  void apply_resource(const sentry_decision::ResourceRequest& resource) {
-    const auto send = [this](sentry_decision::DecisionActionKind kind, int value) {
-      sentry_decision::DecisionAction action;
-      action.kind = kind;
-      action.mode = sentry_decision::ActionMode::kOneShot;
-      action.value = value;
-      action.request_id = ++request_id_;
+  // 资源请求 -> 决策动作：交给派发器处理 one-shot / polled 与 ack，再下发。
+  void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
+    for (const auto& ack : io_->take_acks()) {
+      dispatcher_.on_ack(ack);
+    }
+    sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
+    for (const auto& action : dispatcher_.poll(now)) {
       io_->send_action(action);
-    };
-    if (resource.ammo > 0 && resource.ammo != last_resource_.ammo) {
-      send(sentry_decision::DecisionActionKind::kAmmoExchange, resource.ammo);
     }
-    if (resource.hp > 0 && resource.hp != last_resource_.hp) {
-      send(sentry_decision::DecisionActionKind::kHpExchange, resource.hp);
-    }
-    if (resource.revive && !last_resource_.revive) {
-      send(sentry_decision::DecisionActionKind::kFreeResurrect, 0);
-    }
-    last_resource_ = resource;
   }
 
   std::shared_ptr<sentry_decision_io::RosIoNode> io_;
   sentry_decision::DecisionContext context_;
   sentry_decision::WorldModel world_model_;
   sentry_decision::IntentArbiter arbiter_;
+  sentry_decision::ActionDispatcher dispatcher_;
   sentry_decision::RuleBasedStrategicPolicy policy_;
   sentry_decision_io::DecisionStatePublisher state_publisher_;
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
   std::optional<sentry_decision::Point2D> last_goal_;
-  sentry_decision::ResourceRequest last_resource_{};
-  std::uint32_t request_id_ = 0;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
   rclcpp::TimerBase::SharedPtr timer_;

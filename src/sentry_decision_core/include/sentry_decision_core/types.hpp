@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <variant>
 
 namespace sentry_decision {
@@ -113,6 +114,14 @@ struct DecisionAction {
   Duration interval{0};  // 仅 kPolled 使用
   int value = 0;
   std::uint32_t request_id = 0;
+};
+
+// 下位机对某个动作的执行回执（ROS 无关版本，对应 DecisionAck 消息）。
+struct ActionAck {
+  std::uint32_t request_id = 0;
+  bool accepted = false;
+  std::uint8_t code = 0;
+  std::string detail;
 };
 
 }  // namespace sentry_decision

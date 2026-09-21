@@ -11,12 +11,14 @@
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_bringup/config_loader.hpp"
 #include "sentry_decision_bringup/tree_loader.hpp"
+#include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
 #include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
+#include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/referee_simulator.hpp"
 
@@ -139,6 +141,8 @@ int main(int argc, char** argv) {
   }();
 
   sentry_decision::IntentArbiter arbiter;
+  sentry_decision::ActionDispatcher dispatcher;
+  sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
   const TimePoint epoch = SteadyClock::now();
   std::optional<sentry_decision::Point2D> last_goal;
@@ -171,6 +175,16 @@ int main(int argc, char** argv) {
       navigation.cancel_goal();
       last_goal.reset();
     }
+
+    // 决策动作：本地模拟执行端回执，离线跑通 one-shot / ack 闭环。
+    for (const auto& ack : actuator.take_acks()) {
+      dispatcher.on_ack(ack);
+    }
+    sentry_decision::submit_resource_requests(dispatcher, result.output.resource);
+    for (const auto& action : dispatcher.poll(now)) {
+      actuator.send_action(action);
+    }
+    actuator.update();
 
     if (result.output.nav_goal.has_value()) {
       SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f) pos=(%.2f, %.2f)", tick,

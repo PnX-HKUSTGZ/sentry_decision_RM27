@@ -9,6 +9,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <string>
+#include <vector>
 
 #include "sentry_decision_core/io.hpp"
 #include "sentry_interfaces/msg/decision_ack.hpp"
@@ -52,6 +53,9 @@ class RosIoNode : public rclcpp::Node,
   // 最近一次收到的执行回执；无则空。
   std::optional<sentry_interfaces::msg::DecisionAck> last_ack() const;
 
+  // 取出自上次调用以来收到的全部执行回执（ROS 无关类型），供决策线程消费。
+  std::vector<sentry_decision::ActionAck> take_acks();
+
  private:
   std::string map_frame_;
 
@@ -67,6 +71,7 @@ class RosIoNode : public rclcpp::Node,
 
   mutable std::mutex decision_mutex_;
   std::optional<sentry_interfaces::msg::DecisionAck> last_ack_;
+  std::vector<sentry_decision::ActionAck> ack_queue_;
 
   rclcpp::Subscription<sentry_interfaces::msg::GameInfo>::SharedPtr game_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::SentryInfoOnline>::SharedPtr online_info_sub_;

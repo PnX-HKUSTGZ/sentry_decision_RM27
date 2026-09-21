@@ -74,6 +74,12 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
       decision_ack_topic, 10, [this](sentry_interfaces::msg::DecisionAck::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(decision_mutex_);
         last_ack_ = *msg;
+        sentry_decision::ActionAck ack;
+        ack.request_id = msg->request_id;
+        ack.accepted = msg->accepted;
+        ack.code = msg->code;
+        ack.detail = msg->detail;
+        ack_queue_.push_back(std::move(ack));
         if (msg->accepted) {
           SD_LOG_ACT("io", "决策动作已执行 request_id=%u", msg->request_id);
         } else {
@@ -118,6 +124,13 @@ bool RosIoNode::odometry(sentry_decision::SelfState* out) const {
 std::optional<sentry_interfaces::msg::DecisionAck> RosIoNode::last_ack() const {
   std::lock_guard<std::mutex> lock(decision_mutex_);
   return last_ack_;
+}
+
+std::vector<sentry_decision::ActionAck> RosIoNode::take_acks() {
+  std::lock_guard<std::mutex> lock(decision_mutex_);
+  std::vector<sentry_decision::ActionAck> acks;
+  acks.swap(ack_queue_);
+  return acks;
 }
 
 void RosIoNode::send_goal(const sentry_decision::Point2D& goal) {

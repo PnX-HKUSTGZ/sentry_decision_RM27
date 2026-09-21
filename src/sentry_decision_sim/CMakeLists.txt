@@ -15,7 +15,8 @@ find_package(sentry_decision_core REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/referee_simulator.cpp
-  src/nav_simulator.cpp)
+  src/nav_simulator.cpp
+  src/decision_actuator_sim.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -33,6 +34,10 @@ ament_export_include_directories(include)
 ament_export_dependencies(sentry_decision_core)
 
 if(BUILD_TESTING)
+  add_executable(test_decision_actuator_sim test/test_decision_actuator_sim.cpp)
+  target_link_libraries(test_decision_actuator_sim ${PROJECT_NAME})
+  add_test(NAME test_decision_actuator_sim COMMAND test_decision_actuator_sim)
+
   add_executable(test_referee_simulator test/test_referee_simulator.cpp)
   target_link_libraries(test_referee_simulator ${PROJECT_NAME})
   add_test(NAME test_referee_simulator COMMAND test_referee_simulator)

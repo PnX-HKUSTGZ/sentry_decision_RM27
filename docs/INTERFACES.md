@@ -97,6 +97,11 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 - 决策侧维护未确认命令表，超时未收到 ack 记 WARN（重发策略待定）。
 - `DecisionAck.code` 的取值表待与 MCU 约定；0 为成功。
 
+**实现现状**：决策侧的 one-shot / polled / ack 状态机已实现于 core `ActionDispatcher`，并可用
+`DecisionActuatorSim` 在本地离线跑通闭环；`DecisionAck` 经 `RosIoNode::take_acks` 进入该状态机。
+**待办（P2.3b）**：auto-aim 侧的串口字节帧、动作 `code` 表、`detect_color` 编码，
+待与电控 / MCU 确认后再实现，本阶段不落地。
+
 ## 8. 与 auto-aim 现状的映射（Phase 1）
 
 现有 `GimbalToVision` 可填的最小集合：

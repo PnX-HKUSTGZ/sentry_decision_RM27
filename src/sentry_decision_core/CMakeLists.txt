@@ -13,6 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 add_library(${PROJECT_NAME}
+  src/action_dispatcher.cpp
   src/arbiter.cpp
   src/logging.cpp
   src/referee_protocol.cpp
@@ -56,6 +57,10 @@ if(BUILD_TESTING)
   add_executable(test_config test/test_config.cpp)
   target_link_libraries(test_config ${PROJECT_NAME})
   add_test(NAME test_config COMMAND test_config)
+
+  add_executable(test_action_dispatcher test/test_action_dispatcher.cpp)
+  target_link_libraries(test_action_dispatcher ${PROJECT_NAME})
+  add_test(NAME test_action_dispatcher COMMAND test_action_dispatcher)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

@@ -68,14 +68,16 @@
 | P2.0 工程底座（已完成） | `tree/` 骨架（mission / skill / condition）、`tree_manifest.yaml`、builtin 模块注册与启动校验、`PolicyConfig` 与 YAML 加载 | 容器构建 / 19 测试通过；缺失配置、树引用不存在 key 均启动即失败（负例用例覆盖） |
 | P2.1 战略层（已完成） | `StrategicPolicy` 接口 + `RuleBasedStrategicPolicy` 规则状态机 + 表驱动单测；接入 `DecisionContext`，输出 `kTacticalMode` 意图 | 给定 `WorldState` → 期望 `TacticalMode` |
 | P2.2 nav_policy + nav_executor（已完成） | `mission/nav/*`（撤退 / 补给 / 防守 / 高地 / 进攻 / 巡逻）+ `skill/goto_named_point`；战略模式驱动任务选择；`nav_executor` 回写 `NavState`；接仲裁 | 表驱动 `WorldState → nav_goal`，覆盖旧 `RMUC.xml` 分支 |
-| P2.3 resource | 复活 / 兑换子树，one-shot / polled 动作语义 | `DecisionAction` 边沿 / 重发 / ack 契约测试 |
+| P2.3a 动作派发与 ack（已完成） | `ActionDispatcher`（one-shot / polled / ack 状态机）、资源请求→动作提交、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks` | one-shot 只发一次、polled 按间隔重发、ack 清除、超时 WARN 有单测；离线 ack 闭环通过 |
+| P2.3b 串口适配（待协议） | auto-aim 侧 `DecisionCommand` → 串口帧、`code` 取值表、`detect_color` | 与电控 / MCU 联调；本阶段不实现 |
 | P2.4 安全与干预 | `SafeSupervisor` 兜底；`intervention` core 侧注入与模块开关 | 安全压过 intervention / tactical；关闭模块行为可预期 |
 | P2.5 回归 | 场景脚本、抢占 / halt 契约测试、差异报告、文档 | 抢占 / halt 用例通过；回放确定性；文档同步 |
 
 > P2.0 已完成（本地范围）：分层树骨架、`tree_manifest.yaml` + 启动校验、`config/` 配置外置与 `PolicyConfig`、命名点 / 配置 key 解析。
 > P2.1 战略层已完成：`StrategicPolicy` 接口、规则状态机、`apply_strategy` 接入。
 > P2.2 nav_policy + nav_executor 已完成：六个任务子树 + 战略模式驱动选择；`nav_executor` 状态回写。
-> 待补：功能域拆分为独立 `.so` 与 `module.yaml`（provides / consumes 字段校验）。
+> P2.3a 动作派发与 ack 已完成：`ActionDispatcher` + `DecisionActuatorSim` 离线闭环。
+> P2.3b（串口字节层）与功能域 `.so` 拆分是待办项。
 
 交付物：
 
@@ -137,4 +139,6 @@
   - 已完成（本地）：P2.1 战略层——`StrategicPolicy` 接口 + `RuleBasedStrategicPolicy` 规则状态机、`DecisionContext::apply_strategy`、两个入口接入、表驱动单测；容器 20 测试通过。
   - 已完成（本地）：P2.2 nav_policy + nav_executor——六个 nav 任务子树、`IfTacticalMode` / `IfEnemyOutpostDead` 条件、命名点驱动、`nav_executor` 状态回写；容器 21 测试通过。
   - 进行中：P2 策略迁移，设计已对齐——战略层为纯 C++ `StrategicPolicy` 接口、任务 / 技能实现为分层小树、配置外置、删除姿态、弃用 `/set_bool`（见 `docs/ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §14）。
-  - 下一步：P2.3 resource（复活 / 兑换）；功能域 `.so` 拆分与 `module.yaml` 待补。
+  - 已完成（本地）：P2.3a 动作派发与 ack——`ActionDispatcher`（one-shot / polled / ack / 超时）、资源请求→动作、`DecisionActuatorSim` 本地 mock、`RosIoNode::take_acks`；容器 23 测试通过。
+  - 待办：P2.3b 串口字节层（待电控 / MCU 协议）与功能域 `.so` 拆分 + `module.yaml`。
+  - 下一步：P2.4 安全（SafeSupervisor）与 `intervention` core 侧注入。

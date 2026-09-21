@@ -39,7 +39,13 @@
   - `nav_executor` 回写 `NavState`（current_goal / reached / failed）已有，经 `WorldModel` 生效。
   - 验证：`test_mission_nav` 表驱动 6 场景；容器 7 包 / 21 测试 0 失败。
 - 待补：功能域 `.so` 拆分与 `module.yaml`（provides / consumes 校验）——当前启用/禁用已由 `tree_manifest.yaml` + 启动校验承担，`.so` 分离属编译期整理，优先级低于策略迁移。
-- 下一步：P2.3 resource（复活 / 兑换，one-shot / polled 动作语义）。
+- **P2.3a 动作派发与 ack 完成（本地）**：
+  - core `ActionDispatcher`：one-shot 由无到有只发一次、polled 按 interval 重发、ack 按 `request_id` 清除、超时 WARN；纯逻辑，宿主单测。
+  - `submit_resource_requests` 把 `ResourceRequest` 转成动作；`RosIoNode::take_acks` 把 `DecisionAck` 转 ROS 无关 `ActionAck` 供决策线程消费。
+  - `DecisionActuatorSim` 模拟执行端延迟回执，`decision_main` 离线跑通 ack 闭环。
+  - 验证：宿主 + 容器 7 包 / 23 测试 0 失败。
+- **P2.3b 待办（不实现）**：auto-aim 侧 `DecisionCommand` → 串口字节帧、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。
+- 下一步：P2.4 `SafeSupervisor` 与 `intervention` core 侧注入。
 
 ### 历史（P1 / P2 接口）
 
