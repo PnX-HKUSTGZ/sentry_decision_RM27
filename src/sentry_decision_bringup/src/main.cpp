@@ -6,8 +6,11 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "behaviortree_cpp/bt_factory.h"
+#include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/tree_loader.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/logging.hpp"
@@ -17,7 +20,10 @@
 #include "sentry_decision_sim/referee_simulator.hpp"
 
 #ifndef DEFAULT_TREE_PATH
-#define DEFAULT_TREE_PATH "tree/demo_tree.xml"
+#define DEFAULT_TREE_PATH "tree/root.xml"
+#endif
+#ifndef DEFAULT_CONFIG_PATH
+#define DEFAULT_CONFIG_PATH "config/profiles.yaml"
 #endif
 
 namespace {
@@ -31,6 +37,7 @@ struct Options {
   double rate_hz = 20.0;
   double hp_drop_sec = 1.0;
   std::string tree = DEFAULT_TREE_PATH;
+  std::string config = DEFAULT_CONFIG_PATH;
   std::string plugin;
 };
 
@@ -53,6 +60,8 @@ Options parse_options(int argc, char** argv) {
       options.hp_drop_sec = std::stod(next("--hp-drop"));
     } else if (arg == "--tree") {
       options.tree = next("--tree");
+    } else if (arg == "--config") {
+      options.config = next("--config");
     } else if (arg == "--plugin") {
       options.plugin = next("--plugin");
     } else {
@@ -80,7 +89,19 @@ int main(int argc, char** argv) {
   logger.add_short_sink(console);
   logger.set_short_min_level(sentry_decision::LogLevel::kAct);
 
+  const sentry_decision_bringup::ConfigLoadResult loaded =
+      sentry_decision_bringup::load_policy_config(options.config);
+  if (!loaded.ok()) {
+    std::cerr << "配置加载失败: " << options.config << "\n";
+    for (const auto& error : loaded.errors) {
+      std::cerr << "  - " << error << "\n";
+    }
+    return 1;
+  }
+  SD_LOG_ACT("config", "%s", sentry_decision_bringup::format_config(loaded.config).c_str());
+
   sentry_decision::DecisionContext context;
+  context.config = &loaded.config;
 
   sentry_decision_sim::RefereeSimulator referee;
   sentry_decision_sim::NavSimulator navigation(2.0, 0.2);
@@ -89,10 +110,17 @@ int main(int argc, char** argv) {
   sentry_decision::WorldModel world_model(referee, navigation, navigation);
 
   BT::BehaviorTreeFactory factory;
+  std::vector<std::string> errors;
   if (!options.plugin.empty()) {
     factory.registerFromPlugin(options.plugin);
-  } else {
-    sentry_decision::register_sentry_nodes(factory);
+  }
+  if (!sentry_decision_bringup::setup_tree_factory(factory, options.tree, &loaded.config, &errors,
+                                                   options.plugin.empty())) {
+    std::cerr << "行为树校验失败: " << options.tree << "\n";
+    for (const auto& error : errors) {
+      std::cerr << "  - " << error << "\n";
+    }
+    return 1;
   }
 
   auto blackboard = BT::Blackboard::create();

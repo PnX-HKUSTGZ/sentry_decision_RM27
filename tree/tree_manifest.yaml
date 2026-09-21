@@ -1,0 +1,22 @@
+# 行为树清单：入口 XML 与模块开关。启动时校验；失败即启动报错。
+#
+# P2.0 过渡：所有模块先由 bringup 链接注册（builtin: true）；
+# 各功能域拆成独立 .so 后改为 library: <路径>。
+root: root.xml
+
+modules:
+  common:
+    enabled: true
+    builtin: true      # 条件 + 通用 Intent 叶子节点
+  nav:
+    enabled: false
+    builtin: true      # P2.2
+  resource:
+    enabled: false
+    builtin: true      # P2.3
+  strategic:
+    enabled: false
+    builtin: true      # P2.1：C++ 策略，非 BT 插件
+  intervention:
+    enabled: false
+    builtin: true      # P2.4

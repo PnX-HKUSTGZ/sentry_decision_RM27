@@ -1,0 +1,10 @@
+# rmuc26 策略阈值 / 时间窗（由 profiles.yaml 的 strategy_profile 选择）。
+nav:
+  retreat_hp: 50
+  recovery_hp: 90
+  low_ammo: 50
+  supply_ammo: 150
+  patrol_dwell_s: 5.0
+resource:
+  exchange_ammo_step: 50
+  min_coins: 100

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+  任务层优先级（唯一写优先级的地方）。
+  进入条件：每 tick；退出条件：-。
+  抢占关系：ReactiveFallback 从第一个孩子重扫，低优先级任务被高优先级任务抢占。
+  顺序：撤退 > 巡逻（P2.2 起补充补给 / 前哨 / 堡垒 / 高地）。
+-->
+<root BTCPP_format="4" main_tree_to_execute="MissionRoot">
+  <include path="../skill/goto_named_point.xml"/>
+  <include path="nav/retreat.xml"/>
+  <include path="nav/patrol.xml"/>
+  <BehaviorTree ID="MissionRoot">
+    <ReactiveFallback name="MissionPriority">
+      <SubTree ID="MissionRetreat" __shared_blackboard="true"/>
+      <SubTree ID="MissionPatrol" __shared_blackboard="true"/>
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

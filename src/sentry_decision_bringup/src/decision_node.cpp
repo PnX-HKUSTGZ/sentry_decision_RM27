@@ -5,9 +5,13 @@
 #include <memory>
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "behaviortree_cpp/bt_factory.h"
+#include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/tree_loader.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/logging.hpp"
@@ -17,7 +21,10 @@
 #include "sentry_decision_nodes/nodes.hpp"
 
 #ifndef DEFAULT_TREE_PATH
-#define DEFAULT_TREE_PATH "tree/demo_tree.xml"
+#define DEFAULT_TREE_PATH "tree/root.xml"
+#endif
+#ifndef DEFAULT_CONFIG_PATH
+#define DEFAULT_CONFIG_PATH "config/profiles.yaml"
 #endif
 
 namespace {
@@ -30,6 +37,7 @@ struct Options {
   double rate_hz = 20.0;
   int ticks = 0;  // 0 表示一直运行
   std::string tree = DEFAULT_TREE_PATH;
+  std::string config = DEFAULT_CONFIG_PATH;
   std::string plugin;
 };
 
@@ -50,6 +58,8 @@ Options parse_options(int argc, char** argv) {
       options.ticks = std::stoi(next("--ticks"));
     } else if (arg == "--tree") {
       options.tree = next("--tree");
+    } else if (arg == "--config") {
+      options.config = next("--config");
     } else if (arg == "--plugin") {
       options.plugin = next("--plugin");
     } else {
@@ -64,16 +74,29 @@ Options parse_options(int argc, char** argv) {
   return options;
 }
 
+std::string join_errors(const std::vector<std::string>& errors) {
+  std::string text;
+  for (const auto& error : errors) {
+    if (!text.empty()) {
+      text += "; ";
+    }
+    text += error;
+  }
+  return text;
+}
+
 // 真实 IO 决策节点：RosIoNode 提供信念输入与执行端，本节点跑行为树与仲裁，
 // 并把仲裁结果下发（导航目标 / 速度 / 决策动作）与发布决策状态。
 class DecisionNode : public rclcpp::Node {
  public:
-  DecisionNode(std::shared_ptr<sentry_decision_io::RosIoNode> io, const Options& options)
+  DecisionNode(std::shared_ptr<sentry_decision_io::RosIoNode> io, const Options& options,
+               const sentry_decision::PolicyConfig* config)
       : Node("sentry_decision"),
         io_(std::move(io)),
         world_model_(*io_, *io_, *io_),
         state_publisher_(*this),
         max_ticks_(options.ticks) {
+    context_.config = config;
     build_tree(options.tree, options.plugin);
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
@@ -82,10 +105,13 @@ class DecisionNode : public rclcpp::Node {
 
  private:
   void build_tree(const std::string& tree_path, const std::string& plugin) {
+    std::vector<std::string> errors;
     if (!plugin.empty()) {
       factory_.registerFromPlugin(plugin);
-    } else {
-      sentry_decision::register_sentry_nodes(factory_);
+    }
+    if (!sentry_decision_bringup::setup_tree_factory(factory_, tree_path, context_.config, &errors,
+                                                     plugin.empty())) {
+      throw std::runtime_error("行为树校验失败: " + join_errors(errors));
     }
     auto blackboard = BT::Blackboard::create();
     blackboard->set("context", &context_);
@@ -183,13 +209,30 @@ int main(int argc, char** argv) {
   logger.add_short_sink(console);
   logger.set_short_min_level(sentry_decision::LogLevel::kAct);
 
-  auto io = std::make_shared<sentry_decision_io::RosIoNode>();
-  auto decision = std::make_shared<DecisionNode>(io, options);
+  const sentry_decision_bringup::ConfigLoadResult loaded =
+      sentry_decision_bringup::load_policy_config(options.config);
+  if (!loaded.ok()) {
+    std::cerr << "配置加载失败: " << options.config << "\n";
+    for (const auto& error : loaded.errors) {
+      std::cerr << "  - " << error << "\n";
+    }
+    rclcpp::shutdown();
+    return 1;
+  }
+  SD_LOG_ACT("config", "%s", sentry_decision_bringup::format_config(loaded.config).c_str());
 
-  rclcpp::executors::MultiThreadedExecutor executor;
-  executor.add_node(io);
-  executor.add_node(decision);
-  executor.spin();
+  auto io = std::make_shared<sentry_decision_io::RosIoNode>();
+  try {
+    auto decision = std::make_shared<DecisionNode>(io, options, &loaded.config);
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(io);
+    executor.add_node(decision);
+    executor.spin();
+  } catch (const std::exception& ex) {
+    std::cerr << "启动失败: " << ex.what() << "\n";
+    rclcpp::shutdown();
+    return 1;
+  }
   rclcpp::shutdown();
   return 0;
 }

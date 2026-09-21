@@ -11,19 +11,19 @@ namespace sentry_decision {
 void register_sentry_nodes(BT::BehaviorTreeFactory& factory);
 
 // =============================================================================
-// Node:         CheckLowHp
+// Node:         IfLowHp
 // Category:     Condition (synchronous, no side effects)
-// Purpose:      判断己方血量是否低于阈值，用于撤退分支。
-// Inputs:       hp_threshold: int (端口)
+// Purpose:      判断己方血量是否低于配置阈值，用于撤退分支。
+// Inputs:       hp_key: string (端口, 配置 key，如 "nav.retreat_hp")
 // Outputs:      -
-// Blackboard:   read: context(world.referee.self_hp, valid)  write: (none)
+// Blackboard:   read: context(world.referee.self_hp, valid, config)  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
-// See:          tree/demo_tree.xml -> retreat
+// See:          tree/mission/nav/retreat.xml
 // =============================================================================
-class CheckLowHp : public BT::SyncActionNode {
+class IfLowHp : public BT::SyncActionNode {
  public:
-  CheckLowHp(const std::string& name, const BT::NodeConfig& config);
+  IfLowHp(const std::string& name, const BT::NodeConfig& config);
   static BT::PortsList providedPorts();
   BT::NodeStatus tick() override;
 };
@@ -37,7 +37,7 @@ class CheckLowHp : public BT::SyncActionNode {
 // Blackboard:   read: context  write: context.intents
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: 向本 tick 的意图缓冲写入一条 kTacticalMode 意图。
-// See:          tree/demo_tree.xml -> retreat / patrol
+// See:          tree/mission/nav/retreat.xml
 // =============================================================================
 class EmitTacticalMode : public BT::SyncActionNode {
  public:
@@ -49,17 +49,35 @@ class EmitTacticalMode : public BT::SyncActionNode {
 // =============================================================================
 // Node:         EmitNavGoal
 // Category:     Action (synchronous, writes one Intent)
-// Purpose:      请求一个导航目标（技能层意图）。
+// Purpose:      以显式坐标请求一个导航目标（测试 / 调试用）。
 // Inputs:       x: double, y: double (端口)
 // Outputs:      -
 // Blackboard:   read: context  write: context.intents
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: 向本 tick 的意图缓冲写入一条 kNavGoal 意图。
-// See:          tree/demo_tree.xml -> retreat / patrol
+// See:          test/test_nodes.cpp
 // =============================================================================
 class EmitNavGoal : public BT::SyncActionNode {
  public:
   EmitNavGoal(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// =============================================================================
+// Node:         EmitNavGoalFromPoint
+// Category:     Action (synchronous, writes one Intent)
+// Purpose:      按命名点解析坐标并请求导航目标（技能层去点行为）。
+// Inputs:       point: string (端口, 命名点，如 "home"；可来自 SubTree 端口)
+// Outputs:      -
+// Blackboard:   read: context(config.points)  write: context.intents
+// Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
+// Side Effects: 向本 tick 的意图缓冲写入一条 kNavGoal 意图。
+// See:          tree/skill/goto_named_point.xml
+// =============================================================================
+class EmitNavGoalFromPoint : public BT::SyncActionNode {
+ public:
+  EmitNavGoalFromPoint(const std::string& name, const BT::NodeConfig& config);
   static BT::PortsList providedPorts();
   BT::NodeStatus tick() override;
 };

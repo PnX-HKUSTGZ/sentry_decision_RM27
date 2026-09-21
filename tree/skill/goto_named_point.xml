@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!--
+  技能：按命名点发出导航目标，可被任意任务复用。
+  进入条件：调用方通过 target_point 端口给出命名点。
+  退出条件：发出 Intent 后即 SUCCESS（执行由 nav_executor 负责）。
+  抢占关系：无内部抢占；被父任务 halt 时不再发 Intent。
+-->
+<root BTCPP_format="4" main_tree_to_execute="GotoNamedPoint">
+  <BehaviorTree ID="GotoNamedPoint">
+    <EmitNavGoalFromPoint point="{target_point}"/>
+  </BehaviorTree>
+</root>

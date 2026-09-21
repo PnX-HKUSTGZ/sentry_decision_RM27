@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- 负例：引用配置中不存在的 key，启动校验必须失败。 -->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <Sequence name="BadKey">
+      <IfLowHp hp_key="nav.absent_key"/>
+      <EmitNavGoal x="0.0" y="0.0"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

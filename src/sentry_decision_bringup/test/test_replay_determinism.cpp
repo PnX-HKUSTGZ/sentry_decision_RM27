@@ -4,6 +4,7 @@
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_core/arbiter.hpp"
+#include "sentry_decision_core/config.hpp"
 #include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/replay.hpp"
 #include "sentry_decision_core/world_model.hpp"
@@ -23,6 +24,15 @@ void check(bool ok, const char* expr, const char* file, int line) {
 }
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
+
+// 与 tree/ 骨架匹配的最小配置：命名点 + 撤退阈值。
+PolicyConfig make_config() {
+  PolicyConfig config;
+  config.points["home"] = Point2D{-5.0, 3.0, 0.0};
+  config.points["patrol_a"] = Point2D{1.1, 1.1, 0.0};
+  config.numbers["nav.retreat_hp"] = 50.0;
+  return config;
+}
 
 // 每 tick 录下的决策输出，用于比较两次回放是否完全一致。
 struct StepResult {
@@ -68,7 +78,9 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
   BT::BehaviorTreeFactory factory;
   register_sentry_nodes(factory);
   auto blackboard = BT::Blackboard::create();
+  PolicyConfig config = make_config();
   DecisionContext context;
+  context.config = &config;
   blackboard->set("context", &context);
   BT::Tree tree = factory.createTreeFromFile(tree_path, blackboard);
 
@@ -111,19 +123,19 @@ void test_replay_is_deterministic(const std::string& tree_path) {
   CHECK(first.size() == 60);
   CHECK(first == second);
 
-  // 表驱动：0~950ms 巡逻去 (1,1)，1000ms 起掉血撤退去 (-2,0)。
+  // 表驱动：0~950ms 巡逻去 patrol_a，1000ms 起低血撤退去 home。
+  // P2.0 尚无 StrategicPolicy，战术模式保持 kUnknown。
   for (std::size_t i = 0; i < 19; ++i) {
     CHECK(first[i].hp == 400);
-    CHECK(first[i].mode == TacticalMode::kPatrol);
+    CHECK(first[i].mode == TacticalMode::kUnknown);
     CHECK(first[i].has_goal);
-    CHECK(first[i].goal_x == 1.0);
-    CHECK(first[i].goal_y == 1.0);
+    CHECK(first[i].goal_x == 1.1);
+    CHECK(first[i].goal_y == 1.1);
   }
   CHECK(first[19].hp == 50);
-  CHECK(first[19].mode == TacticalMode::kRetreat);
   CHECK(first[19].has_goal);
-  CHECK(first[19].goal_x == -2.0);
-  CHECK(first[19].goal_y == 0.0);
+  CHECK(first[19].goal_x == -5.0);
+  CHECK(first[19].goal_y == 3.0);
 }
 
 }  // namespace

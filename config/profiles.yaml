@@ -1,0 +1,8 @@
+# 决策配置入口：选择地图 / 策略 profile 与赛前开关。
+# 相对路径相对本文件所在目录解析。
+map_profile: RMUL26
+strategy_profile: rmuc26
+
+pre_match:
+  enemy_engineer_can_climb_stairs: false
+  allow_cross_undulation: false
