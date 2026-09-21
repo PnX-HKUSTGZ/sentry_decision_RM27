@@ -20,11 +20,12 @@ struct ScenarioValue {
 
 // 场景时间轴上的一个事件。
 struct ScenarioEvent {
-  enum class Kind { kSetWorld, kExpect };
+  // kSetWorld 改世界；kExpect 断言；kAddIntent / kDisable 经 /decision/debug 注入干预。
+  enum class Kind { kSetWorld, kExpect, kAddIntent, kDisable };
 
   sentry_decision::Duration at{};
   Kind kind = Kind::kSetWorld;
-  // set_world / expect 的字段 -> 取值。
+  // set_world / expect / add_intent / disable 的字段 -> 取值（均为标量）。
   std::map<std::string, ScenarioValue> args;
 };
 

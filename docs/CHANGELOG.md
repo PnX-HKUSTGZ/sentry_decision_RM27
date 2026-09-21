@@ -30,6 +30,9 @@
 - `sentry_decision_core`：`referee_protocol` 按 2026 规则 / 通信协议补齐——`EventCode` 覆盖场地事件全字段，`SentryInfo2` 增加姿态，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState` 增 `info3`
 - `sentry_decision_io`：`sentry_bridge` 解码 `sentry_info_3`
 - `sentry_decision_sim`：`SimWorld` 支持 `sentry_info_3` 场景字段
+- 场景脚本支持 `add_intent` / `disable`（经 `/decision/debug` 注入干预），新增 `scenario/intervention.yaml` 与 `scenario_intervention` 测试
+- `sentry_decision_bringup`：新增 `replay_main` 离线回放入口；`load_replay_data` 支持新格式 `/sentry/*` 上行
+- 新增 `tools/replay_smoke_test.sh`（录制一局场景 bag 后离线重放并校验干预复现）
 - 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
 
 ## [v0.2.0]

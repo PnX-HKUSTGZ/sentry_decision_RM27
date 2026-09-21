@@ -63,7 +63,22 @@ target_compile_definitions(decision_node PRIVATE
   DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/profiles.yaml"
   DEFAULT_MODULE_LIB_DIR="${SENTRY_NODES_LIB_DIR}")
 
-install(TARGETS decision_main decision_node DESTINATION lib/${PROJECT_NAME})
+# 离线回放入口：读 rosbag2 后按原时刻重放（含人工干预），不启动 ROS 节点。
+add_executable(replay_main src/replay_main.cpp)
+target_link_libraries(replay_main
+  bringup_loader
+  sentry_decision_core::sentry_decision_core
+  sentry_decision_nodes::sentry_decision_common
+  sentry_decision_nodes::sentry_decision_nav
+  sentry_decision_nodes::sentry_decision_strategic
+  sentry_decision_io::sentry_decision_io
+  behaviortree_cpp::behaviortree_cpp)
+target_compile_definitions(replay_main PRIVATE
+  DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/root.xml"
+  DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/profiles.yaml"
+  DEFAULT_MODULE_LIB_DIR="${SENTRY_NODES_LIB_DIR}")
+
+install(TARGETS decision_main decision_node replay_main DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/ DESTINATION share/${PROJECT_NAME}/tree)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../config/ DESTINATION share/${PROJECT_NAME}/config)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)

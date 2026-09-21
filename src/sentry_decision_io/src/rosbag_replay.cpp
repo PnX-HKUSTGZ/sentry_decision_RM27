@@ -11,6 +11,7 @@
 #include <std_msgs/msg/u_int16.hpp>
 
 #include "sentry_decision_io/intervention_convert.hpp"
+#include "sentry_decision_io/sentry_bridge.hpp"
 #include "sentry_decision_msgs/msg/intervention_event.hpp"
 
 namespace sentry_decision_io {
@@ -112,6 +113,38 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
                                 &command)) {
         data.interventions.push_back({at, command});
       }
+      continue;
+    }
+
+    // 新格式上行：逐条 merge 进 RefereeState 后压入快照，语义与实时节点一致。
+    if (topic == topics.game_info) {
+      merge(deserialize<sentry_interfaces::msg::GameInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.online_info) {
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOnline>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.offline_info) {
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOffline>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.team_info) {
+      merge(deserialize<sentry_interfaces::msg::TeamInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.radar_info) {
+      merge(deserialize<sentry_interfaces::msg::RadarInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
       continue;
     }
 

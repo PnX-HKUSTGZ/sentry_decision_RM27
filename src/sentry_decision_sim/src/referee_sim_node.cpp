@@ -17,6 +17,7 @@
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
+#include "sentry_decision_msgs/srv/debug_command.hpp"
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/scenario.hpp"
@@ -177,6 +178,8 @@ class RefereeSimNode : public rclcpp::Node {
     decision_state_sub_ = create_subscription<sentry_decision_msgs::msg::DecisionState>(
         decision_state_topic, 10,
         [this](sentry_decision_msgs::msg::DecisionState::SharedPtr msg) { on_decision(*msg); });
+    // 场景 add_intent / disable 经该服务注入干预。
+    debug_client_ = create_client<sentry_decision_msgs::srv::DebugCommand>("/decision/debug");
 
     using namespace std::placeholders;
     action_server_ = rclcpp_action::create_server<NavigateToPose>(
@@ -335,10 +338,19 @@ class RefereeSimNode : public rclcpp::Node {
         std::chrono::duration_cast<Duration>(SteadyClock::now() - scenario_start_);
     while (next_event_ < scenario_.events.size() && scenario_.events[next_event_].at <= elapsed) {
       const ScenarioEvent& event = scenario_.events[next_event_];
-      if (event.kind == ScenarioEvent::Kind::kSetWorld) {
-        apply_set_world(event);
-      } else {
-        apply_expect(event);
+      switch (event.kind) {
+        case ScenarioEvent::Kind::kSetWorld:
+          apply_set_world(event);
+          break;
+        case ScenarioEvent::Kind::kExpect:
+          apply_expect(event);
+          break;
+        case ScenarioEvent::Kind::kAddIntent:
+          apply_add_intent(event);
+          break;
+        case ScenarioEvent::Kind::kDisable:
+          apply_disable(event);
+          break;
       }
       ++next_event_;
     }
@@ -346,6 +358,77 @@ class RefereeSimNode : public rclcpp::Node {
         !finished_) {
       finish();
     }
+  }
+
+  static std::string scenario_text(const ScenarioValue& value) {
+    switch (value.type) {
+      case ScenarioValue::Type::kString:
+        return value.text;
+      case ScenarioValue::Type::kBool:
+        return value.boolean ? "true" : "false";
+      case ScenarioValue::Type::kNumber:
+      default:
+        return std::to_string(value.number);
+    }
+  }
+
+  void send_debug(const std::string& command, const std::string& args) {
+    if (!debug_client_) {
+      return;
+    }
+    auto request = std::make_shared<sentry_decision_msgs::srv::DebugCommand::Request>();
+    request->command = command;
+    request->args = args;
+    debug_client_->async_send_request(request);
+  }
+
+  // add_intent: {field, value, lease_sec?, reason?} -> /decision/debug set_intent。
+  void apply_add_intent(const ScenarioEvent& event) {
+    const auto field = event.args.find("field");
+    const auto value = event.args.find("value");
+    if (field == event.args.end() || value == event.args.end()) {
+      fail("add_intent 需要 field 与 value");
+      return;
+    }
+    std::string lease = "0";
+    const auto lease_it = event.args.find("lease_sec");
+    if (lease_it != event.args.end()) {
+      lease = scenario_text(lease_it->second);
+    }
+    std::string reason = "scenario";
+    const auto reason_it = event.args.find("reason");
+    if (reason_it != event.args.end()) {
+      reason = scenario_text(reason_it->second);
+    }
+    const std::string args = "{field: " + scenario_text(field->second) +
+                             ", value: " + scenario_text(value->second) + ", lease_sec: " + lease +
+                             ", reason: '" + reason + "'}";
+    send_debug("set_intent", args);
+    SD_LOG_ACT("sim", "场景 t=%.1fs add_intent: %s", event.at.count() / 1000.0, args.c_str());
+  }
+
+  // disable: {modules: "nav,strategic"} -> 逐个 /decision/debug set_module enabled=false。
+  void apply_disable(const ScenarioEvent& event) {
+    const auto modules = event.args.find("modules");
+    if (modules == event.args.end()) {
+      fail("disable 需要 modules");
+      return;
+    }
+    const std::string text = scenario_text(modules->second);
+    std::size_t start = 0;
+    while (start <= text.size()) {
+      const std::size_t comma = text.find(',', start);
+      const std::string name =
+          text.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+      if (!name.empty()) {
+        send_debug("set_module", "{module: " + name + ", enabled: false}");
+      }
+      if (comma == std::string::npos) {
+        break;
+      }
+      start = comma + 1;
+    }
+    SD_LOG_ACT("sim", "场景 t=%.1fs disable: %s", event.at.count() / 1000.0, text.c_str());
   }
 
   void apply_set_world(const ScenarioEvent& event) {
@@ -422,6 +505,7 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Publisher<sentry_interfaces::msg::DecisionAck>::SharedPtr ack_pub_;
   rclcpp::Subscription<sentry_interfaces::msg::DecisionCommand>::SharedPtr decision_command_sub_;
   rclcpp::Subscription<sentry_decision_msgs::msg::DecisionState>::SharedPtr decision_state_sub_;
+  rclcpp::Client<sentry_decision_msgs::srv::DebugCommand>::SharedPtr debug_client_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;

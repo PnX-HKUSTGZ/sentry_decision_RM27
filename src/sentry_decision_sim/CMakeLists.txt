@@ -82,6 +82,22 @@ if(BUILD_TESTING)
     ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
     TIMEOUT 90)
 
+  # 端到端：场景 add_intent / disable 注入干预（干预即测试用例）。
+  add_test(NAME scenario_intervention
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/intervention.yaml)
+  set_tests_properties(scenario_intervention PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 90)
+
+  # 端到端：录制一局场景 bag，再用 replay_main 离线重放（含人工干预）。
+  add_test(NAME replay_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/replay_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/intervention.yaml)
+  set_tests_properties(replay_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 150)
+
   # 端到端：干预 service / action 与 /decision/intervention。
   add_test(NAME intervention_smoke
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/intervention_smoke_test.sh)

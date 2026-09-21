@@ -169,5 +169,5 @@
   - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core 并由实时 / 回放共用 `apply_intervention`；`ReplayData` 增干预通道、`ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；回放确定性测试含人工接管。
   - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web`（vendored `roslib.min.js`、原生 ES modules、无打包）× `viz.launch.py`（rosbridge + 静态服务）；树状态 / 战场 / 世界状态 / 模块与干预面板 + 干预按钮；纯逻辑 node 单测与 `viz_smoke`；镜像新增 `ros-jazzy-rosbridge-suite`。
   - 已完成（本地）：裁判协议补全——依据 `refs/26UC`（2026 规则 V2.2.0 + 通信协议 V2.0.0）扩展 `referee_protocol`：场地事件全字段、姿态与 `SentryInfo3` 剩余时长。
-  - 已完成（本地）：P3.5 文档与验收——ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步；三条验收由 `scenario_full_match`（完整对局）、`replay_determinism`（含干预回放）、`viz_smoke` + 前端 node 单测覆盖；实际 rosbag 录制演示待实机 / P4。
+  - 已完成（本地）：P3.5 文档与验收——场景支持 `add_intent` / `disable`（`scenario_intervention`）；新增 `replay_main` 离线回放（读新格式 `/sentry/*` bag，原时刻重放干预）与 `replay_smoke`（录制 intervention 场景再回放，3 条干预复现）；ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步。
   - P2 主体已完成（本地范围）。

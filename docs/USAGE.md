@@ -161,9 +161,20 @@ timeline:
     expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
 ```
 
-`set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
-`add_intent` / `disable` 依赖 P3.2 的干预接口，将在其落地后接入。
-端到端回归由 `tools/scenario_smoke_test.sh` 驱动（也注册为 `scenario_full_match` 测试）。
+`set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`stance`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
+
+`add_intent` 与 `disable` 经 `/decision/debug` 注入干预，把「人工干预」写成可提交的测试用例：
+
+```yaml
+  - at: 3.0
+    add_intent: { field: nav_goal, value: "[7.0, 1.0]", lease_sec: 0 }
+  - at: 5.0
+    add_intent: { field: stance, value: "defense", lease_sec: 0 }
+  - at: 7.0
+    disable: { modules: "nav" }
+```
+
+端到端回归由 `tools/scenario_smoke_test.sh` 驱动（注册为 `scenario_full_match` 与 `scenario_intervention`）。
 
 ### 4.7 人工干预
 
@@ -208,6 +219,20 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 node src/sentry_decision_viz/web/test/format.test.mjs
 ```
 端到端冒烟：`tools/viz_smoke_test.sh`（也注册为 `viz_smoke`；未装 rosbridge 时跳过）。
+
+### 4.9 离线回放（replay_main）
+
+`decision_node` 与 `referee_sim_node` 运行时用 rosbag 录下上行与干预，赛后用 `replay_main` 离线重放：
+
+```bash
+ros2 bag record -o match_bag \
+  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info \
+  /aft_mapped_to_init /decision/intervention
+
+ros2 run sentry_decision_bringup replay_main --bag match_bag
+```
+
+`replay_main` 读 `/sentry/*`（新格式）或旧标量话题，逐 tick 重跑行为树 / 仲裁 / 安全，并在原时刻注入录到的 `/decision/intervention`；以 `ACT` 日志输出现模式变化与最终统计。含干预的同一份 bag 两次回放逐 tick 一致（`replay_determinism`）。端到端冒烟：`tools/replay_smoke_test.sh`（也注册为 `replay_smoke`）。
 
 ## 5. 命令参数
 
@@ -274,6 +299,16 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |
 
+### 5.5 replay_main 参数
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--bag` | 必填 | rosbag2 路径（含 `/sentry/*` 上行与 `/decision/intervention`） |
+| `--ticks` | `0` | 最多回放 tick 数，`0` 表示回放到数据结束 |
+| `--rate` | `20.0` | 回放步长频率（Hz），取值 `(0, 1000]` |
+| `--odom-topic` | `/aft_mapped_to_init` | 里程计话题 |
+| `--tree` / `--config` | 安装后的路径 | 行为树 / 配置入口 |
+
 ## 6. 测试
 
 | 范围 | 命令 |
@@ -281,6 +316,8 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
+| 场景 / 干预 / 回放 / 面板冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh` |
+| 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
 | 格式检查 | `tools/format.sh --check` |
 
 ## 7. 环境变量

@@ -622,17 +622,20 @@ timeline:
     expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
 ```
 
-P3.1 支持 `set_world` / `expect`；`add_intent` / `disable` 所需的干预通道已在 P3.2 就绪，
-场景脚本接入留待后续。场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，
-订阅 `/decision/state` 在事件时刻断言，等价于 §10.5 的「干预即测试用例」。
+场景支持 `set_world` / `expect` / `add_intent` / `disable`：后两者经 `/decision/debug`
+在事件时刻注入干预，因此场景脚本可直接把「人工干预」写成可提交的测试用例。
+场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
 
 ### 14.5 干预回放
 
 干预是一路带时间戳的输入（§10.5），必须与信念输入一起录制、按原时刻重放：
 
 - `core::ReplayData` 增 `interventions` 通道，`ReplaySource` 暴露当前时刻生效的干预事件；
-- io 的 `load_replay_data` 从 `/decision/intervention` 读取；
-- 回放时干预事件在对应 tick 注入 `InterventionController`，因此含干预的回放仍逐 tick 确定。
+- io 的 `load_replay_data` 从 `/decision/intervention` 读取，并支持新格式 `/sentry/*` 上行
+  （走 `sentry_bridge` 合并）与旧标量话题；
+- 回放时干预事件在对应 tick 注入 `InterventionController`，因此含干预的回放仍逐 tick 确定；
+- `bringup/replay_main` 读 bag 后离线重放：逐 tick 应用干预、跑行为树 / 仲裁 / 安全，
+  输出模式与目标变化，用于赛后复盘。
 
 ### 14.6 网页面板
 

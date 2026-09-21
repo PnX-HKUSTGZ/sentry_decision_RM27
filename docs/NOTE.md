@@ -29,7 +29,7 @@
 
 ### 待办
 
-- P3.5 收尾（本地）：文档已同步，三条验收由集成测试覆盖；实际 rosbag 录制演示待实机。
+- P3.5 收尾（本地）：已完成——场景 `add_intent` / `disable`、`replay_main` 离线回放与 `replay_smoke`；实际实机 bag 复盘待 P4。
 - 已完成：参考文档 `refs/26UC`（抽取到 `refs/26UC/_text/`）补齐 `referee_protocol` 的 `event_code` 全字段与 `sentry_info_3`；`detect_color` 为视觉字段、文档未定义，仍待 auto-aim 确认。
 - 场景脚本 `add_intent` / `disable` 接入（干预通道已就绪）。
 - P4：实车 / 仿真跑通、旧仓库归档、迁移报告。
