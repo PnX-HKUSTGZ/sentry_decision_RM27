@@ -9,6 +9,39 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增 `docs/ARCHITECTURE.md` §14「可视化与仿真」，以及 `docs/ROADMAP.md` P3 子阶段规划：树状态 `TreeStatus`、Groot2 可选接入、干预 action / service、裁判仿真与场景脚本、干预回放、rosbridge 网页面板。
+- `sentry_decision_msgs`：新增 `TreeNodeStatus` / `TreeStatus` 消息
+- 新增 `sentry_decision_viz` 包：`TreeStatePublisher`（发布 `/decision/tree_status`）与可选 Groot2 桥
+- `decision_node`：新增 `--groot2-port` 参数（默认关闭）
+- `sentry_decision_sim`：新增 `referee_sim_node`（发布 `/sentry/*` 与 odom、提供 `NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与 ROS 无关的场景解析 / 消息级仿真世界
+- 新增场景脚本 `scenario/full_match.yaml` 与端到端测试 `tools/scenario_smoke_test.sh`（巡逻→进攻→撤退→复活）
+- `sentry_decision_msgs`：新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`
+- `sentry_decision_core`：`IntentArbiter` 结果新增逐字段 `winners`；`InterventionController` 支持按字段清除与只读视图
+- `sentry_decision_io`：新增 `InterventionServer`（干预 action / service 服务端与线程安全命令队列）及取值解析
+- `decision_node`：接入干预服务端，发布 `/decision/intervention`，`list_state` 返回 JSON 快照
+- 新增 `tools/intervention_smoke_test.sh` 干预冒烟测试
+- `sentry_decision_core`：`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData` 增干预通道，`ReplaySource::interventions()` 按时刻返回
+- `sentry_decision_io`：`load_replay_data` 读取 `/decision/intervention` 并重建干预命令
+- `sentry_decision_viz`：新增 rosbridge 网页面板（`web/` 静态页、vendored `roslib.min.js`、`viz.launch.py`），含树状态 / 战场 / 世界状态 / 模块与干预面板及干预按钮
+- 新增 `web/test/format.test.mjs`（node 纯逻辑单测，CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`
+- `docker/Dockerfile`：新增 `ros-jazzy-rosbridge-suite`
+- `sentry_decision_core`：`referee_protocol` 按 2026 规则 / 通信协议补齐——`EventCode` 覆盖场地事件全字段，`SentryInfo2` 增加姿态，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState` 增 `info3`
+- `sentry_decision_io`：`sentry_bridge` 解码 `sentry_info_3`
+- `sentry_decision_sim`：`SimWorld` 支持 `sentry_info_3` 场景字段
+- 场景脚本支持 `add_intent` / `disable`（经 `/decision/debug` 注入干预），新增 `scenario/intervention.yaml` 与 `scenario_intervention` 测试
+- `sentry_decision_bringup`：新增 `replay_main` 离线回放入口；`load_replay_data` 支持新格式 `/sentry/*` 上行
+- 新增 `tools/replay_smoke_test.sh`（录制一局场景 bag 后离线重放并校验干预复现）
+- 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
+- `referee_sim_node` 新增 `--hold`（场景时间轴跑完后不退出）与 `scenario/demo.yaml` 面板演示世界
+
+### Fixed
+
+- 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE
+- `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
+- 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）
+
 ## [v0.2.0]
 
 ### Added
@@ -51,10 +84,6 @@
 ### Changed
 
 - 行为树源文件迁移到仓库根目录 `tree/`；bringup 构建、安装与测试路径同步，运行路径不变
-
-### Removed
-
-- 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
 
 ### Fixed
 

@@ -1,0 +1,35 @@
+# 干预即测试用例：add_intent 覆盖导航目标 / 姿态，disable 关闭模块。
+# 由 referee_sim_node 经 /decision/debug（service）注入，再断言 /decision/state。
+name: intervention
+
+world:
+  game_status: 4
+  game_time_remaining: 500
+  self_hp: 400
+  self_ammo: 100
+  base_hp: 5000
+  our_outpost_hp: 1500
+  enemy_outpost_hp: 1500
+
+timeline:
+  # 巡逻（移动姿态），默认去 patrol_a (0, 1.1)。
+  - at: 2.0
+    expect: { tactical_mode: patrol, stance: move, has_nav_goal: true }
+
+  # 人工接管导航目标。
+  - at: 3.0
+    add_intent: { field: nav_goal, value: "[7.0, 1.0]", lease_sec: 0 }
+  - at: 4.5
+    expect: { nav_goal_x: 7.0, nav_goal_y: 1.0 }
+
+  # 人工接管姿态。
+  - at: 5.0
+    add_intent: { field: stance, value: "defense", lease_sec: 0 }
+  - at: 6.5
+    expect: { stance: defense }
+
+  # 关闭 nav 模块：导航意图（含干预）被字段过滤，不再有导航目标。
+  - at: 7.0
+    disable: { modules: "nav" }
+  - at: 8.5
+    expect: { has_nav_goal: false }

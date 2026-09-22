@@ -28,6 +28,7 @@ void merge(const SentryInfoOnlineMsg& msg, sentry_decision::RefereeState* out) {
   out->gimbal_yaw_deg = msg.speed_monitor_angle;
   out->info1 = sentry_decision::decode_sentry_info1(msg.sentry_info_1);
   out->info2 = sentry_decision::decode_sentry_info2(msg.sentry_info_2);
+  out->info3 = sentry_decision::decode_sentry_info3(msg.sentry_info_3);
 }
 
 void merge(const SentryInfoOfflineMsg& msg, sentry_decision::RefereeState* out) {

@@ -58,7 +58,9 @@ void test_apply_online_decodes_bitfields() {
   msg.energy_ratio = 60;
   msg.speed_monitor_angle = 90.0f;
   msg.sentry_info_1 = 291u | (1u << 19);  // ammo_exchanged_local=291, can_free_resurrect
-  msg.sentry_info_2 = static_cast<std::uint16_t>(1u | (0x7FFu << 1) | (1u << 14));
+  msg.sentry_info_2 =
+      static_cast<std::uint16_t>(1u | (0x7FFu << 1) | (2u << 12) | (1u << 14) | (1u << 15));
+  msg.sentry_info_3 = 5ull | (6ull << 16) | (7ull << 32);
 
   RefereeState state;
   merge(msg, &state);
@@ -73,7 +75,12 @@ void test_apply_online_decodes_bitfields() {
   CHECK(state.info1.can_free_resurrect);
   CHECK(state.info2.disengaged);
   CHECK(state.info2.remaining_ammo_exchange == 0x7FF);
+  CHECK(state.info2.stance == SentryStance::kDefense);
   CHECK(state.info2.can_activate_energy);
+  CHECK(state.info2.stance_enhanced);
+  CHECK(state.info3.attack_stance_remaining_s == 5);
+  CHECK(state.info3.move_stance_remaining_s == 6);
+  CHECK(state.info3.attack_enhanced_remaining_s == 7);
 }
 
 void test_apply_offline_team_radar() {

@@ -1,0 +1,6 @@
+{
+  "name": "sentry-decision-viz-web",
+  "private": true,
+  "type": "module",
+  "description": "仅用于让 Node 以 ESM 解析 src/*.js 做纯逻辑单测；无依赖、无构建步骤。"
+}

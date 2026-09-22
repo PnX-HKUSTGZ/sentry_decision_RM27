@@ -123,6 +123,30 @@ void test_determinism() {
   CHECK((first == std::vector<int>{400, 50, 50, 50, 50}));
 }
 
+void test_intervention_channel() {
+  ReplayData data = make_referee_series();
+  InterventionCommand first;
+  first.kind = InterventionCommand::Kind::kModuleSwitch;
+  first.module = "nav";
+  first.enabled = false;
+  data.interventions.push_back({Duration{0}, first});
+
+  InterventionCommand second;
+  second.kind = InterventionCommand::Kind::kClearWorld;
+  data.interventions.push_back({Duration{200}, second});
+
+  ReplaySource replay(data);
+  // at = 0 的事件在首次调用即返回，且不重复。
+  CHECK(replay.interventions().size() == 1);
+  CHECK(replay.interventions().empty());
+  replay.step(Duration{100});
+  CHECK(replay.interventions().empty());
+  replay.step(Duration{100});  // now = 200
+  const std::vector<InterventionCommand> due = replay.interventions();
+  CHECK(due.size() == 1);
+  CHECK(due[0].kind == InterventionCommand::Kind::kClearWorld);
+}
+
 void test_navigation_sink_counters() {
   ReplaySource replay(make_referee_series());
   replay.send_goal(Point2D{1.0, 2.0, 0.0});
@@ -141,6 +165,7 @@ int main() {
   test_epoch_stamp_and_freshness();
   test_finished_and_empty();
   test_determinism();
+  test_intervention_channel();
   test_navigation_sink_counters();
   if (g_failures == 0) {
     std::printf("all core replay tests passed\n");

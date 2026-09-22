@@ -29,6 +29,7 @@ void test_decision_output_conversion() {
   output.nav_goal = Point2D{1.5, -2.5, 0.75};
   output.cmd_vel = Twist{0.1, 0.2, 0.3};
   output.tactical_mode = TacticalMode::kRetreat;
+  output.stance = SentryStance::kDefense;
   output.resource.ammo = 17;
   output.resource.hp = 3;
   output.resource.revive = true;
@@ -43,6 +44,7 @@ void test_decision_output_conversion() {
   CHECK(msg.cmd_vel.linear.y == 0.2);
   CHECK(msg.cmd_vel.angular.z == 0.3);
   CHECK(msg.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kRetreat));
+  CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kDefense));
   CHECK(msg.resource_ammo == 17);
   CHECK(msg.resource_hp == 3);
   CHECK(msg.resource_revive);
@@ -61,6 +63,7 @@ void test_world_state_conversion() {
   world.referee.enemy_outpost_hp = 1200;
   world.referee.enemy_base_hp = 5000;
   world.referee.can_rebuild_outpost = true;
+  world.referee.info2.stance = SentryStance::kMove;
 
   world.self.valid = true;
   world.self.pose = Point2D{3.0, 4.0, 0.5};
@@ -90,6 +93,7 @@ void test_world_state_conversion() {
   CHECK(msg.enemy_outpost_hp == 1200);
   CHECK(msg.enemy_base_hp == 5000);
   CHECK(msg.can_rebuild_outpost);
+  CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kMove));
   CHECK(msg.self_valid);
   CHECK(msg.pos_x == 3.0);
   CHECK(msg.pos_y == 4.0);

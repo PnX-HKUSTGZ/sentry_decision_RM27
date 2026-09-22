@@ -3,12 +3,43 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（P2 策略迁移）
+## 当前 sprint（P3 可视化与仿真）
+
+### 已锁定决策
+
+- 分支 `p3-viz-sim`（基于 `p2-strategy` @ `5e39311`），上游 `origin/p3-viz-sim` 已设置。
+- 子阶段：P3.0 观测底座 → P3.1 裁判仿真 + 场景脚本 → P3.2 干预 ROS 接口 → P3.3 干预回放 → P3.4 网页面板 → P3.5 文档与验收（详见 `docs/ROADMAP.md`）。
+- 包边界：新增 `sentry_decision_viz`（`TreeStatePublisher` + Groot2 桥 + 网页资产 + launch）；ROS 仿真节点 `referee_sim_node` 放 `sentry_decision_sim`（core 仿真库保持 ROS 无关）；`InterventionServer` 放 `sentry_decision_io`；干预 action / service 消息放 `sentry_decision_msgs`。
+- 树状态：`TreeStatus` / `TreeNodeStatus` 消息，`Tree::applyVisitor` 展平；active path 取 RUNNING 节点集合（运行中节点的祖先必然也在运行）；`/decision/tree_status`（transient local）。
+- Groot2：可选 `--groot2-port`（BT.CPP 4.9 已带 zmq），不作为 CI 验收。
+- 干预线程模型：service / action 回调只校验入队，tick 边界 drain 进 `InterventionController`；应用结果发 `/decision/intervention` 供录制回放。
+- 网页：vanilla JS + vendored `roslib.min.js`（锁版本、BSD-2），原生 ES modules 分层（bridge / store / panels / battlefield），无 npm 构建；为将来迁移 Vite + TS 留接缝。
+- P2.3b 串口字节层仍待 MCU 协议，排除在 P3 外。
+- 设计细节同步至 `docs/ARCHITECTURE.md` §14。
+
+### 进行中
+
+- 文档已同步：`ARCHITECTURE.md` §14（可视化与仿真）与 §5 / §10.6 / §12 / §17 引用；`ROADMAP.md` P3 子阶段与状态；`CHANGELOG.md` Unreleased。
+- 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 包与 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过，`format.sh --check` 通过。
+- 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。
+- 已完成（本地）：P3.2 干预 ROS 接口——`sentry_decision_msgs` 新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；io 新增 `InterventionServer`（action / service 只入队，tick 边界应用）与取值解析（yaml-cpp）；core `IntentArbiter` 新增逐字段 `winners`、`InterventionController` 支持按字段清除；`decision_node` 发布 `/decision/intervention` 并提供 `list_state` JSON；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
+- 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData.interventions` + `ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；core / bringup / io 测试覆盖干预通道与含干预的回放确定性。
+- 已完成（本地）：裁判协议补全——`EventCode` 覆盖 0x0101 全字段；`SentryInfo2` 增加 `stance` / `stance_enhanced`，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState.info3`、io 合并与 sim `sentry_info_3` 同步；单测覆盖。
+- 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web` 纯静态页（vendored `roslib.min.js` 1.4.1、原生 ES modules、`web/package.json` 仅声明 `type: module`）；`bridge` / `store` / `format` / `panels/*` / `battlefield` 分层；`viz.launch.py` 起 rosbridge + 静态服务；`web/test/format.test.mjs` node 单测（CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`；`docker/Dockerfile` 加 `ros-jazzy-rosbridge-suite`。
+
+### 待办
+
+- P3.5 收尾（本地）：已完成——场景 `add_intent` / `disable`、`replay_main` 离线回放与 `replay_smoke`；实际实机 bag 复盘待 P4。
+- 已完成：参考文档 `refs/26UC`（抽取到 `refs/26UC/_text/`）补齐 `referee_protocol` 的 `event_code` 全字段与 `sentry_info_3`；`detect_color` 为视觉字段、文档未定义，仍待 auto-aim 确认。
+- 场景脚本 `add_intent` / `disable` 接入（干预通道已就绪）。
+- P4：实车 / 仿真跑通、旧仓库归档、迁移报告。
+
+## 历史（P2 策略迁移，已完成）
 
 ### 已锁定决策
 
 - 战略层：纯 C++ `StrategicPolicy` 接口（输入 `WorldState`，输出 `StrategicDecision`），在树 tick 前求值写入 `DecisionContext.strategy`；不是 BT 子树。
-- 删除「姿态」（stance）：P2 验收输出为 `nav_goal` / `tactical_mode` / `resource` / `cmd_vel`，不含姿态。
+- 姿态（stance）：2026 规则 §5.6.4 为有效机制；已恢复接入（`SentryStance` / `IntentField::kStance` / `DecisionOutput.stance`），由战略层按战术模式映射并随仲裁输出。
 - 弃用 `/set_bool`（`Reloading` / `ifreload`）：P2 不迁移该行为。
 - 树结构：任务 / 技能 / 条件分层为多棵小树，避免旧仓库一整棵大树；`tree/` 按层建 `mission/`、`skill/`、`condition/`，相似树可再分子目录、零散的直接放层根。
 - 命名：条件节点 / 子树 `If*`；任务子树 `Mission*`；技能子树 `<Verb><Object>`；发 Intent 叶子 `Emit*`；写状态叶子 `Set*`；请求叶子 `Request*`。
@@ -20,7 +51,7 @@
 ### 进行中
 
 - 分支 `p2-strategy`（基于 `main` @ `4958c8b`）。
-- 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §14；`ROADMAP.md` P2 子阶段与状态。
+- 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §15；`ROADMAP.md` P2 子阶段与状态。
 - **P2.0 完成（本地）**：
   - `config/`：单一入口 `profiles.yaml` + `maps/RMUL26.yaml` + `policies/rmuc26.yaml`；core `PolicyConfig` 纯结构；bringup `config_loader` 用 yaml-cpp 加载并校验。
   - `tree/`：`root.xml` → `mission/root.xml`（优先级）→ `mission/nav/*` + `skill/goto_named_point.xml`；命名规范 `If*` / `Mission*` / `Emit*` 落地。
@@ -102,4 +133,4 @@
 - 当前无法上实车，一律以本地 PC 容器验证为准。
 - 不自动执行 Git 操作；不自动执行系统级操作。
 - 文档优先（docs-first），设计变更先改文档再改代码。
-- 未确定项集中记录在 `docs/ARCHITECTURE.md` 第 16 节。
+- 未确定项集中记录在 `docs/ARCHITECTURE.md` 第 17 节。

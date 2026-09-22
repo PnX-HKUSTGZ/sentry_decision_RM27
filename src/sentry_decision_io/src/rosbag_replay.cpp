@@ -3,11 +3,16 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/serialization.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/u_int16.hpp>
+
+#include "sentry_decision_io/intervention_convert.hpp"
+#include "sentry_decision_io/sentry_bridge.hpp"
+#include "sentry_decision_msgs/msg/intervention_event.hpp"
 
 namespace sentry_decision_io {
 namespace {
@@ -36,6 +41,45 @@ sentry_decision::SelfState self_state_from_odometry(const nav_msgs::msg::Odometr
   return self;
 }
 
+// InterventionEvent -> core 干预命令；无法重建的事件返回 false 并跳过。
+bool intervention_from_msg(const sentry_decision_msgs::msg::InterventionEvent& msg,
+                           sentry_decision::InterventionCommand* out) {
+  using Event = sentry_decision_msgs::msg::InterventionEvent;
+  using Kind = sentry_decision::InterventionCommand::Kind;
+  switch (msg.kind) {
+    case Event::KIND_INTENT: {
+      std::string error;
+      return parse_manual_override(msg.field, msg.value, msg.lease_sec, msg.reason, out, &error);
+    }
+    case Event::KIND_CLEAR_INTENT:
+      out->kind = Kind::kClearIntent;
+      return parse_intent_field(msg.field, &out->intent_field);
+    case Event::KIND_WORLD_OVERRIDE:
+      out->kind = Kind::kWorldOverride;
+      out->world_field = static_cast<sentry_decision::WorldField>(msg.field);
+      try {
+        out->world_value = std::stod(msg.value);
+      } catch (const std::exception&) {
+        return false;
+      }
+      return true;
+    case Event::KIND_CLEAR_WORLD:
+      out->kind = Kind::kClearWorld;
+      out->world_field = static_cast<sentry_decision::WorldField>(msg.field);
+      return true;
+    case Event::KIND_MODULE_SWITCH:
+      out->kind = Kind::kModuleSwitch;
+      out->module = msg.module;
+      out->enabled = msg.enabled;
+      return true;
+    case Event::KIND_CLEAR_ALL:
+      out->kind = Kind::kClearAll;
+      return true;
+    default:
+      return false;
+  }
+}
+
 }  // namespace
 
 sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
@@ -60,6 +104,47 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
     if (topic == topics.odometry) {
       data.odometry.push_back(
           {at, self_state_from_odometry(deserialize<nav_msgs::msg::Odometry>(*bag_msg))});
+      continue;
+    }
+
+    if (topic == topics.interventions) {
+      sentry_decision::InterventionCommand command;
+      if (intervention_from_msg(deserialize<sentry_decision_msgs::msg::InterventionEvent>(*bag_msg),
+                                &command)) {
+        data.interventions.push_back({at, command});
+      }
+      continue;
+    }
+
+    // 新格式上行：逐条 merge 进 RefereeState 后压入快照，语义与实时节点一致。
+    if (topic == topics.game_info) {
+      merge(deserialize<sentry_interfaces::msg::GameInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.online_info) {
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOnline>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.offline_info) {
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOffline>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.team_info) {
+      merge(deserialize<sentry_interfaces::msg::TeamInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
+      continue;
+    }
+    if (topic == topics.radar_info) {
+      merge(deserialize<sentry_interfaces::msg::RadarInfo>(*bag_msg), &referee);
+      referee.valid = true;
+      data.referee.push_back({at, referee});
       continue;
     }
 

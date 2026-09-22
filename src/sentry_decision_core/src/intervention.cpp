@@ -9,6 +9,10 @@ void InterventionController::inject(Intent intent, TimePoint now) {
   intents_[intent.field] = intent;
 }
 
+void InterventionController::clear_intent(IntentField field) {
+  intents_.erase(field);
+}
+
 void InterventionController::set_world_override(WorldField field, double value) {
   world_overrides_[field] = value;
 }
@@ -36,6 +40,8 @@ const char* InterventionController::module_for_field(IntentField field) {
       return "resource";
     case IntentField::kTacticalMode:
       return "strategic";
+    case IntentField::kStance:
+      return "strategic";
   }
   return "";
 }
@@ -60,6 +66,33 @@ std::vector<Intent> InterventionController::active_intents(TimePoint now) const 
     }
   }
   return active;
+}
+
+void apply_intervention(InterventionController* controller, const InterventionCommand& command,
+                        TimePoint now) {
+  if (controller == nullptr) {
+    return;
+  }
+  switch (command.kind) {
+    case InterventionCommand::Kind::kIntent:
+      controller->inject(command.intent, now);
+      break;
+    case InterventionCommand::Kind::kClearIntent:
+      controller->clear_intent(command.intent_field);
+      break;
+    case InterventionCommand::Kind::kWorldOverride:
+      controller->set_world_override(command.world_field, command.world_value);
+      break;
+    case InterventionCommand::Kind::kClearWorld:
+      controller->clear_world_override(command.world_field);
+      break;
+    case InterventionCommand::Kind::kModuleSwitch:
+      controller->set_module_enabled(command.module, command.enabled);
+      break;
+    case InterventionCommand::Kind::kClearAll:
+      controller->clear();
+      break;
+  }
 }
 
 WorldState InterventionController::apply_world(const WorldState& world) const {

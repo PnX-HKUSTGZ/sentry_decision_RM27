@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RM27 哨兵决策面板</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <span class="title">RM27 哨兵决策面板</span>
+      <span id="conn" class="conn conn-off">未连接</span>
+      <label class="ws">
+        rosbridge
+        <input id="ws-url" value="ws://localhost:9090" size="24" />
+      </label>
+      <button id="connect">连接</button>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>行为树 <span id="tree-meta" class="meta"></span></h2>
+        <div id="tree" class="scroll"></div>
+      </section>
+
+      <section class="panel">
+        <h2>战场俯视图</h2>
+        <canvas id="battlefield" width="520" height="520"></canvas>
+        <div class="legend">
+          <span class="dot self"></span>己方
+          <span class="dot goal"></span>导航目标
+          <span class="dot enemy"></span>敌方
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>世界状态</h2>
+        <div id="world" class="scroll short"></div>
+
+        <h2>模块与干预</h2>
+        <div id="intents" class="scroll short"></div>
+
+        <h2>人工干预</h2>
+        <div id="controls"></div>
+      </section>
+    </main>
+
+    <script src="vendor/roslib.min.js"></script>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

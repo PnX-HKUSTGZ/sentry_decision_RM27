@@ -20,6 +20,9 @@ const std::vector<OwnerRule>& owner_rules() {
        {SourceId::kSupervisor, SourceId::kIntervention}},
       {IntentField::kResourceRequest, SourceId::kSkill, {SourceId::kIntervention}},
       {IntentField::kTacticalMode, SourceId::kStrategic, {SourceId::kIntervention}},
+      {IntentField::kStance,
+       SourceId::kStrategic,
+       {SourceId::kSupervisor, SourceId::kIntervention}},
   };
   return rules;
 }
@@ -53,6 +56,8 @@ bool has_matching_value(const Intent& intent) {
       return std::holds_alternative<ResourceRequest>(intent.value);
     case IntentField::kTacticalMode:
       return std::holds_alternative<TacticalMode>(intent.value);
+    case IntentField::kStance:
+      return std::holds_alternative<SentryStance>(intent.value);
   }
   return false;
 }
@@ -70,6 +75,9 @@ void apply(const Intent& winner, DecisionOutput& out) {
       break;
     case IntentField::kTacticalMode:
       out.tactical_mode = std::get<TacticalMode>(winner.value);
+      break;
+    case IntentField::kStance:
+      out.stance = std::get<SentryStance>(winner.value);
       break;
   }
 }
@@ -139,7 +147,8 @@ ArbiterResult IntentArbiter::resolve(TimePoint now) const {
   }
 
   const IntentField fields[] = {IntentField::kNavGoal, IntentField::kChassisVel,
-                                IntentField::kResourceRequest, IntentField::kTacticalMode};
+                                IntentField::kResourceRequest, IntentField::kTacticalMode,
+                                IntentField::kStance};
   for (IntentField field : fields) {
     const Intent* winner = nullptr;
     std::vector<SourceId> losers;
@@ -159,6 +168,7 @@ ArbiterResult IntentArbiter::resolve(TimePoint now) const {
     }
     if (winner != nullptr) {
       apply(*winner, result.output);
+      result.winners[field] = winner->source;
       if (!losers.empty()) {
         result.conflicts.push_back(Conflict{field, winner->source, losers});
       }

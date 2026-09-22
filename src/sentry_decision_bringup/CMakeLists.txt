@@ -12,6 +12,7 @@ find_package(sentry_decision_core REQUIRED)
 find_package(sentry_decision_nodes REQUIRED)
 find_package(sentry_decision_io REQUIRED)
 find_package(sentry_decision_sim REQUIRED)
+find_package(sentry_decision_viz REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
 # 模块 .so 安装在 sentry_decision_nodes 包前缀下；从其 CMake 配置目录回推 lib 目录。
@@ -55,13 +56,29 @@ target_link_libraries(decision_node
   sentry_decision_nodes::sentry_decision_nav
   sentry_decision_nodes::sentry_decision_strategic
   sentry_decision_io::sentry_decision_io
+  sentry_decision_viz::sentry_decision_viz
   behaviortree_cpp::behaviortree_cpp)
 target_compile_definitions(decision_node PRIVATE
   DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/root.xml"
   DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/profiles.yaml"
   DEFAULT_MODULE_LIB_DIR="${SENTRY_NODES_LIB_DIR}")
 
-install(TARGETS decision_main decision_node DESTINATION lib/${PROJECT_NAME})
+# 离线回放入口：读 rosbag2 后按原时刻重放（含人工干预），不启动 ROS 节点。
+add_executable(replay_main src/replay_main.cpp)
+target_link_libraries(replay_main
+  bringup_loader
+  sentry_decision_core::sentry_decision_core
+  sentry_decision_nodes::sentry_decision_common
+  sentry_decision_nodes::sentry_decision_nav
+  sentry_decision_nodes::sentry_decision_strategic
+  sentry_decision_io::sentry_decision_io
+  behaviortree_cpp::behaviortree_cpp)
+target_compile_definitions(replay_main PRIVATE
+  DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/root.xml"
+  DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/profiles.yaml"
+  DEFAULT_MODULE_LIB_DIR="${SENTRY_NODES_LIB_DIR}")
+
+install(TARGETS decision_main decision_node replay_main DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/ DESTINATION share/${PROJECT_NAME}/tree)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../config/ DESTINATION share/${PROJECT_NAME}/config)
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
@@ -125,6 +142,12 @@ if(BUILD_TESTING)
 
   add_test(NAME decision_node_boot
     COMMAND decision_node --ticks 5 --rate 200
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles.yaml)
+
+  # Groot2 为可选能力：显式开启端口时不得影响正常启动与退出。
+  add_test(NAME decision_node_groot2
+    COMMAND decision_node --ticks 5 --rate 200 --groot2-port 16671
             --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
             --config ${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles.yaml)
 
