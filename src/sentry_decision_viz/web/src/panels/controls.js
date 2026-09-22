@@ -33,7 +33,7 @@ export function createControlsPanel(el, bridge, onLog) {
   modeOptions.forEach(function (name) {
     html += '<option value="' + name + '">' + name + '</option>';
   });
-  html += '</select><input id="lease" value="5" size="3" title="lease 秒"/><button id="btn-mode">切换</button></div>';
+  html += '</select><input id="lease" value="0" size="3" title="lease 秒（0=持续到清除）"/><button id="btn-mode">切换</button></div>';
   html += '<div class="row"><span>点位</span><input id="point-x" value="0" size="4"/>';
   html += '<input id="point-y" value="0" size="4"/><button id="btn-point">前往</button></div>';
   html += '<div class="row"><span>模块</span><select id="module-select">';
@@ -45,9 +45,10 @@ export function createControlsPanel(el, bridge, onLog) {
   html += '<pre id="log" class="log"></pre>';
   el.innerHTML = html;
 
+  // lease 秒；0 表示持续到「清空干预」/「重置」，负数按 0 处理。
   function lease() {
     const value = parseFloat(document.getElementById('lease').value);
-    return value > 0 ? value : 5;
+    return isFinite(value) && value > 0 ? value : 0;
   }
 
   // 人工意图统一走 /decision/debug set_intent（service）。

@@ -13,6 +13,13 @@ function drawField(ctx, extent, width, height) {
   ctx.fillStyle = '#0d151c';
   ctx.fillRect(left, top, right - left, bottom - top);
 
+  // 半场底色：己方（x<0）冷色、敌方（x>0）暖色，让 x 轴分界一眼可见。
+  const half = worldToCanvas({ x: 0, y: 0 }, extent, width, height);
+  ctx.fillStyle = 'rgba(74, 163, 255, 0.08)';
+  ctx.fillRect(left, top, half.x - left, bottom - top);
+  ctx.fillStyle = 'rgba(224, 90, 90, 0.08)';
+  ctx.fillRect(half.x, top, right - half.x, bottom - top);
+
   // 1m 网格
   ctx.strokeStyle = '#1d2833';
   ctx.lineWidth = 1;
@@ -32,9 +39,9 @@ function drawField(ctx, extent, width, height) {
   }
 
   // 中线（世界 x = 0，己方半场在 x<0）与中圈。
-  const center = worldToCanvas({ x: 0, y: 0 }, extent, width, height);
-  ctx.strokeStyle = '#3a4b5c';
-  ctx.lineWidth = 1.5;
+  const center = half;
+  ctx.strokeStyle = '#5b86c0';
+  ctx.lineWidth = 2;
   ctx.setLineDash([7, 6]);
   ctx.beginPath();
   ctx.moveTo(center.x, top);
