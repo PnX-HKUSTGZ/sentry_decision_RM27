@@ -40,14 +40,20 @@ MODULE="$(ros2 service call /decision/debug sentry_decision_msgs/srv/DebugComman
   "{command: 'set_module', args: '{module: nav, enabled: false}'}" 2>&1)"
 check 'success=True' "${MODULE}" "set_module 未成功"
 
-# 先订阅，避免错过一次性事件；给 DDS 发现留足时间，避免并发下抖动。
-(timeout 8 ros2 topic echo /decision/intervention >/tmp/intervention_topic.log 2>&1) & EP=$!
-sleep 2
-GOAL="$(ros2 action send_goal /decision/manual_override \
-  sentry_decision_msgs/action/ManualOverride \
-  "{field: 0, value: '[1.0, 2.0]', lease_sec: 2.0, reason: 'manual'}" 2>&1)"
-check 'override finished' "${GOAL}" "manual_override 未成功结束"
-wait "${EP}" 2>/dev/null || true
+# 先订阅，避免错过一次性事件；给 DDS 发现留足时间，并重试一次以抵御并发抖动。
+capture_event() {
+  (timeout 8 ros2 topic echo /decision/intervention >/tmp/intervention_topic.log 2>&1) & EP=$!
+  sleep 2
+  GOAL="$(ros2 action send_goal /decision/manual_override \
+    sentry_decision_msgs/action/ManualOverride \
+    "{field: 0, value: '[1.0, 2.0]', lease_sec: 2.0, reason: 'manual'}" 2>&1)"
+  check 'override finished' "${GOAL}" "manual_override 未成功结束"
+  wait "${EP}" 2>/dev/null || true
+}
+capture_event
+if ! grep -q 'kind:' /tmp/intervention_topic.log; then
+  capture_event
+fi
 
 EVENT="$(cat /tmp/intervention_topic.log)"
 check 'kind:' "${EVENT}" "未收到 /decision/intervention"

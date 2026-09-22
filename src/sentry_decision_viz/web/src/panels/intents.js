@@ -59,7 +59,28 @@ export function createIntentsPanel(el) {
             })
             .join(' ')
         : '-';
-      html += '</td></tr></table>';
+      html += '</td></tr>';
+
+      const resource = snapshot.resource || {};
+      html += '<tr><th>资源请求</th><td>ammo=' + (resource.ammo || 0) + ' hp=' + (resource.hp || 0) +
+        ' revive=' + (resource.revive ? 'true' : 'false') + '</td></tr>';
+
+      const action = snapshot.last_action;
+      html += '<tr><th>最近动作</th><td>';
+      html += action
+        ? escapeHtml(action.kind) + ' value=' + action.value + ' #' + action.request_id
+        : '-';
+      html += '</td></tr>';
+
+      const ack = snapshot.last_ack;
+      html += '<tr><th>动作回执</th><td>';
+      html += ack
+        ? '#' + ack.request_id + ' ' + (ack.accepted ? 'accepted' : 'rejected') + ' code=' + ack.code +
+          (ack.detail ? ' ' + escapeHtml(ack.detail) : '')
+        : '-';
+      html += '</td></tr>';
+
+      html += '</table>';
       el.innerHTML = html;
     },
   };

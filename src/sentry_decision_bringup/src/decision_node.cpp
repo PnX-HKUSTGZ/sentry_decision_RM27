@@ -109,6 +109,49 @@ std::string join_errors(const std::vector<std::string>& errors) {
   return text;
 }
 
+const char* action_kind_name(sentry_decision::DecisionActionKind kind) {
+  using K = sentry_decision::DecisionActionKind;
+  switch (kind) {
+    case K::kAmmoExchange:
+      return "ammo_exchange";
+    case K::kHpExchange:
+      return "hp_exchange";
+    case K::kFreeResurrect:
+      return "free_resurrect";
+    case K::kInstantResurrect:
+      return "instant_resurrect";
+    case K::kRemoteAmmoExchange:
+      return "remote_ammo_exchange";
+    case K::kRemoteHpExchange:
+      return "remote_hp_exchange";
+    case K::kNone:
+    default:
+      return "none";
+  }
+}
+
+// 最小 JSON 字符串转义，用于把回执 detail 放进 list_state。
+std::string json_escape(const std::string& text) {
+  std::string out;
+  out.reserve(text.size());
+  for (char c : text) {
+    switch (c) {
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      default:
+        out += c;
+    }
+  }
+  return out;
+}
+
 // 真实 IO 决策节点：RosIoNode 提供信念输入与执行端，本节点跑行为树与仲裁，
 // 并把仲裁结果下发（导航目标 / 速度 / 决策动作）与发布决策状态。
 class DecisionNode : public rclcpp::Node {
@@ -354,7 +397,27 @@ class DecisionNode : public rclcpp::Node {
       first = false;
       out << "\"" << sentry_decision_io::world_field_name(entry.first) << "\":" << entry.second;
     }
-    out << "},\"safety_emergency\":" << (safety_emergency_ ? "true" : "false") << "}";
+    out << "},\"resource\":{\"ammo\":" << result.output.resource.ammo
+        << ",\"hp\":" << result.output.resource.hp
+        << ",\"revive\":" << (result.output.resource.revive ? "true" : "false") << "}";
+    out << ",\"last_action\":";
+    if (has_last_action_) {
+      out << "{\"kind\":\"" << action_kind_name(last_action_.kind)
+          << "\",\"value\":" << last_action_.value << ",\"request_id\":" << last_action_.request_id
+          << "}";
+    } else {
+      out << "null";
+    }
+    out << ",\"last_ack\":";
+    if (has_last_ack_) {
+      out << "{\"request_id\":" << last_ack_.request_id
+          << ",\"accepted\":" << (last_ack_.accepted ? "true" : "false")
+          << ",\"code\":" << static_cast<int>(last_ack_.code) << ",\"detail\":\""
+          << json_escape(last_ack_.detail) << "\"}";
+    } else {
+      out << "null";
+    }
+    out << ",\"safety_emergency\":" << (safety_emergency_ ? "true" : "false") << "}";
 
     std::lock_guard<std::mutex> lock(state_mutex_);
     state_json_ = out.str();
@@ -380,10 +443,16 @@ class DecisionNode : public rclcpp::Node {
   void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
     for (const auto& ack : io_->take_acks()) {
       dispatcher_.on_ack(ack);
+      last_ack_ = ack;
+      has_last_ack_ = true;
     }
     sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
     for (const auto& action : dispatcher_.poll(now)) {
       io_->send_action(action);
+      last_action_ = action;
+      has_last_action_ = true;
+      SD_LOG_ACT("action", "下发 %s value=%d request_id=%u", action_kind_name(action.kind),
+                 action.value, action.request_id);
     }
   }
 
@@ -399,6 +468,10 @@ class DecisionNode : public rclcpp::Node {
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
   sentry_decision::NavGoalTracker nav_tracker_;
+  bool has_last_action_ = false;
+  sentry_decision::DecisionAction last_action_;
+  bool has_last_ack_ = false;
+  sentry_decision::ActionAck last_ack_;
   bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;

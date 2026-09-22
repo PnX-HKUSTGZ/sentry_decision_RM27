@@ -40,6 +40,7 @@
 - `TacticalMode::kIdle`：战略层只在 `game_status=4`（比赛中）执行任务，准备 / 自检 / 倒计时 / 结算输出 idle；`MissionPatrol` 以 `IfTacticalMode` 门控，待机时不下发任务目标
 - 准备阶段改为 3 分钟倒计时；网页面板状态栏用 `MM:SS` 白色显示
 - 网页面板新增世界覆盖表单（自身 / 基地 / 前哨血量、金币、发弹量、剩余时间，走 `/decision/debug set_world`）与「暂停 / 继续」；后者新增 `SetGamePause.srv` 与 `/sentry_sim/set_game_pause`，暂停时冻结计时与机器人运动；场景新增可选 `start_pose`
+- `list_state` 增加 `resource` / `last_action` / `last_ack`，网页面板显示资源请求、最近下发的决策动作与执行回执；`decision_node` 下发动作时记 `[action]` ACT 日志
 
 ### Fixed
 
@@ -56,6 +57,8 @@
 - 未进入「比赛中」时网页面板的人工意图按钮自动禁用，避免准备阶段误发干预
 - 战场半场用底色区分（己方 x<0 冷色 / 敌方 x>0 暖色）并加竖向中线，消除此前“上下分”的误读
 - 面板 `lease` 默认改为 0（持续到「清空干预」/「重置」），并修正 `lease()` 把 0 误当 5 的问题；有限 lease 按系统时间计算，暂停期间仍会到期
+- 面板 `lease` 从「模式」行移到独立「持续」行并加说明
+- 「兑换发弹 / 血量」经 `resource_request` 意图转成一次性 `DecisionCommand`，不改变任务树；现在可在面板「资源请求 / 最近动作 / 动作回执」与 `[action]` 日志中确认是否尝试 / 成功
 
 ## [v0.2.0]
 

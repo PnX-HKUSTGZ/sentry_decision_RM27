@@ -265,7 +265,8 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
 - 中间战场俯视图（示意场地底图：己方半场 x<0 冷色 / 敌方半场 x>0 暖色，中间竖线；叠加己方位姿、
   导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
-- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者（每秒轮询 `list_state`）；
+- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执
+  （每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
   「重置」回未开始，并清空决策节点的干预 / 世界覆盖 / 模块开关；
 - 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
@@ -302,9 +303,14 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > 无法对接 ROS 2 action 的 `/_action/*` 服务。action 接口本身仍可用
 > `ros2 action send_goal /decision/manual_override ...` 直接调用。
 
-> 「模式 / 点位」旁的 `lease` 默认 **0**：人工接管一直生效，直到点「清空干预」或「重置」。
+> 「持续」一行的 `lease` 默认 **0**：人工接管一直生效，直到点「清空干预」或「重置」。
 > 填正数则按秒到期后自动交还任务树（注意：lease 用系统时间计算，暂停期间仍会到期；
 > 想让它跨暂停持续，请保持 0）。
+
+> 「兑换发弹 / 血量」注入的是 `resource_request` 意图，由决策层转成一次性 `DecisionCommand`
+> 动作下发给执行端，**不经过任务树**，所以行为树不会有分支变化；是否尝试 / 成功看右侧
+> 「资源请求 / 最近动作 / 动作回执」，或决策节点日志的 `[action] 下发 ...` 与
+> `[action] 动作 N 已确认`。
 
 未进入「比赛中」（`game_status != 4`）时，人工意图按钮自动禁用，避免准备阶段误发干预；
 世界覆盖与「清空干预」仍可用。世界覆盖只改数值、不提升 `referee.valid`，不会绕过安全急停。
