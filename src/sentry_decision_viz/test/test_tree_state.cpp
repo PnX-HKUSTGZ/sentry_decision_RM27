@@ -169,6 +169,14 @@ void test_completed_status_is_cached() {
   if (cached.nodes.size() == 1) {
     CHECK(cached.nodes[0].status == static_cast<std::uint8_t>(BT::NodeStatus::SUCCESS));
   }
+
+  // 新的一拍先 clear：上一拍已完成的节点不再残留 SUCCESS，避免误导为上拍/历史状态。
+  recorder.clear();
+  const sentry_decision_msgs::msg::TreeStatus next = collect_tree_status(tree, recorder, 2, 0.0);
+  CHECK(next.nodes.size() == 1);
+  if (next.nodes.size() == 1) {
+    CHECK(next.nodes[0].status == static_cast<std::uint8_t>(BT::NodeStatus::IDLE));
+  }
 }
 
 }  // namespace

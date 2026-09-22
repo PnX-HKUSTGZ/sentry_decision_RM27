@@ -552,7 +552,9 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 子节点完成时由父控制节点触发）；若在 `tickOnce()` 返回后直接读 `node->status()`，整棵树都会
 显示 IDLE。因此 `TreeStatusRecorder` 订阅 `TreeNode::subscribeToStatusChange`，缓存每个节点的
 可见状态：迁移到 IDLE 时保留原 SUCCESS / FAILURE，RUNNING 被 halt 则回落 IDLE——与官方
-`Groot2Publisher` 对 IDLE 的处理一致。
+`Groot2Publisher` 对 IDLE 的处理一致。每拍 tick 前调用 `TreeStatusRecorder::clear()`，
+缓存只保留本拍执行的节点；未执行的分支退回实时 `node->status()`（通常 IDLE），
+避免上一拍的 SUCCESS 残留到待机阶段造成误读。
 
 - `sentry_decision_msgs/msg/TreeNodeStatus`：`full_path`、`registration_name`、`instance_name`、
   `status`（与 `BT::NodeStatus` 1:1：IDLE 0 / RUNNING 1 / SUCCESS 2 / FAILURE 3 / SKIPPED 4）。
@@ -663,7 +665,9 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
 - 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
   只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
 - 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
-  分别调用 `/decision/debug`（service）与 `/decision/manual_override`（action）；
+  统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发；
+  `ManualOverride` action 仍保留给 `ros2 action send_goal` 等客户端；面板不用 action 是因为
+  vendored roslib 1.4.1 的 `ActionClient` 为 ROS 1 actionlib 命名，无法对接 ROS 2 action；
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/
   `panels/*`（每个面板一个模块）/ `battlefield`（canvas）分层，使用浏览器原生 ES modules；
 - `web/vendor/roslib.min.js` 锁版本 vendor（BSD-2，1.4.1）；`web/package.json` 仅声明
@@ -678,7 +682,7 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
 ### 14.7 依赖
 
 - 镜像新增 `ros-jazzy-rosbridge-suite`；
-- Groot2 依赖已随 `ros-jazzy-behaviortree-cpp`（4.9.0）提供，无需额外系统包；
+- Groot2 依赖已随 `ros-jazzy-behaviortree-cpp`（4.10.0）提供，无需额外系统包；
 - 网页面板仅新增一个 vendor 的 JS 文件，不引入前端工具链。
 
 ## 15. 配置

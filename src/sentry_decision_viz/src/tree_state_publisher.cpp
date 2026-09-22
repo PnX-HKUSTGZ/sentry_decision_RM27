@@ -12,6 +12,10 @@ TreeStatePublisher::TreeStatePublisher(rclcpp::Node& node, BT::Tree& tree, const
   publisher_ = node_.create_publisher<sentry_decision_msgs::msg::TreeStatus>(topic, qos);
 }
 
+void TreeStatePublisher::begin_tick() {
+  recorder_.clear();
+}
+
 void TreeStatePublisher::publish(std::uint32_t tick, double tick_ms) {
   sentry_decision_msgs::msg::TreeStatus status =
       collect_tree_status(tree_, recorder_, tick, tick_ms);

@@ -48,6 +48,8 @@
 - 战场俯视图 `mode` 文字移至右上角，避免与左上角半场标注重叠
 - 人工接管战术模式（面板「切换模式」/「强制撤退」）现在会在本拍覆盖 `context.strategy.mode`，真正切换任务树分支
 - `scenario/demo.yaml` 补充 `enemy_base_hp`，避免面板把敌方基地血量显示成 0（并非读数错误）
+- 树状态缓存改为每拍 `clear()`：未执行的分支不再残留上一拍的 SUCCESS（此前待机阶段会误显示攻击分支 SUCCESS）
+- 网页面板人工干预改走 `/decision/debug set_intent` service：vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名，无法对接 ROS 2 `ManualOverride` action，导致「切换模式 / 前往点位」等按钮无效果
 
 ## [v0.2.0]
 

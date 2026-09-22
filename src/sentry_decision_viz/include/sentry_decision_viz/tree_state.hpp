@@ -29,6 +29,9 @@ class TreeStatusRecorder {
   // 返回缓存的可见状态；未记录时退回读取 node->status()。
   std::uint8_t status_of(const BT::TreeNode& node) const;
 
+  // 开始新的一拍：清空上一拍的缓存，使快照只反映本拍执行的节点。
+  void clear();
+
  private:
   mutable std::mutex mutex_;
   std::unordered_map<std::uint16_t, std::uint8_t> last_status_;

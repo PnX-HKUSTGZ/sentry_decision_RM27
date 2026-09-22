@@ -21,6 +21,9 @@ class TreeStatePublisher {
 
   TreeStatePublisher(rclcpp::Node& node, BT::Tree& tree, const std::string& topic = kDefaultTopic);
 
+  // 开始新的一拍：清空上一拍缓存，必须在 tree tickOnce 之前调用，使快照只反映本拍。
+  void begin_tick();
+
   // 采集并发布一次快照；在 tree tickOnce 之后调用。
   void publish(std::uint32_t tick, double tick_ms = 0.0);
 

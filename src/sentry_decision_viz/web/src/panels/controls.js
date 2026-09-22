@@ -1,5 +1,6 @@
-// 人工干预控件：比赛阶段 -> /sentry_sim/set_game_stage；
-// 其余按钮 -> /decision/debug (service) 与 /decision/manual_override (action)。
+// 人工干预控件：比赛阶段 -> /sentry_sim/set_game_stage；其余走 /decision/debug (service)。
+// 不使用 ManualOverride action：vendored roslib 1.4.1 的 ActionClient 是 ROS 1 actionlib
+// 命名（/<action>/goal 等），无法对接 ROS 2 action 的 /_action/* 服务，故面板统一走 service。
 export function createControlsPanel(el, bridge, onLog) {
   const options = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
   let html = '';
@@ -32,15 +33,12 @@ export function createControlsPanel(el, bridge, onLog) {
     return value > 0 ? value : 5;
   }
 
-  function override(field, value, label) {
-    bridge
-      .sendManualOverride(field, value, lease(), 'web-' + label)
-      .then(function () {
-        onLog(label + ' 已结束');
-      })
-      .catch(function (error) {
-        onLog(label + ' 失败: ' + error);
-      });
+  // 人工意图统一走 /decision/debug set_intent（service）。
+  function setIntent(field, value, label) {
+    const args =
+      '{field: ' + field + ', value: ' + value + ', lease_sec: ' + lease() +
+      ", reason: 'web-" + label + "'}";
+    debug('set_intent', args, label);
   }
 
   function debug(command, args, label) {
@@ -96,18 +94,18 @@ export function createControlsPanel(el, bridge, onLog) {
   });
 
   document.getElementById('btn-retreat').addEventListener('click', function () {
-    override(3, 'retreat', '强制撤退');
+    setIntent('tactical_mode', 'retreat', '强制撤退');
   });
   document.getElementById('btn-clear').addEventListener('click', function () {
     debug('clear_all', '', '清空干预');
   });
   document.getElementById('btn-mode').addEventListener('click', function () {
-    override(3, document.getElementById('mode-select').value, '切换模式');
+    setIntent('tactical_mode', document.getElementById('mode-select').value, '切换模式');
   });
   document.getElementById('btn-point').addEventListener('click', function () {
     const x = parseFloat(document.getElementById('point-x').value) || 0;
     const y = parseFloat(document.getElementById('point-y').value) || 0;
-    override(0, '[' + x + ', ' + y + ']', '前往点位');
+    setIntent('nav_goal', '[' + x + ', ' + y + ']', '前往点位');
   });
   document.getElementById('btn-module-on').addEventListener('click', function () {
     const name = document.getElementById('module-select').value;
@@ -118,10 +116,10 @@ export function createControlsPanel(el, bridge, onLog) {
     debug('set_module', '{module: ' + name + ', enabled: false}', '禁用 ' + name);
   });
   document.getElementById('btn-ammo').addEventListener('click', function () {
-    override(2, '{ammo: 50, hp: 0, revive: false}', '兑换发弹');
+    setIntent('resource_request', '{ammo: 50, hp: 0, revive: false}', '兑换发弹');
   });
   document.getElementById('btn-hp').addEventListener('click', function () {
-    override(2, '{ammo: 0, hp: 50, revive: false}', '兑换血量');
+    setIntent('resource_request', '{ammo: 0, hp: 50, revive: false}', '兑换血量');
   });
 
   return {

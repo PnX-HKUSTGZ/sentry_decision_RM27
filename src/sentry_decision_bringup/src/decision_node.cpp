@@ -168,6 +168,8 @@ class DecisionNode : public rclcpp::Node {
     context_.clear_intents();
     context_.apply_strategy(policy_.decide(context_.world));
     sentry_decision::apply_intervention_intents(intervention_, now, &context_);
+    // 清空上一拍的树状态缓存，让快照只反映本拍执行的节点。
+    tree_publisher_->begin_tick();
     const TimePoint tick_begin = SteadyClock::now();
     tree_->tickOnce();
     const double tick_ms =

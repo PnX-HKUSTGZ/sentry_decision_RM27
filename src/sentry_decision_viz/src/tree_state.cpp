@@ -63,6 +63,11 @@ std::uint8_t TreeStatusRecorder::status_of(const BT::TreeNode& node) const {
   return it == last_status_.end() ? static_cast<std::uint8_t>(node.status()) : it->second;
 }
 
+void TreeStatusRecorder::clear() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  last_status_.clear();
+}
+
 sentry_decision_msgs::msg::TreeStatus collect_tree_status(
     const BT::Tree& tree, const std::function<std::uint8_t(const BT::TreeNode&)>& status_of,
     std::uint32_t tick, double tick_ms) {

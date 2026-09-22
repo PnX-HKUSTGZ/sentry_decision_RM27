@@ -1,5 +1,7 @@
-// rosbridge 适配：把 ROSLIB 的 topic / service / action 包成面板易用的接口。
+// rosbridge 适配：把 ROSLIB 的 topic / service 包成面板易用的接口。
 // 只有这个模块接触全局 ROSLIB，其余模块保持纯数据 / DOM。
+// 不使用 ROSLIB.ActionClient：vendored roslib 1.4.1 的 ActionClient 采用 ROS 1
+// actionlib 命名，无法对接 ROS 2 action，面板的人工干预统一走 service。
 export function createBridge(options) {
   const url = options.url;
   let ros = null;
@@ -77,36 +79,9 @@ export function createBridge(options) {
     });
   }
 
-  function sendManualOverride(field, value, leaseSec, reason) {
-    return new Promise(function (resolve, reject) {
-      const client = new ROSLIB.ActionClient({
-        ros: ros,
-        serverName: '/decision/manual_override',
-        actionName: 'sentry_decision_msgs/action/ManualOverride',
-      });
-      const goal = new ROSLIB.Goal({
-        actionClient: client,
-        goalMessage: {
-          field: field,
-          value: value,
-          lease_sec: leaseSec,
-          reason: reason || 'web',
-        },
-      });
-      goal.on('result', function (result) {
-        resolve(result);
-      });
-      goal.on('timeout', function () {
-        reject(new Error('action timeout'));
-      });
-      goal.send();
-    });
-  }
-
   return {
     connect: connect,
     callDebug: callDebug,
     setGameStage: setGameStage,
-    sendManualOverride: sendManualOverride,
   };
 }

@@ -286,12 +286,17 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 | 控件 | 作用 | 底层调用 |
 | --- | --- | --- |
 | 比赛阶段 / 重置 | 推进或重置裁判仿真的比赛阶段 | `/sentry_sim/set_game_stage` |
-| 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `ManualOverride(field=3, value=retreat)` |
-| 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `ManualOverride(field=3)` |
-| 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `ManualOverride(field=0)` |
+| 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `set_intent {field: tactical_mode, value: retreat}` |
+| 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `set_intent {field: tactical_mode}` |
+| 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `set_intent {field: nav_goal}` |
 | 模块 启用 / 禁用 | 运行期关闭某模块后，该字段的意图（含人工干预）被丢弃 | `/decision/debug set_module` |
-| 兑换发弹 / 血量 | 注入资源请求（ammo / hp） | `ManualOverride(field=2)` |
+| 兑换发弹 / 血量 | 注入资源请求（ammo / hp） | `set_intent {field: resource_request}` |
 | 清空干预 | 清空全部人工干预 / 世界覆盖 / 模块开关 | `/decision/debug clear_all` |
+
+> 面板人工干预统一走 `/decision/debug` 的 `set_intent` service，不使用 `ManualOverride` action：
+> vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名（`/<action>/goal` 等），
+> 无法对接 ROS 2 action 的 `/_action/*` 服务。action 接口本身仍可用
+> `ros2 action send_goal /decision/manual_override ...` 直接调用。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
