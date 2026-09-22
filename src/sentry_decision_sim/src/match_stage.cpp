@@ -53,7 +53,7 @@ void MatchStageController::reset() {
 }
 
 void MatchStageController::tick_second() {
-  if (!active_ || !counting_) {
+  if (!active_ || !counting_ || paused_) {
     return;
   }
   if (remaining_ > 0) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,8 @@ struct ScenarioEvent {
 
 struct Scenario {
   std::string name;
+  // 机器人初始位姿（可选）：进程启动与「重置」时应用，避免停在场地中央。
+  std::optional<sentry_decision::Point2D> start_pose;
   // 初始世界（可选）：进程启动时、时间轴之前应用。
   std::map<std::string, ScenarioValue> initial_world;
   // 已按 at 升序排列。

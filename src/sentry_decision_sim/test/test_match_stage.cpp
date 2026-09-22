@@ -73,6 +73,24 @@ void test_auto_advance() {
   CHECK(!controller.counting());
 }
 
+void test_pause_freezes_countdown() {
+  MatchStageController controller;
+  std::string error;
+  CHECK(controller.set(3, &error));  // 5s 倒计时
+  CHECK(controller.remaining_seconds() == 5);
+  controller.set_paused(true);
+  for (int i = 0; i < 10; ++i) {
+    controller.tick_second();
+  }
+  CHECK(controller.stage() == MatchStage::kCountdown);
+  CHECK(controller.remaining_seconds() == 5);  // 暂停期间不倒数
+  controller.set_paused(false);
+  for (int i = 0; i < 5; ++i) {
+    controller.tick_second();
+  }
+  CHECK(controller.stage() == MatchStage::kRunning);
+}
+
 void test_reset() {
   MatchStageController controller;
   std::string error;
@@ -90,6 +108,7 @@ void test_reset() {
 int main() {
   test_forward_only();
   test_auto_advance();
+  test_pause_freezes_countdown();
   test_reset();
 
   if (g_failures != 0) {

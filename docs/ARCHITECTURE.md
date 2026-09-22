@@ -640,7 +640,9 @@ timeline:
 比赛阶段由 ROS 无关的 `MatchStageController` 管理，并通过 `/sentry_sim/set_game_stage`
 （`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒
 递减并自动进入下一阶段。控制器未被调用前不干预场景设定的 `game_status` / `game_time_remaining`，
-因此既有场景测试不受影响。
+因此既有场景测试不受影响。场景可声明 `start_pose: [x, y, yaw]` 作为机器人初始位姿，进程启动与
+「重置」都会应用（重置同时清空导航目标）。另提供 `SetGamePause`（`/sentry_sim/set_game_pause`）：
+暂停时冻结计时与 `NavSimulator` 运动，odom 仍刷新时间戳以免被判失效，恢复后从当前时刻继续。
 
 战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
 任务树的 `MissionPatrol` 也以 `IfTacticalMode(patrol)` 门控，因此待机时不下发任务导航目标。
@@ -666,6 +668,8 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
   只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
 - 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
   统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发；
+  另外提供世界覆盖（`set_world` / `clear_world`，覆盖血量 / 金币 / 发弹 / 剩余时间）与暂停按钮；
+  未进入「比赛中」时人工意图按钮自动禁用；
   `ManualOverride` action 仍保留给 `ros2 action send_goal` 等客户端；面板不用 action 是因为
   vendored roslib 1.4.1 的 `ActionClient` 为 ROS 1 actionlib 命名，无法对接 ROS 2 action；
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/

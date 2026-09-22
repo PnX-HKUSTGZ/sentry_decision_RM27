@@ -21,6 +21,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ManualOverride.action"
   "srv/DebugCommand.srv"
   "srv/SetGameStage.srv"
+  "srv/SetGamePause.srv"
   DEPENDENCIES std_msgs geometry_msgs action_msgs unique_identifier_msgs)
 
 ament_export_dependencies(rosidl_default_runtime)

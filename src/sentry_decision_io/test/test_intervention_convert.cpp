@@ -73,6 +73,19 @@ void test_debug_command() {
   CHECK(commands[0].world_value == 20.0);
 
   commands.clear();
+  CHECK(parse_debug_command("set_world", "{field: base_hp, value: 5000}", &commands, &list_state,
+                            &error));
+  CHECK(commands.size() == 1);
+  CHECK(commands[0].world_field == WorldField::kBaseHp);
+  CHECK(commands[0].world_value == 5000.0);
+
+  commands.clear();
+  CHECK(parse_debug_command("set_world", "{field: enemy_base_hp, value: 4200}", &commands,
+                            &list_state, &error));
+  CHECK(commands.size() == 1);
+  CHECK(commands[0].world_field == WorldField::kEnemyBaseHp);
+
+  commands.clear();
   CHECK(parse_debug_command("set_intent", "{field: nav_goal, value: [1, 2], lease_sec: 2.0}",
                             &commands, &list_state, &error));
   CHECK(commands.size() == 1);
@@ -92,7 +105,7 @@ void test_debug_command() {
 
   commands.clear();
   CHECK(parse_debug_command("clear_world", "{}", &commands, &list_state, &error));
-  CHECK(commands.size() == 6);
+  CHECK(commands.size() == 8);  // 覆盖全部 8 个 WorldField
 
   commands.clear();
   CHECK(parse_debug_command("list_state", "", &commands, &list_state, &error));

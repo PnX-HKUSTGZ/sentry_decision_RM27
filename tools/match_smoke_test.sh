@@ -29,6 +29,16 @@ stage_now() {
   timeout 5 ros2 topic echo --once /sentry/game_info 2>/dev/null | awk '/game_status:/{print $2; exit}'
 }
 
+time_now() {
+  timeout 5 ros2 topic echo --once /sentry/game_info 2>/dev/null | \
+    awk '/game_time_remaining:/{print $2; exit}'
+}
+
+odom_pose() {
+  timeout 5 ros2 topic echo --once /aft_mapped_to_init 2>/dev/null | \
+    awk '/position:/{p=1;next} p&&/x:/{x=$2} p&&/y:/{print x" "$2; exit}'
+}
+
 expect_stage() {
   local want="$1" label="$2" got
   got="$(stage_now)"
@@ -66,6 +76,35 @@ expect_stage 4 "快进到比赛中"
 call_stage 0
 sleep 0.5
 expect_stage 0 "重置回未开始"
+
+# 暂停：冻结倒计时（剩余时间在 2s 内不应变化）。
+call_stage 3
+sleep 0.5
+ros2 service call /sentry_sim/set_game_pause sentry_decision_msgs/srv/SetGamePause \
+  "{paused: true}" >/tmp/match_pause.log 2>&1 || true
+if ! grep -q "paused=True" /tmp/match_pause.log; then
+  echo "FAIL: 暂停应返回 paused=True" >&2
+  cat /tmp/match_pause.log >&2
+  fail=1
+fi
+paused_t0="$(time_now)"
+sleep 2
+paused_t1="$(time_now)"
+if [[ "${paused_t0}" != "${paused_t1}" ]]; then
+  echo "FAIL: 暂停期间剩余时间不应变化（${paused_t0} -> ${paused_t1}）" >&2
+  fail=1
+fi
+ros2 service call /sentry_sim/set_game_pause sentry_decision_msgs/srv/SetGamePause \
+  "{paused: false}" >/dev/null 2>&1 || true
+
+# 重置位置：demo 的 start_pose 为 (-5, 3)。
+call_stage 0
+sleep 0.5
+pose="$(odom_pose)"
+if [[ "${pose}" != "-5.0 3.0" ]]; then
+  echo "FAIL: 重置后位姿应为 (-5.0, 3.0)，实际 ${pose}" >&2
+  fail=1
+fi
 
 if [[ "${fail}" -eq 0 ]]; then
   echo "match smoke test passed"

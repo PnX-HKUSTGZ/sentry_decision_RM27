@@ -86,6 +86,22 @@ ScenarioLoadResult load_scenario(const std::string& path) {
   if (root["world"]) {
     parse_args(root["world"], "world", &result.scenario.initial_world, &result.errors);
   }
+  if (root["start_pose"]) {
+    const YAML::Node node = root["start_pose"];
+    if (node.IsSequence() && node.size() >= 2 && node.size() <= 3) {
+      try {
+        sentry_decision::Point2D pose;
+        pose.x = node[0].as<double>();
+        pose.y = node[1].as<double>();
+        pose.yaw = node.size() == 3 ? node[2].as<double>() : 0.0;
+        result.scenario.start_pose = pose;
+      } catch (const std::exception&) {
+        result.errors.push_back("start_pose 必须是 [x, y] 或 [x, y, yaw]");
+      }
+    } else {
+      result.errors.push_back("start_pose 必须是 [x, y] 或 [x, y, yaw]");
+    }
+  }
   if (!root["timeline"]) {
     result.errors.push_back("缺少 timeline");
     return result;

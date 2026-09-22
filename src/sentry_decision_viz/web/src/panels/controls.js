@@ -1,19 +1,36 @@
-// 人工干预控件：比赛阶段 -> /sentry_sim/set_game_stage；其余走 /decision/debug (service)。
+// 人工干预控件：比赛阶段 / 暂停 -> 裁判仿真 service；其余走 /decision/debug (service)。
 // 不使用 ManualOverride action：vendored roslib 1.4.1 的 ActionClient 是 ROS 1 actionlib
 // 命名（/<action>/goal 等），无法对接 ROS 2 action 的 /_action/* 服务，故面板统一走 service。
 export function createControlsPanel(el, bridge, onLog) {
-  const options = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
+  const modeOptions = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
+  const worldFields = [
+    ['self_hp', '自身血量'],
+    ['self_ammo', '自身弹量'],
+    ['coins', '金币'],
+    ['base_hp', '己方基地'],
+    ['our_outpost_hp', '己方前哨'],
+    ['enemy_outpost_hp', '敌方前哨'],
+    ['enemy_base_hp', '敌方基地'],
+    ['game_time_remaining', '剩余时间'],
+  ];
   let html = '';
-  html += '<div class="row"><span>比赛阶段</span>';
+  html += '<div class="row"><span>比赛</span>';
   html += '<button id="btn-stage-1">准备</button>';
   html += '<button id="btn-stage-2">15s自检</button>';
   html += '<button id="btn-stage-3">5s倒计时</button>';
   html += '<button id="btn-stage-4">开始比赛</button>';
+  html += '<button id="btn-pause">暂停</button>';
   html += '<button id="btn-reset">重置</button></div>';
+  html += '<div class="row"><span>世界</span><select id="world-field">';
+  worldFields.forEach(function (item) {
+    html += '<option value="' + item[0] + '">' + item[1] + '</option>';
+  });
+  html += '</select><input id="world-value" value="400" size="4"/>';
+  html += '<button id="btn-world-set">设置</button><button id="btn-world-clear">清除</button></div>';
   html += '<div class="row"><button id="btn-retreat">强制撤退</button>';
   html += '<button id="btn-clear">清空干预</button></div>';
   html += '<div class="row"><span>模式</span><select id="mode-select">';
-  options.forEach(function (name) {
+  modeOptions.forEach(function (name) {
     html += '<option value="' + name + '">' + name + '</option>';
   });
   html += '</select><input id="lease" value="5" size="3" title="lease 秒"/><button id="btn-mode">切换</button></div>';
@@ -77,12 +94,30 @@ export function createControlsPanel(el, bridge, onLog) {
     });
   });
 
+  // 暂停 / 恢复：冻结比赛计时与机器人运动。
+  let paused = false;
+  const pauseButton = document.getElementById('btn-pause');
+  pauseButton.addEventListener('click', function () {
+    bridge
+      .setGamePause(!paused)
+      .then(function (response) {
+        paused = !!(response && response.paused);
+        pauseButton.textContent = paused ? '继续' : '暂停';
+        onLog(response && response.message ? response.message : paused ? '已暂停' : '已恢复');
+      })
+      .catch(function (error) {
+        onLog('暂停失败: ' + error);
+      });
+  });
+
   document.getElementById('btn-reset').addEventListener('click', function () {
-    // 重置裁判仿真的世界，并清空决策节点的干预 / 世界覆盖 / 模块开关。
+    // 重置裁判仿真的世界与位姿，并清空决策节点的干预 / 世界覆盖 / 模块开关。
     bridge
       .setGameStage(0)
       .then(function () {
-        onLog('比赛已重置到未开始');
+        paused = false;
+        pauseButton.textContent = '暂停';
+        onLog('比赛已重置到未开始（含位置）');
         return bridge.callDebug('clear_all', '');
       })
       .then(function () {
@@ -91,6 +126,20 @@ export function createControlsPanel(el, bridge, onLog) {
       .catch(function (error) {
         onLog('重置失败: ' + error);
       });
+  });
+
+  document.getElementById('btn-world-set').addEventListener('click', function () {
+    const field = document.getElementById('world-field').value;
+    const value = parseFloat(document.getElementById('world-value').value);
+    if (!isFinite(value)) {
+      onLog('世界覆盖: 取值无效');
+      return;
+    }
+    debug('set_world', '{field: ' + field + ', value: ' + value + '}', '世界覆盖 ' + field);
+  });
+  document.getElementById('btn-world-clear').addEventListener('click', function () {
+    const field = document.getElementById('world-field').value;
+    debug('clear_world', '{field: ' + field + '}', '清除覆盖 ' + field);
   });
 
   document.getElementById('btn-retreat').addEventListener('click', function () {
@@ -122,6 +171,15 @@ export function createControlsPanel(el, bridge, onLog) {
     setIntent('resource_request', '{ammo: 0, hp: 50, revive: false}', '兑换血量');
   });
 
+  // 未进入「比赛中」时禁用人工意图按钮与输入（世界覆盖 / 清空干预仍可用）。
+  const intentElements = [
+    'btn-retreat', 'btn-mode', 'mode-select', 'lease',
+    'btn-point', 'point-x', 'point-y',
+    'btn-ammo', 'btn-hp',
+  ].map(function (id) {
+    return document.getElementById(id);
+  });
+
   return {
     render: function (state) {
       const current = state.world ? state.world.gameStatus : 0;
@@ -129,6 +187,14 @@ export function createControlsPanel(el, bridge, onLog) {
       stageButtons.forEach(function (item) {
         item.el.disabled = item.stage <= current;
       });
+      // 只有 game_status=4（比赛中）才接受人工意图。
+      const running = current === 4;
+      intentElements.forEach(function (element) {
+        element.disabled = !running;
+      });
+      if (!running) {
+        document.getElementById('mode-select').title = '比赛开始后才能人工干预';
+      }
     },
   };
 }

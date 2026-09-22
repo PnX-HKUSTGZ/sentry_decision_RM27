@@ -252,8 +252,12 @@ bool parse_world_field(const std::string& name, WorldField* out) {
     *out = WorldField::kSelfAmmo;
   } else if (name == "our_outpost_hp") {
     *out = WorldField::kOurOutpostHp;
+  } else if (name == "base_hp") {
+    *out = WorldField::kBaseHp;
   } else if (name == "enemy_outpost_hp") {
     *out = WorldField::kEnemyOutpostHp;
+  } else if (name == "enemy_base_hp") {
+    *out = WorldField::kEnemyBaseHp;
   } else if (name == "game_time_remaining") {
     *out = WorldField::kGameTimeRemaining;
   } else if (name == "coins") {
@@ -288,8 +292,12 @@ const char* world_field_name(WorldField field) {
       return "self_ammo";
     case WorldField::kOurOutpostHp:
       return "our_outpost_hp";
+    case WorldField::kBaseHp:
+      return "base_hp";
     case WorldField::kEnemyOutpostHp:
       return "enemy_outpost_hp";
+    case WorldField::kEnemyBaseHp:
+      return "enemy_base_hp";
     case WorldField::kGameTimeRemaining:
       return "game_time_remaining";
     case WorldField::kCoins:
@@ -447,9 +455,14 @@ bool parse_debug_command(const std::string& command, const std::string& args,
       out->push_back(cmd);
       return true;
     }
-    const WorldField all[] = {
-        WorldField::kSelfHp,         WorldField::kSelfAmmo,          WorldField::kOurOutpostHp,
-        WorldField::kEnemyOutpostHp, WorldField::kGameTimeRemaining, WorldField::kCoins};
+    const WorldField all[] = {WorldField::kSelfHp,
+                              WorldField::kSelfAmmo,
+                              WorldField::kOurOutpostHp,
+                              WorldField::kBaseHp,
+                              WorldField::kEnemyOutpostHp,
+                              WorldField::kEnemyBaseHp,
+                              WorldField::kGameTimeRemaining,
+                              WorldField::kCoins};
     for (WorldField field : all) {
       InterventionCommand cmd;
       cmd.kind = InterventionCommand::Kind::kClearWorld;

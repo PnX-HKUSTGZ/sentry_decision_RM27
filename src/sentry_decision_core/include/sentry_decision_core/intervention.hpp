@@ -15,7 +15,9 @@ enum class WorldField {
   kSelfHp,
   kSelfAmmo,
   kOurOutpostHp,
+  kBaseHp,
   kEnemyOutpostHp,
+  kEnemyBaseHp,
   kGameTimeRemaining,
   kCoins,
 };

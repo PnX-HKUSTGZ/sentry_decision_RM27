@@ -113,8 +113,14 @@ WorldState InterventionController::apply_world(const WorldState& world) const {
       case WorldField::kOurOutpostHp:
         out.referee.our_outpost_hp = static_cast<int>(value);
         break;
+      case WorldField::kBaseHp:
+        out.referee.base_hp = static_cast<int>(value);
+        break;
       case WorldField::kEnemyOutpostHp:
         out.referee.enemy_outpost_hp = static_cast<int>(value);
+        break;
+      case WorldField::kEnemyBaseHp:
+        out.referee.enemy_base_hp = static_cast<int>(value);
         break;
       case WorldField::kGameTimeRemaining:
         out.referee.game_time_remaining = static_cast<int>(value);

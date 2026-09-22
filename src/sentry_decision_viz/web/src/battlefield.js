@@ -31,14 +31,14 @@ function drawField(ctx, extent, width, height) {
     ctx.stroke();
   }
 
-  // 中线（世界 y = 0）与中圈
+  // 中线（世界 x = 0，己方半场在 x<0）与中圈。
   const center = worldToCanvas({ x: 0, y: 0 }, extent, width, height);
   ctx.strokeStyle = '#3a4b5c';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([7, 6]);
   ctx.beginPath();
-  ctx.moveTo(left, center.y);
-  ctx.lineTo(right, center.y);
+  ctx.moveTo(center.x, top);
+  ctx.lineTo(center.x, bottom);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.beginPath();
@@ -50,11 +50,14 @@ function drawField(ctx, extent, width, height) {
   ctx.lineWidth = 2;
   ctx.strokeRect(left + 1, top + 1, right - left - 2, bottom - top - 2);
 
-  // 半场标注
+  // 半场标注（底边）：己方在 x<0（左），敌方在 x>0（右）。
   ctx.fillStyle = '#5f7285';
   ctx.font = '13px monospace';
-  ctx.fillText('敌方半场', left + 8, top + 18);
+  ctx.textAlign = 'left';
   ctx.fillText('己方半场', left + 8, bottom - 8);
+  ctx.textAlign = 'right';
+  ctx.fillText('敌方半场', right - 8, bottom - 8);
+  ctx.textAlign = 'left';
 }
 
 function drawGoal(ctx, point, extent, width, height) {

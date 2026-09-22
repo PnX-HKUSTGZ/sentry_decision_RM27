@@ -18,6 +18,7 @@
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
 #include "sentry_decision_msgs/srv/debug_command.hpp"
+#include "sentry_decision_msgs/srv/set_game_pause.hpp"
 #include "sentry_decision_msgs/srv/set_game_stage.hpp"
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/match_stage.hpp"
@@ -136,8 +137,10 @@ class RefereeSimNode : public rclcpp::Node {
         }
       }
     }
-    // 保存初始世界，供比赛阶段服务的「重置」恢复。
+    // 保存初始世界与位姿，供比赛阶段服务的「重置」恢复。
     initial_world_ = world_;
+    start_pose_ = scenario_.start_pose.value_or(nav_.pose());
+    nav_.set_pose(start_pose_);
     last_stage_tick_ = SteadyClock::now();
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
@@ -201,6 +204,16 @@ class RefereeSimNode : public rclcpp::Node {
           handle_set_game_stage(*request, *response);
         });
 
+    // 网页面板 / 手动暂停比赛（仅仿真）。
+    const auto set_game_pause_service =
+        declare_parameter<std::string>("set_game_pause_service", "/sentry_sim/set_game_pause");
+    set_game_pause_server_ = create_service<sentry_decision_msgs::srv::SetGamePause>(
+        set_game_pause_service,
+        [this](const std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Request> request,
+               std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Response> response) {
+          handle_set_game_pause(*request, *response);
+        });
+
     using namespace std::placeholders;
     action_server_ = rclcpp_action::create_server<NavigateToPose>(
         this, navigate_action,
@@ -262,6 +275,10 @@ class RefereeSimNode : public rclcpp::Node {
     }
     if (reset_requested) {
       world_ = initial_world_;
+      nav_.set_pose(start_pose_);
+      nav_.cancel_goal();
+      match_.set_paused(false);
+      nav_.set_paused(false);
     }
     last_stage_tick_ = SteadyClock::now();
     sync_world_stage();
@@ -271,6 +288,18 @@ class RefereeSimNode : public rclcpp::Node {
     response.message = "ok";
     SD_LOG_ACT("sim", "比赛阶段 -> %d（剩余 %ds）", static_cast<int>(match_.stage()),
                match_.remaining_seconds());
+  }
+
+  // 暂停 / 恢复：冻结比赛计时与机器人运动，odom 仍刷新时间戳（保持有效）。
+  void handle_set_game_pause(const sentry_decision_msgs::srv::SetGamePause::Request& request,
+                             sentry_decision_msgs::srv::SetGamePause::Response& response) {
+    match_.set_paused(request.paused);
+    nav_.set_paused(request.paused);
+    last_stage_tick_ = SteadyClock::now();  // 恢复时从当前时刻继续计时
+    response.success = true;
+    response.paused = match_.paused();
+    response.message = match_.paused() ? "已暂停" : "已恢复";
+    SD_LOG_ACT("sim", "比赛%s", match_.paused() ? "已暂停" : "已恢复");
   }
 
   // 把阶段控制器的状态写回 SimWorld；未激活时保留场景设定的 game_status / 时间。
@@ -552,6 +581,7 @@ class RefereeSimNode : public rclcpp::Node {
   SimWorld world_;
   SimWorld initial_world_;
   sentry_decision_sim::MatchStageController match_;
+  sentry_decision::Point2D start_pose_{};
   TimePoint last_stage_tick_{};
   Scenario scenario_;
   bool has_scenario_ = false;
@@ -580,6 +610,7 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Subscription<sentry_decision_msgs::msg::DecisionState>::SharedPtr decision_state_sub_;
   rclcpp::Client<sentry_decision_msgs::srv::DebugCommand>::SharedPtr debug_client_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;
+  rclcpp::Service<sentry_decision_msgs::srv::SetGamePause>::SharedPtr set_game_pause_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;

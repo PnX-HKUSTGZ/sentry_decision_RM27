@@ -193,6 +193,7 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 
 ```yaml
 name: full_match
+start_pose: [-5.0, 3.0, 0.0]    # 机器人初始位姿（可选，重置时也会恢复）
 world:                          # 初始世界（时间轴之前应用）
   self_hp: 400
   self_ammo: 100
@@ -209,6 +210,7 @@ timeline:
 ```
 
 `set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`stance`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
+`start_pose` 为可选的机器人初始位姿：进程启动与「重置」都会应用，避免默认停在场地中央。
 
 `add_intent` 与 `disable` 经 `/decision/debug` 注入干预，把「人工干预」写成可提交的测试用例：
 
@@ -285,7 +287,9 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 
 | 控件 | 作用 | 底层调用 |
 | --- | --- | --- |
-| 比赛阶段 / 重置 | 推进或重置裁判仿真的比赛阶段 | `/sentry_sim/set_game_stage` |
+| 比赛阶段 / 重置 | 推进阶段；重置回未开始并恢复机器人初始位姿 | `/sentry_sim/set_game_stage` |
+| 暂停 / 继续 | 冻结比赛计时与机器人运动（odom 保持最后位置） | `/sentry_sim/set_game_pause` |
+| 世界覆盖 设置 / 清除 | 覆盖自身 / 基地 / 前哨血量、金币、发弹量、剩余时间的决策视图 | `/decision/debug set_world` / `clear_world` |
 | 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `set_intent {field: tactical_mode, value: retreat}` |
 | 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `set_intent {field: tactical_mode}` |
 | 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `set_intent {field: nav_goal}` |
@@ -297,6 +301,9 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名（`/<action>/goal` 等），
 > 无法对接 ROS 2 action 的 `/_action/*` 服务。action 接口本身仍可用
 > `ros2 action send_goal /decision/manual_override ...` 直接调用。
+
+未进入「比赛中」（`game_status != 4`）时，人工意图按钮自动禁用，避免准备阶段误发干预；
+世界覆盖与「清空干预」仍可用。世界覆盖只改数值、不提升 `referee.valid`，不会绕过安全急停。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
@@ -384,6 +391,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--scenario` | 空 | 场景 YAML 路径；为空则持续发布全零世界 |
 | `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
 | `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
+| `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

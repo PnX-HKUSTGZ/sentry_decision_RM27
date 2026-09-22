@@ -39,6 +39,7 @@
 - 新增 `tools/match_smoke_test.sh` 比赛阶段冒烟测试
 - `TacticalMode::kIdle`：战略层只在 `game_status=4`（比赛中）执行任务，准备 / 自检 / 倒计时 / 结算输出 idle；`MissionPatrol` 以 `IfTacticalMode` 门控，待机时不下发任务目标
 - 准备阶段改为 3 分钟倒计时；网页面板状态栏用 `MM:SS` 白色显示
+- 网页面板新增世界覆盖表单（自身 / 基地 / 前哨血量、金币、发弹量、剩余时间，走 `/decision/debug set_world`）与「暂停 / 继续」；后者新增 `SetGamePause.srv` 与 `/sentry_sim/set_game_pause`，暂停时冻结计时与机器人运动；场景新增可选 `start_pose`
 
 ### Fixed
 
@@ -50,6 +51,9 @@
 - `scenario/demo.yaml` 补充 `enemy_base_hp`，避免面板把敌方基地血量显示成 0（并非读数错误）
 - 树状态缓存改为每拍 `clear()`：未执行的分支不再残留上一拍的 SUCCESS（此前待机阶段会误显示攻击分支 SUCCESS）
 - 网页面板人工干预改走 `/decision/debug set_intent` service：vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名，无法对接 ROS 2 `ManualOverride` action，导致「切换模式 / 前往点位」等按钮无效果
+- 战场半场标注改为沿 x 轴左右划分（己方 x<0 / 敌方 x>0）；此前按 y 轴上下标注，导致 `home`(-5,3) 看起来在敌方半场
+- 「重置」现在同时恢复机器人初始位姿并清除导航目标（此前只重置世界与阶段，位置不动）
+- 未进入「比赛中」时网页面板的人工意图按钮自动禁用，避免准备阶段误发干预
 
 ## [v0.2.0]
 
