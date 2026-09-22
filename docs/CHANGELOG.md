@@ -34,6 +34,13 @@
 - `sentry_decision_bringup`：新增 `replay_main` 离线回放入口；`load_replay_data` 支持新格式 `/sentry/*` 上行
 - 新增 `tools/replay_smoke_test.sh`（录制一局场景 bag 后离线重放并校验干预复现）
 - 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
+- `referee_sim_node` 新增 `--hold`（场景时间轴跑完后不退出）与 `scenario/demo.yaml` 面板演示世界
+
+### Fixed
+
+- 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE
+- `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
+- 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）
 
 ## [v0.2.0]
 

@@ -206,7 +206,8 @@ th {
 
 .log {
   grid-column: span 2;
-  max-height: 90px;
+  min-height: 180px;
+  max-height: 300px;
   overflow: auto;
   color: var(--muted);
   font-size: 12px;

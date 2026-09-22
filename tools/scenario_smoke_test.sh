@@ -2,6 +2,9 @@
 # 容器内场景冒烟：启动 decision_node，再用 referee_sim_node 跑一个场景时间轴并断言。
 set -euo pipefail
 
+# 使用独立 ROS_DOMAIN_ID，避免与同批次其它集成测试的节点互相干扰。
+export ROS_DOMAIN_ID="${SCENARIO_DOMAIN_ID:-41}"
+
 SCENARIO="${1:-}"
 if [[ -z "${SCENARIO}" ]]; then
   echo "用法: scenario_smoke_test.sh <scenario.yaml>" >&2

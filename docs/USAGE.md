@@ -26,6 +26,7 @@ source .docker-build/install/setup.bash
 | 真实 IO 决策闭环 | `ros2 run sentry_decision_bringup decision_node` |
 | 裁判仿真（持续发布世界状态） | `ros2 run sentry_decision_sim referee_sim_node` |
 | 跑一个场景 | `ros2 run sentry_decision_sim referee_sim_node --scenario "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/full_match.yaml"` |
+| 面板演示（稳定非零世界，不退出） | `ros2 run sentry_decision_sim referee_sim_node --scenario "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml" --hold` |
 | 网页面板（rosbridge :9090 + 页面 :8080） | `ros2 launch sentry_decision_viz viz.launch.py` |
 | 离线回放 | `ros2 run sentry_decision_bringup replay_main --bag <bag>` |
 | 查看决策状态 | `ros2 topic echo /decision/state`（或 `/decision/tree_status`、`/decision/world_state`） |
@@ -177,6 +178,16 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
   "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/full_match.yaml"
 ```
 
+网页面板演示用一份稳定的非零世界（无断言、不退出）：
+
+```bash
+ros2 run sentry_decision_sim referee_sim_node --scenario \
+  "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml" --hold
+```
+
+> 不带 `--scenario` 时裁判仿真发布的是全零世界（`referee_valid=true` 但所有数值为 0），
+> 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
+
 场景 YAML 结构（`full_match.yaml` 跑通巡逻→进攻→撤退→复活）：
 
 ```yaml
@@ -247,8 +258,9 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 
 浏览器打开 `http://<宿主>:8080/`，点「连接」连到 `ws://<宿主>:9090`。页面显示：
 
-- 左侧行为树（`/decision/tree_status`，active path 高亮）；
-- 中间战场俯视图（己方位姿、导航目标、敌方位置）；
+- 左侧行为树（`/decision/tree_status`，RUNNING 高亮；已完成节点保留 SUCCESS / FAILURE，
+  不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
+- 中间战场俯视图（示意场地底图 + 己方位姿、导航目标、敌方位置）；
 - 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者（每秒轮询 `list_state`）；
 - 底部干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
 
@@ -332,7 +344,8 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 参数 / 命令行 | 默认 | 说明 |
 | --- | --- | --- |
 | `--rate` | `20.0` | 发布与 tick 频率（Hz），取值 `(0, 1000]` |
-| `--scenario` | 空 | 场景 YAML 路径；为空则持续发布世界状态 |
+| `--scenario` | 空 | 场景 YAML 路径；为空则持续发布全零世界 |
+| `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

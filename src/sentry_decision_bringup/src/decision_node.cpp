@@ -124,7 +124,7 @@ class DecisionNode : public rclcpp::Node {
       policy_ = sentry_decision::RuleBasedStrategicPolicy::from_config(*config);
     }
     build_tree(options.tree, options.plugin);
-    tree_publisher_.emplace(*this);
+    tree_publisher_.emplace(*this, *tree_);
     if (options.groot2_port > 0) {
       groot2_ = std::make_unique<sentry_decision_viz::Groot2Bridge>(
           *tree_, static_cast<unsigned>(options.groot2_port));
@@ -207,7 +207,7 @@ class DecisionNode : public rclcpp::Node {
 
     const std::uint32_t tick = tick_count_++;
     state_publisher_.publish(context_.world, safe_result, tick);
-    tree_publisher_->publish(*tree_, tick, tick_ms);
+    tree_publisher_->publish(tick, tick_ms);
     update_intervention_state(safe_result, now);
 
     if (max_ticks_ > 0 && tick_count_ >= static_cast<std::uint32_t>(max_ticks_)) {
@@ -321,12 +321,28 @@ class DecisionNode : public rclcpp::Node {
     }
     out << "},\"modules\":{";
     first = true;
-    for (const auto& entry : intervention_.module_switches()) {
+    // 内置模块未显式设置时默认启用；始终列出，面板才能看出初始状态。
+    static const char* const kBuiltinModules[] = {"nav", "strategic", "resource", "recovery"};
+    for (const char* name : kBuiltinModules) {
       if (!first) {
         out << ",";
       }
       first = false;
-      out << "\"" << entry.first << "\":" << (entry.second ? "true" : "false");
+      out << "\"" << name << "\":" << (intervention_.module_enabled(name) ? "true" : "false");
+    }
+    // 兜底：service 里设置过的自定义模块也一并展示。
+    for (const auto& entry : intervention_.module_switches()) {
+      bool known = false;
+      for (const char* name : kBuiltinModules) {
+        if (entry.first == name) {
+          known = true;
+          break;
+        }
+      }
+      if (known) {
+        continue;
+      }
+      out << ",\"" << entry.first << "\":" << (entry.second ? "true" : "false");
     }
     out << "},\"world_overrides\":{";
     first = true;

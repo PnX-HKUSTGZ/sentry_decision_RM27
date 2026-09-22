@@ -44,6 +44,8 @@ using sentry_decision_sim::SimWorld;
 struct Options {
   double rate_hz = 20.0;
   std::string scenario;
+  // 场景时间轴跑完后不退出，保持最后一个世界状态，适合网页面板演示。
+  bool hold = false;
 };
 
 Options parse_options(int argc, char** argv) {
@@ -61,6 +63,8 @@ Options parse_options(int argc, char** argv) {
       options.rate_hz = std::stod(next("--rate"));
     } else if (arg == "--scenario") {
       options.scenario = next("--scenario");
+    } else if (arg == "--hold") {
+      options.hold = true;
     } else {
       std::cerr << "未知参数: " << arg << "\n";
       std::exit(2);
@@ -119,6 +123,7 @@ class RefereeSimNode : public rclcpp::Node {
         nav_(2.0, 0.2),
         scenario_(std::move(scenario)),
         has_scenario_(has_scenario),
+        hold_(options.hold),
         scenario_start_(SteadyClock::now()) {
     declare_and_create_interfaces();
     if (has_scenario_) {
@@ -354,8 +359,8 @@ class RefereeSimNode : public rclcpp::Node {
       }
       ++next_event_;
     }
-    if (next_event_ >= scenario_.events.size() && elapsed >= scenario_.end + Duration{500} &&
-        !finished_) {
+    if (!hold_ && next_event_ >= scenario_.events.size() &&
+        elapsed >= scenario_.end + Duration{500} && !finished_) {
       finish();
     }
   }
@@ -483,6 +488,7 @@ class RefereeSimNode : public rclcpp::Node {
   SimWorld world_;
   Scenario scenario_;
   bool has_scenario_ = false;
+  bool hold_ = false;
   TimePoint scenario_start_{};
   std::size_t next_event_ = 0;
   std::size_t expect_total_ = 0;

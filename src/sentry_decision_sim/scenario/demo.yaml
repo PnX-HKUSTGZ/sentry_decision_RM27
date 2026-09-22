@@ -1,0 +1,22 @@
+# 网页面板演示世界：稳定的非零对局状态。
+# 用法：referee_sim_node --scenario <该文件> --hold
+#   --hold 让场景时间轴跑完后不退出，持续发布最后一个世界状态。
+name: demo
+
+# 初始世界（时间轴之前应用）。
+world:
+  game_status: 4
+  game_time_remaining: 300
+  coins: 220
+  self_hp: 400
+  self_ammo: 100
+  base_hp: 5000
+  our_outpost_hp: 1500
+  enemy_outpost_hp: 1200
+  can_rebuild_outpost: true
+
+# 至少需要一个事件（解析器要求）；该事件只做无副作用的世界回填。
+timeline:
+  - at: 0.0
+    set_world:
+      game_time_remaining: 300

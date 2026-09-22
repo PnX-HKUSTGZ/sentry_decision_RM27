@@ -547,7 +547,12 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 ### 14.2 树状态（TreeStatus）
 
 行为树 tick 在单线程执行，可视化通过只读快照观察。BT.CPP v4 提供 `Tree::applyVisitor` 与
-`TreeNode::status()/fullPath()/registrationName()`，据此展平整棵树：
+`TreeNode::status()/fullPath()/registrationName()`，据此展平整棵树。BT.CPP 4.10 起
+`Tree::tickRoot` 会在一次完成的 tick 末尾对节点调用 `resetStatus()`（根完成时由 Tree 触发，
+子节点完成时由父控制节点触发）；若在 `tickOnce()` 返回后直接读 `node->status()`，整棵树都会
+显示 IDLE。因此 `TreeStatusRecorder` 订阅 `TreeNode::subscribeToStatusChange`，缓存每个节点的
+可见状态：迁移到 IDLE 时保留原 SUCCESS / FAILURE，RUNNING 被 halt 则回落 IDLE——与官方
+`Groot2Publisher` 对 IDLE 的处理一致。
 
 - `sentry_decision_msgs/msg/TreeNodeStatus`：`full_path`、`registration_name`、`instance_name`、
   `status`（与 `BT::NodeStatus` 1:1：IDLE 0 / RUNNING 1 / SUCCESS 2 / FAILURE 3 / SKIPPED 4）。
@@ -555,11 +560,13 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
   `TreeNodeStatus[] nodes`、`string[] active_path`。
 - **active path** = 所有 `RUNNING` 节点的 `full_path`：BT 中运行中节点的祖先必然也在运行，
   因此等价于「RUNNING 及祖先链」。前端据此高亮当前执行分支。
+- 快照状态取自 `TreeStatusRecorder` 缓存，因此已完成节点仍显示 SUCCESS / FAILURE，
+  不会被 tick 末的 reset 刷成 IDLE。
 - 话题 `/decision/tree_status`，QoS 使用 transient local，保证后到订阅者能拿到最近一帧。
 
 发布与 `DecisionState` 同一节拍（默认 20 Hz）且在 tick 末尾，因此树状态与当拍输出一致。
 Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显式开启时附加
-`BT::Groot2Publisher`（BT.CPP 4.9 已带 zmq 支持），不作为 CI 验收项。
+`BT::Groot2Publisher`（BT.CPP 4.10 已带 zmq 支持），不作为 CI 验收项。
 
 ### 14.3 干预接口（ROS）
 

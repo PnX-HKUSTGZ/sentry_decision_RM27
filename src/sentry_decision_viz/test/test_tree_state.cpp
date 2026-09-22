@@ -141,11 +141,42 @@ void test_all_success_has_empty_active_path() {
   CHECK(status.active_path.empty());
 }
 
+// BT.CPP >= 4.10 完成 tick 后会把节点 resetStatus 成 IDLE；recorder 必须保留可见状态。
+void test_completed_status_is_cached() {
+  BT::BehaviorTreeFactory factory;
+  factory.registerNodeType<SucceedOnce>("SucceedOnce");
+  const std::string xml = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Main">
+    <SucceedOnce name="ok"/>
+  </BehaviorTree>
+</root>
+)";
+  BT::Tree tree = factory.createTreeFromText(xml);
+  TreeStatusRecorder recorder(tree);
+  tree.tickOnce();
+
+  // 实时状态已被 tickRoot 重置为 IDLE。
+  const sentry_decision_msgs::msg::TreeStatus live = collect_tree_status(tree, 1, 0.0);
+  CHECK(live.nodes.size() == 1);
+  if (live.nodes.size() == 1) {
+    CHECK(live.nodes[0].status == static_cast<std::uint8_t>(BT::NodeStatus::IDLE));
+  }
+
+  // 缓存仍保留 SUCCESS，面板不会整棵树都显示 IDLE。
+  const sentry_decision_msgs::msg::TreeStatus cached = collect_tree_status(tree, recorder, 1, 0.0);
+  CHECK(cached.nodes.size() == 1);
+  if (cached.nodes.size() == 1) {
+    CHECK(cached.nodes[0].status == static_cast<std::uint8_t>(BT::NodeStatus::SUCCESS));
+  }
+}
+
 }  // namespace
 
 int main() {
   test_node_states_and_active_path();
   test_all_success_has_empty_active_path();
+  test_completed_status_is_cached();
 
   if (g_failures != 0) {
     std::printf("%d check(s) failed\n", g_failures);

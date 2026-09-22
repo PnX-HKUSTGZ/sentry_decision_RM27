@@ -2,6 +2,9 @@
 # 容器内冒烟：验证 decision_node 的干预 action / service 与 /decision/intervention。
 set -euo pipefail
 
+# 使用独立 ROS_DOMAIN_ID，避免与同批次其它集成测试的节点互相干扰。
+export ROS_DOMAIN_ID="${INTERVENTION_DOMAIN_ID:-44}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVERLAY="${SCENARIO_OVERLAY_DIR:-${ROOT}/.docker-build/install}"
 
