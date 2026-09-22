@@ -28,8 +28,8 @@ void test_forward_only() {
   CHECK(controller.set(1, &error));
   CHECK(controller.active());
   CHECK(controller.stage() == MatchStage::kPreparation);
-  CHECK(controller.remaining_seconds() == 0);
-  CHECK(!controller.counting());
+  CHECK(controller.remaining_seconds() == 180);  // 3 分钟准备
+  CHECK(controller.counting());
 
   error.clear();
   CHECK(!controller.set(1, &error));  // 当前阶段拒绝

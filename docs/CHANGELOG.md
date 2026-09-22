@@ -37,6 +37,8 @@
 - `referee_sim_node` 新增 `--hold`（场景时间轴跑完后不退出）与 `scenario/demo.yaml` 面板演示世界
 - `sentry_decision_msgs`：新增 `SetGameStage.srv`；`referee_sim_node` 提供 `/sentry_sim/set_game_stage` 与 ROS 无关的 `MatchStageController`（准备 / 15s自检 / 5s倒计时 / 比赛中：只可前进、按秒自动推进、可重置），网页面板新增比赛状态栏与阶段按钮
 - 新增 `tools/match_smoke_test.sh` 比赛阶段冒烟测试
+- `TacticalMode::kIdle`：战略层只在 `game_status=4`（比赛中）执行任务，准备 / 自检 / 倒计时 / 结算输出 idle；`MissionPatrol` 以 `IfTacticalMode` 门控，待机时不下发任务目标
+- 准备阶段改为 3 分钟倒计时；网页面板状态栏用 `MM:SS` 白色显示
 
 ### Fixed
 
@@ -44,6 +46,8 @@
 - `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
 - 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）
 - 战场俯视图 `mode` 文字移至右上角，避免与左上角半场标注重叠
+- 人工接管战术模式（面板「切换模式」/「强制撤退」）现在会在本拍覆盖 `context.strategy.mode`，真正切换任务树分支
+- `scenario/demo.yaml` 补充 `enemy_base_hp`，避免面板把敌方基地血量显示成 0（并非读数错误）
 
 ## [v0.2.0]
 

@@ -1,5 +1,7 @@
 #include "sentry_decision_core/intervention.hpp"
 
+#include <variant>
+
 namespace sentry_decision {
 
 void InterventionController::inject(Intent intent, TimePoint now) {
@@ -123,6 +125,21 @@ WorldState InterventionController::apply_world(const WorldState& world) const {
     }
   }
   return out;
+}
+
+void apply_intervention_intents(const InterventionController& controller, TimePoint now,
+                                DecisionContext* context) {
+  if (context == nullptr) {
+    return;
+  }
+  for (const auto& intent : controller.active_intents(now)) {
+    if (intent.field == IntentField::kTacticalMode) {
+      if (const auto* mode = std::get_if<TacticalMode>(&intent.value)) {
+        context->strategy.mode = *mode;
+      }
+    }
+    context->emit(intent);
+  }
 }
 
 }  // namespace sentry_decision

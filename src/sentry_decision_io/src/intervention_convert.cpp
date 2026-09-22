@@ -120,9 +120,13 @@ bool parse_tactical_mode(const YAML::Node& node, TacticalMode* out) {
     *out = TacticalMode::kRespawn;
     return true;
   }
+  if (text == "idle") {
+    *out = TacticalMode::kIdle;
+    return true;
+  }
   try {
     const int value = node.as<int>();
-    if (value < 0 || value > 6) {
+    if (value < 0 || value > 7) {
       return false;
     }
     *out = static_cast<TacticalMode>(value);
@@ -193,7 +197,7 @@ bool parse_value_node(IntentField field, const YAML::Node& node, Intent* out, st
     case IntentField::kTacticalMode: {
       TacticalMode mode;
       if (!parse_tactical_mode(node, &mode)) {
-        *error = "tactical_mode 需要名称（patrol 等）或 0-6";
+        *error = "tactical_mode 需要名称（patrol / idle 等）或 0-7";
         return false;
       }
       out->value = mode;

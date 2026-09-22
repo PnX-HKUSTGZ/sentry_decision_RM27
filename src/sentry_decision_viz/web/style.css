@@ -134,7 +134,8 @@ canvas {
 
 .match-time {
   margin-left: auto;
-  color: var(--muted);
+  color: var(--text);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 

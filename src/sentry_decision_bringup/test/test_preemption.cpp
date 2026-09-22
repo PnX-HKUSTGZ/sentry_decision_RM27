@@ -48,6 +48,7 @@ WorldState make_world() {
   world.referee.our_outpost_hp = 1500;
   world.referee.enemy_outpost_hp = 1500;
   world.referee.game_time_remaining = 420;
+  world.referee.game_status = GameStatus::kRunning;
   return world;
 }
 

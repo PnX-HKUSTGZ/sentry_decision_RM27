@@ -3,6 +3,7 @@ import {
   battlefieldModel,
   decisionToView,
   escapeHtml,
+  formatMmSs,
   gameStageName,
   nodeStatusName,
   parseListState,
@@ -29,6 +30,10 @@ check(tacticalModeName(42) === '#42', 'tacticalModeName unknown');
 check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
 check(gameStageName(2) === '15s自检', 'gameStageName');
 check(gameStageName(99) === '#99', 'gameStageName unknown');
+check(formatMmSs(180) === '03:00', 'formatMmSs 3min');
+check(formatMmSs(5) === '00:05', 'formatMmSs seconds');
+check(formatMmSs(0) === '00:00', 'formatMmSs zero');
+check(tacticalModeName(7) === 'idle', 'tacticalModeName idle');
 
 const tree = treeStatusToView({
   tick: 3,

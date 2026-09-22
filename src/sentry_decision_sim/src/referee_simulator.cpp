@@ -12,6 +12,7 @@ RefereeSimulator::RefereeSimulator() {
   state_.our_outpost_hp = 1500;
   state_.enemy_outpost_hp = 1500;
   state_.enemy_base_hp = 5000;
+  state_.game_status = sentry_decision::GameStatus::kRunning;  // 本地仿真默认直接进入比赛中
   state_.valid = false;
 }
 

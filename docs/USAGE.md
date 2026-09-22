@@ -261,11 +261,15 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 
 - 左侧行为树（`/decision/tree_status`，RUNNING 高亮；已完成节点保留 SUCCESS / FAILURE，
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
-- 中间战场俯视图（示意场地底图 + 己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与剩余时间；
+- 中间战场俯视图（示意场地底图 + 己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与
+  `MM:SS` 倒计时；
 - 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者（每秒轮询 `list_state`）；
-- 比赛阶段按钮：准备 / 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
+- 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
   「重置」回未开始，并清空决策节点的干预 / 世界覆盖 / 模块开关；
 - 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+
+> 决策只有收到 `game_status=4`（比赛中）才执行任务；未开始 / 准备 / 自检 / 倒计时 / 结算阶段输出
+> `idle`，不下发任务导航目标，因此「准备阶段不动、开始比赛后才进攻/巡逻」。
 
 比赛阶段服务由裁判仿真提供（真实比赛由裁判系统决定，故仅仿真用）：
 
@@ -274,8 +278,23 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
   "{stage: 4}"   # 0 重置 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中
 ```
 
-`stage` 除 0（重置）外必须大于当前阶段，否则返回 `success=false`；自检与倒计时归零后
+`stage` 除 0（重置）外必须大于当前阶段，否则返回 `success=false`；准备 / 自检 / 倒计时归零后
 自动进入下一阶段。冒烟测试：`tools/match_smoke_test.sh`（也注册为 `match_smoke`）。
+
+**右键「人工干预」区控件说明**：
+
+| 控件 | 作用 | 底层调用 |
+| --- | --- | --- |
+| 比赛阶段 / 重置 | 推进或重置裁判仿真的比赛阶段 | `/sentry_sim/set_game_stage` |
+| 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `ManualOverride(field=3, value=retreat)` |
+| 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `ManualOverride(field=3)` |
+| 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `ManualOverride(field=0)` |
+| 模块 启用 / 禁用 | 运行期关闭某模块后，该字段的意图（含人工干预）被丢弃 | `/decision/debug set_module` |
+| 兑换发弹 / 血量 | 注入资源请求（ammo / hp） | `ManualOverride(field=2)` |
+| 清空干预 | 清空全部人工干预 / 世界覆盖 / 模块开关 | `/decision/debug clear_all` |
+
+人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
+「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
 
 需要镜像包含 `ros-jazzy-rosbridge-suite`（见 `docker/Dockerfile`）。纯逻辑单测：
 ```bash

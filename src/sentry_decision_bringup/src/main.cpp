@@ -167,9 +167,7 @@ int main(int argc, char** argv) {
     context.world = intervention.apply_world(world_model.snapshot(now));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    for (const auto& intent : intervention.active_intents(now)) {
-      context.emit(intent);
-    }
+    apply_intervention_intents(intervention, now, &context);
     tree.tickOnce();
 
     // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。

@@ -50,6 +50,10 @@ StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world) cons
   if (!referee.valid) {
     return make_decision(TacticalMode::kUnknown);
   }
+  // 只有「比赛中」才执行任务；准备 / 自检 / 倒计时 / 结算阶段保持待机，不下发任务意图。
+  if (referee.game_status != GameStatus::kRunning) {
+    return make_decision(TacticalMode::kIdle);
+  }
   if (referee.self_hp <= 0) {
     return make_decision(TacticalMode::kRespawn);
   }

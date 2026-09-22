@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "behaviortree_cpp/bt_factory.h"
@@ -166,9 +167,7 @@ class DecisionNode : public rclcpp::Node {
     context_.world = intervention_.apply_world(world_model_.snapshot(now));
     context_.clear_intents();
     context_.apply_strategy(policy_.decide(context_.world));
-    for (const auto& intent : intervention_.active_intents(now)) {
-      context_.emit(intent);
-    }
+    sentry_decision::apply_intervention_intents(intervention_, now, &context_);
     const TimePoint tick_begin = SteadyClock::now();
     tree_->tickOnce();
     const double tick_ms =

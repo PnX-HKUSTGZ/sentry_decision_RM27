@@ -176,9 +176,7 @@ int main(int argc, char** argv) {
     context.world = intervention.apply_world(model.snapshot(now));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    for (const auto& intent : intervention.active_intents(now)) {
-      context.emit(intent);
-    }
+    sentry_decision::apply_intervention_intents(intervention, now, &context);
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);

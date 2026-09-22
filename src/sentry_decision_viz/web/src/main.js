@@ -3,6 +3,7 @@ import { createBridge } from './bridge.js';
 import {
   battlefieldModel,
   decisionToView,
+  formatMmSs,
   parseListState,
   treeStatusToView,
   worldStateToView,
@@ -63,7 +64,7 @@ store.subscribe(function (state) {
   const world = state.world;
   document.getElementById('match-stage').textContent = world ? world.gameStatusName : '未开始';
   document.getElementById('match-time').textContent =
-    world && world.gameTime > 0 ? '剩余 ' + world.gameTime + ' s' : '--';
+    world && world.gameTime > 0 ? formatMmSs(world.gameTime) : '--';
   document.getElementById('log').textContent = state.log.join('\n');
 });
 

@@ -581,14 +581,16 @@ Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> I
 - 回调只做**校验 + 入队**，不触碰 `WorldState` 与行为树；
 - tick 开始时按固定顺序应用本拍命令，保证确定性；
 - 应用成功的干预记 `ACT`（来源、字段、lease、原因），并发布到 `/decision/intervention` 以便录制与回放；
-- `IntentArbiter::resolve` 的结果新增逐字段胜者 `winners`，供 action 反馈与 `list_state` 使用。
+- `IntentArbiter::resolve` 的结果新增逐字段胜者 `winners`，供 action 反馈与 `list_state` 使用；
+- 人工接管 `kTacticalMode` 时，tick 在跑任务树前先用接管值覆盖 `context.strategy.mode`，
+  因此「切换模式」会真正改变任务树分支，而不只是改变仲裁输出。
 
 **action `ManualOverride`**（goal / result / feedback）：
 
 | goal 字段 | 说明 |
 | --- | --- |
 | `field` | `FIELD_NAV_GOAL` / `FIELD_CHASSIS_VEL` / `FIELD_RESOURCE_REQUEST` / `FIELD_TACTICAL_MODE` / `FIELD_STANCE`，与 `core::IntentField` 一致 |
-| `value` | 类型化文本（YAML/JSON）：`[x, y, yaw]` / `[vx, vy, wz]` / `{ammo, hp, revive}` / 模式名或 0-6 |
+| `value` | 类型化文本（YAML/JSON）：`[x, y, yaw]` / `[vx, vy, wz]` / `{ammo, hp, revive}` / 模式名或 0-7 |
 | `lease_sec` | 生效时长，`0` 表示不过期；goal 保持执行态直到失效或被取消 |
 | `reason` | 记入日志与 `/decision/intervention` |
 
@@ -637,6 +639,9 @@ timeline:
 （`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒
 递减并自动进入下一阶段。控制器未被调用前不干预场景设定的 `game_status` / `game_time_remaining`，
 因此既有场景测试不受影响。
+
+战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
+任务树的 `MissionPatrol` 也以 `IfTacticalMode(patrol)` 门控，因此待机时不下发任务导航目标。
 
 ### 14.5 干预回放
 

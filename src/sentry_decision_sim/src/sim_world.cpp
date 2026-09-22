@@ -36,6 +36,8 @@ bool parse_tactical_mode(const std::string& name, int* out) {
     *out = 5;
   } else if (name == "respawn") {
     *out = 6;
+  } else if (name == "idle") {
+    *out = 7;
   } else {
     return false;
   }

@@ -25,6 +25,7 @@ WorldState make_world() {
   world.referee.our_outpost_hp = 1500;
   world.referee.enemy_outpost_hp = 1500;
   world.referee.game_time_remaining = 420;
+  world.referee.game_status = GameStatus::kRunning;
   return world;
 }
 
@@ -59,6 +60,11 @@ void test_priority() {
   world = make_world();
   world.referee.game_time_remaining = 500;  // 超出进攻窗口 -> 巡逻
   CHECK(policy.decide(world).mode == TacticalMode::kPatrol);
+
+  world = make_world();
+  world.referee.game_status = GameStatus::kPreparation;  // 未进入比赛中 -> 待机
+  CHECK(policy.decide(world).mode == TacticalMode::kIdle);
+  world.referee.game_status = GameStatus::kRunning;
 
   world = make_world();
   world.referee.valid = false;

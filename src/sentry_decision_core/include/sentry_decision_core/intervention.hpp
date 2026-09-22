@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "sentry_decision_core/context.hpp"
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_core/world_state.hpp"
 
@@ -92,5 +93,12 @@ class InterventionController {
 // 把一条命令应用到控制器（供实时 tick 与回放共用，保证两条路径语义一致）。
 void apply_intervention(InterventionController* controller, const InterventionCommand& command,
                         TimePoint now);
+
+// 把本拍生效的干预意图写入 context：
+//   - kTacticalMode 接管会先覆盖 context->strategy.mode，使任务树本拍即按接管后的模式选分支；
+//   - 其余意图照常写入 context->intents，交由仲裁。
+// 实时 tick 与回放共用，保证「切换模式」在两条路径上语义一致。
+void apply_intervention_intents(const InterventionController& controller, TimePoint now,
+                                DecisionContext* context);
 
 }  // namespace sentry_decision

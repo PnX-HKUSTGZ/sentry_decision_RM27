@@ -4,13 +4,14 @@ namespace sentry_decision_sim {
 
 int stage_duration_seconds(MatchStage stage) {
   switch (stage) {
+    case MatchStage::kPreparation:
+      return 180;  // 3 分钟准备阶段
     case MatchStage::kSelfCheck:
       return 15;
     case MatchStage::kCountdown:
       return 5;
     case MatchStage::kRunning:
       return 420;
-    case MatchStage::kPreparation:
     case MatchStage::kNotStarted:
     default:
       return 0;
@@ -20,8 +21,8 @@ int stage_duration_seconds(MatchStage stage) {
 void MatchStageController::enter(MatchStage stage) {
   stage_ = stage;
   remaining_ = stage_duration_seconds(stage);
-  counting_ = stage == MatchStage::kSelfCheck || stage == MatchStage::kCountdown ||
-              stage == MatchStage::kRunning;
+  counting_ = stage == MatchStage::kPreparation || stage == MatchStage::kSelfCheck ||
+              stage == MatchStage::kCountdown || stage == MatchStage::kRunning;
 }
 
 bool MatchStageController::set(std::uint8_t stage, std::string* error) {
@@ -61,7 +62,9 @@ void MatchStageController::tick_second() {
   if (remaining_ > 0) {
     return;
   }
-  if (stage_ == MatchStage::kSelfCheck) {
+  if (stage_ == MatchStage::kPreparation) {
+    enter(MatchStage::kSelfCheck);
+  } else if (stage_ == MatchStage::kSelfCheck) {
     enter(MatchStage::kCountdown);
   } else if (stage_ == MatchStage::kCountdown) {
     enter(MatchStage::kRunning);

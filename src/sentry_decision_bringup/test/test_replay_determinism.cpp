@@ -64,6 +64,7 @@ ReplayData make_data() {
   referee.our_outpost_hp = 1500;
   referee.enemy_outpost_hp = 1500;
   referee.game_time_remaining = 420;
+  referee.game_status = GameStatus::kRunning;
   data.referee.push_back({Duration{0}, referee});
 
   RefereeState hurt = referee;
@@ -115,9 +116,7 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
     context.world = intervention.apply_world(model.snapshot(replay.stamp()));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    for (const auto& intent : intervention.active_intents(replay.stamp())) {
-      context.emit(intent);
-    }
+    apply_intervention_intents(intervention, replay.stamp(), &context);
     tree.tickOnce();
 
     arbiter.clear_source(SourceId::kStrategic);
@@ -154,24 +153,32 @@ void test_replay_is_deterministic(const std::string& tree_path) {
   CHECK(first.size() == 60);
   CHECK(first == second);
 
-  // 表驱动：0~950ms 满血、去 patrol_a；1000ms 起低血撤退、去 home。
-  // 前若干 tick 裁判数据尚未在有效期内（stale），战略层输出 kUnknown；
-  // 数据有效后满血双方前哨在场 -> 进攻。
-  for (std::size_t i = 0; i < 19; ++i) {
+  // at=0 的裁判在 500ms 内有效 -> 进攻（该测试里 enemy_outpost 与 patrol_a 同为 1.1,1.1）。
+  for (std::size_t i = 0; i < 10; ++i) {
     CHECK(first[i].hp == 400);
+    CHECK(first[i].mode == TacticalMode::kAttack);
     CHECK(first[i].has_goal);
     CHECK(first[i].goal_x == 1.1);
     CHECK(first[i].goal_y == 1.1);
   }
-  CHECK(first[0].mode == TacticalMode::kAttack);
+  // 500~1000ms 无新裁判数据 -> stale -> kUnknown -> 不下发任务目标。
+  for (std::size_t i = 10; i < 19; ++i) {
+    CHECK(first[i].hp == 400);
+    CHECK(first[i].mode == TacticalMode::kUnknown);
+    CHECK(!first[i].has_goal);
+  }
+  // at=1000ms 起低血 -> 撤退 home(-5,3)，在有效期内。
   CHECK(first[19].hp == 50);
   CHECK(first[19].mode == TacticalMode::kRetreat);
   CHECK(first[19].has_goal);
   CHECK(first[19].goal_x == -5.0);
   CHECK(first[19].goal_y == 3.0);
-
-  // 2500ms 的人工接管：2450ms 仍为巡逻点，2500ms 起被干预目标覆盖。
-  CHECK(first[48].goal_x == 1.1);
+  // 1500ms 后裁判再次 stale -> 无任务目标。
+  CHECK(first[48].hp == 50);
+  CHECK(first[48].mode == TacticalMode::kUnknown);
+  CHECK(!first[48].has_goal);
+  // 2500ms 的人工接管：导航目标被干预覆盖为 (9,9)（即使战略层 stale 也生效）。
+  CHECK(first[49].mode == TacticalMode::kUnknown);
   CHECK(first[49].goal_x == 9.0);
   CHECK(first[49].goal_y == 9.0);
 }

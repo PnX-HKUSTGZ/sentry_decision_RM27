@@ -40,7 +40,17 @@ enum class Priority : int {
   kSafety = 4,
 };
 
-enum class TacticalMode { kUnknown, kPatrol, kAttack, kDefend, kRetreat, kHeal, kRespawn };
+enum class TacticalMode {
+  kUnknown = 0,
+  kPatrol = 1,
+  kAttack = 2,
+  kDefend = 3,
+  kRetreat = 4,
+  kHeal = 5,
+  kRespawn = 6,
+  // 比赛未进入「比赛中」（准备 / 自检 / 倒计时 / 结算）时的待机模式：不执行任务。
+  kIdle = 7,
+};
 
 // 哨兵物理姿态（2026 规则 5.6.4）。取值与裁判 SentryInfo2.stance 位段一致：
 // 1 进攻 / 2 防御 / 3 移动；0 表示未知（消息未给或不在比赛中）。

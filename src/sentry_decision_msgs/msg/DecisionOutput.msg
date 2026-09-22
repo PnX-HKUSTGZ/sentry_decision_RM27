@@ -7,7 +7,7 @@ float64 nav_goal_yaw
 bool has_cmd_vel
 geometry_msgs/Twist cmd_vel
 
-# TacticalMode: 0 unknown / 1 patrol / 2 attack / 3 defend / 4 retreat / 5 heal / 6 respawn
+# TacticalMode: 0 unknown / 1 patrol / 2 attack / 3 defend / 4 retreat / 5 heal / 6 respawn / 7 idle
 uint8 tactical_mode
 
 # SentryStance: 0 unknown / 1 attack / 2 defense / 3 move

@@ -2,7 +2,7 @@
 // 不碰 DOM / ROSLIB，因此可在 node 下直接单测（web/test/format.test.mjs）。
 
 export const NODE_STATUS = ['IDLE', 'RUNNING', 'SUCCESS', 'FAILURE', 'SKIPPED'];
-export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
+export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn', 'idle'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 // 比赛阶段：0 未开始 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中 / 5 结算。
 export const GAME_STAGES = ['未开始', '准备', '15s自检', '5s倒计时', '比赛中', '比赛结算'];
@@ -21,6 +21,14 @@ export function stanceName(stance) {
 
 export function gameStageName(status) {
   return GAME_STAGES[status] || '#' + status;
+}
+
+// 秒 -> "MM:SS"（用于比赛倒计时）。
+export function formatMmSs(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const mm = String(Math.floor(total / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return mm + ':' + ss;
 }
 
 export function treeStatusToView(msg) {
