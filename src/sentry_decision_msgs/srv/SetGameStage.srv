@@ -1,0 +1,9 @@
+# 设置裁判仿真的比赛阶段（仅模拟 / 演示用；真实比赛由裁判系统决定）。
+# stage: 0 重置到未开始 / 1 准备 / 2 15s 自检 / 3 5s 倒计时 / 4 比赛中。
+# 除 0（重置）外只允许前进：stage 必须大于当前阶段，否则拒绝。
+uint8 stage
+---
+bool success
+uint8 stage
+int32 remaining_time
+string message

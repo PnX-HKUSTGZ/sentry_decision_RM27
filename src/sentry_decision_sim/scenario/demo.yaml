@@ -1,12 +1,12 @@
-# 网页面板演示世界：稳定的非零对局状态。
+# 网页面板演示世界：稳定的非零世界状态，比赛阶段由面板 / set_game_stage 服务驱动。
 # 用法：referee_sim_node --scenario <该文件> --hold
 #   --hold 让场景时间轴跑完后不退出，持续发布最后一个世界状态。
 name: demo
 
-# 初始世界（时间轴之前应用）。
+# 初始世界（时间轴之前应用）。比赛从未开始开始，面板按钮可逐级快进。
 world:
-  game_status: 4
-  game_time_remaining: 300
+  game_status: 0
+  game_time_remaining: 0
   coins: 220
   self_hp: 400
   self_ammo: 100
@@ -19,4 +19,4 @@ world:
 timeline:
   - at: 0.0
     set_world:
-      game_time_remaining: 300
+      game_status: 0

@@ -1,7 +1,14 @@
-// 人工干预控件：按钮 -> /decision/debug (service) 与 /decision/manual_override (action)。
+// 人工干预控件：比赛阶段 -> /sentry_sim/set_game_stage；
+// 其余按钮 -> /decision/debug (service) 与 /decision/manual_override (action)。
 export function createControlsPanel(el, bridge, onLog) {
   const options = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
   let html = '';
+  html += '<div class="row"><span>比赛阶段</span>';
+  html += '<button id="btn-stage-1">准备</button>';
+  html += '<button id="btn-stage-2">15s自检</button>';
+  html += '<button id="btn-stage-3">5s倒计时</button>';
+  html += '<button id="btn-stage-4">开始比赛</button>';
+  html += '<button id="btn-reset">重置</button></div>';
   html += '<div class="row"><button id="btn-retreat">强制撤退</button>';
   html += '<button id="btn-clear">清空干预</button></div>';
   html += '<div class="row"><span>模式</span><select id="mode-select">';
@@ -47,6 +54,47 @@ export function createControlsPanel(el, bridge, onLog) {
       });
   }
 
+  // 比赛阶段：0 重置，1-4 快进（服务端负责拒绝回退）。
+  function setStage(stage, label) {
+    bridge
+      .setGameStage(stage)
+      .then(function (response) {
+        const ok = response && response.success;
+        onLog(label + ': ' + (ok ? 'ok' : '失败 ' + (response && response.message)));
+      })
+      .catch(function (error) {
+        onLog(label + ' 失败: ' + error + '（裁判仿真节点未运行？）');
+      });
+  }
+
+  const stageButtons = [
+    { stage: 1, el: document.getElementById('btn-stage-1') },
+    { stage: 2, el: document.getElementById('btn-stage-2') },
+    { stage: 3, el: document.getElementById('btn-stage-3') },
+    { stage: 4, el: document.getElementById('btn-stage-4') },
+  ];
+  stageButtons.forEach(function (item) {
+    item.el.addEventListener('click', function () {
+      setStage(item.stage, '比赛阶段 ' + item.stage);
+    });
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', function () {
+    // 重置裁判仿真的世界，并清空决策节点的干预 / 世界覆盖 / 模块开关。
+    bridge
+      .setGameStage(0)
+      .then(function () {
+        onLog('比赛已重置到未开始');
+        return bridge.callDebug('clear_all', '');
+      })
+      .then(function () {
+        onLog('决策节点干预状态已清空');
+      })
+      .catch(function (error) {
+        onLog('重置失败: ' + error);
+      });
+  });
+
   document.getElementById('btn-retreat').addEventListener('click', function () {
     override(3, 'retreat', '强制撤退');
   });
@@ -77,6 +125,12 @@ export function createControlsPanel(el, bridge, onLog) {
   });
 
   return {
-    render: function () {},
+    render: function (state) {
+      const current = state.world ? state.world.gameStatus : 0;
+      // 只允许前进：阶段 <= 当前阶段时禁用（0 未开始时全部可用）。
+      stageButtons.forEach(function (item) {
+        item.el.disabled = item.stage <= current;
+      });
+    },
   };
 }

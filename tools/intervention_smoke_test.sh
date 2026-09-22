@@ -40,9 +40,9 @@ MODULE="$(ros2 service call /decision/debug sentry_decision_msgs/srv/DebugComman
   "{command: 'set_module', args: '{module: nav, enabled: false}'}" 2>&1)"
 check 'success=True' "${MODULE}" "set_module 未成功"
 
-# 先订阅，避免错过一次性事件。
-(timeout 4 ros2 topic echo /decision/intervention >/tmp/intervention_topic.log 2>&1) & EP=$!
-sleep 1
+# 先订阅，避免错过一次性事件；给 DDS 发现留足时间，避免并发下抖动。
+(timeout 8 ros2 topic echo /decision/intervention >/tmp/intervention_topic.log 2>&1) & EP=$!
+sleep 2
 GOAL="$(ros2 action send_goal /decision/manual_override \
   sentry_decision_msgs/action/ManualOverride \
   "{field: 0, value: '[1.0, 2.0]', lease_sec: 2.0, reason: 'manual'}" 2>&1)"

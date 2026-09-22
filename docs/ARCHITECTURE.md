@@ -633,6 +633,11 @@ timeline:
 在事件时刻注入干预，因此场景脚本可直接把「人工干预」写成可提交的测试用例。
 场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
 
+比赛阶段由 ROS 无关的 `MatchStageController` 管理，并通过 `/sentry_sim/set_game_stage`
+（`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒
+递减并自动进入下一阶段。控制器未被调用前不干预场景设定的 `game_status` / `game_time_remaining`，
+因此既有场景测试不受影响。
+
 ### 14.5 干预回放
 
 干预是一路带时间戳的输入（§10.5），必须与信念输入一起录制、按原时刻重放：
@@ -648,8 +653,10 @@ timeline:
 
 rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅用于纯逻辑单测）：
 
-- 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（己方 / 导航目标 /
-  敌方，canvas 绘制）、右侧 `WorldState` 与模块 / Intent 面板；
+- 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（场地底图 + 己方 /
+  导航目标 / 敌方，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与模块 / Intent 面板；
+- 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
+  只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
 - 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
   分别调用 `/decision/debug`（service）与 `/decision/manual_override`（action）；
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/

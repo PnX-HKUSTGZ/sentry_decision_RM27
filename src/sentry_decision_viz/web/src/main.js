@@ -50,15 +50,20 @@ const bridge = createBridge({
 const treePanel = createTreePanel(document.getElementById('tree'), document.getElementById('tree-meta'));
 const worldPanel = createWorldPanel(document.getElementById('world'));
 const intentsPanel = createIntentsPanel(document.getElementById('intents'));
-createControlsPanel(document.getElementById('controls'), bridge, appendLog);
+const controlsPanel = createControlsPanel(document.getElementById('controls'), bridge, appendLog);
 
 store.subscribe(function (state) {
   treePanel.render(state);
   worldPanel.render(state);
   intentsPanel.render(state);
+  controlsPanel.render(state);
   drawBattlefield(canvas, battlefieldModel(state.world, state.decision));
   connEl.textContent = state.connected ? '已连接' : '未连接';
   connEl.className = 'conn ' + (state.connected ? 'conn-on' : 'conn-off');
+  const world = state.world;
+  document.getElementById('match-stage').textContent = world ? world.gameStatusName : '未开始';
+  document.getElementById('match-time').textContent =
+    world && world.gameTime > 0 ? '剩余 ' + world.gameTime + ' s' : '--';
   document.getElementById('log').textContent = state.log.join('\n');
 });
 

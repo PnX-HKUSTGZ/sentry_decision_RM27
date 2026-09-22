@@ -3,6 +3,7 @@ import {
   battlefieldModel,
   decisionToView,
   escapeHtml,
+  gameStageName,
   nodeStatusName,
   parseListState,
   stanceName,
@@ -26,6 +27,8 @@ check(nodeStatusName(9) === '#9', 'nodeStatusName unknown');
 check(tacticalModeName(4) === 'retreat', 'tacticalModeName');
 check(tacticalModeName(42) === '#42', 'tacticalModeName unknown');
 check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
+check(gameStageName(2) === '15s自检', 'gameStageName');
+check(gameStageName(99) === '#99', 'gameStageName unknown');
 
 const tree = treeStatusToView({
   tick: 3,

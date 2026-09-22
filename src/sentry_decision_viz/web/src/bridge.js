@@ -65,6 +65,18 @@ export function createBridge(options) {
     });
   }
 
+  // 比赛阶段控制（裁判仿真服务）：0 重置 / 1 准备 / 2 自检 / 3 倒计时 / 4 比赛。
+  function setGameStage(stage) {
+    return new Promise(function (resolve, reject) {
+      const client = new ROSLIB.Service({
+        ros: ros,
+        name: '/sentry_sim/set_game_stage',
+        serviceType: 'sentry_decision_msgs/srv/SetGameStage',
+      });
+      client.callService({ stage: stage }, resolve, reject);
+    });
+  }
+
   function sendManualOverride(field, value, leaseSec, reason) {
     return new Promise(function (resolve, reject) {
       const client = new ROSLIB.ActionClient({
@@ -94,6 +106,7 @@ export function createBridge(options) {
   return {
     connect: connect,
     callDebug: callDebug,
+    setGameStage: setGameStage,
     sendManualOverride: sendManualOverride,
   };
 }

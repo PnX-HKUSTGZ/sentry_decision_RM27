@@ -18,7 +18,9 @@
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
 #include "sentry_decision_msgs/srv/debug_command.hpp"
+#include "sentry_decision_msgs/srv/set_game_stage.hpp"
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
+#include "sentry_decision_sim/match_stage.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/scenario.hpp"
 #include "sentry_decision_sim/sim_world.hpp"
@@ -134,6 +136,9 @@ class RefereeSimNode : public rclcpp::Node {
         }
       }
     }
+    // 保存初始世界，供比赛阶段服务的「重置」恢复。
+    initial_world_ = world_;
+    last_stage_tick_ = SteadyClock::now();
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -186,6 +191,16 @@ class RefereeSimNode : public rclcpp::Node {
     // 场景 add_intent / disable 经该服务注入干预。
     debug_client_ = create_client<sentry_decision_msgs::srv::DebugCommand>("/decision/debug");
 
+    // 网页面板 / 手动设置比赛阶段（仅仿真）。
+    const auto set_game_stage_service =
+        declare_parameter<std::string>("set_game_stage_service", "/sentry_sim/set_game_stage");
+    set_game_stage_server_ = create_service<sentry_decision_msgs::srv::SetGameStage>(
+        set_game_stage_service,
+        [this](const std::shared_ptr<sentry_decision_msgs::srv::SetGameStage::Request> request,
+               std::shared_ptr<sentry_decision_msgs::srv::SetGameStage::Response> response) {
+          handle_set_game_stage(*request, *response);
+        });
+
     using namespace std::placeholders;
     action_server_ = rclcpp_action::create_server<NavigateToPose>(
         this, navigate_action,
@@ -232,6 +247,54 @@ class RefereeSimNode : public rclcpp::Node {
     has_decision_ = true;
   }
 
+  // 比赛阶段：网页面板 / 手动设置的入口。stage=0 重置到未开始，其余只允许前进。
+  void handle_set_game_stage(const sentry_decision_msgs::srv::SetGameStage::Request& request,
+                             sentry_decision_msgs::srv::SetGameStage::Response& response) {
+    const bool reset_requested = request.stage == 0;
+    std::string error;
+    if (!match_.set(request.stage, &error)) {
+      response.success = false;
+      response.stage = static_cast<std::uint8_t>(match_.stage());
+      response.remaining_time = match_.remaining_seconds();
+      response.message = error;
+      SD_LOG_WARN("sim", "比赛阶段设置被拒: %s", error.c_str());
+      return;
+    }
+    if (reset_requested) {
+      world_ = initial_world_;
+    }
+    last_stage_tick_ = SteadyClock::now();
+    sync_world_stage();
+    response.success = true;
+    response.stage = static_cast<std::uint8_t>(match_.stage());
+    response.remaining_time = match_.remaining_seconds();
+    response.message = "ok";
+    SD_LOG_ACT("sim", "比赛阶段 -> %d（剩余 %ds）", static_cast<int>(match_.stage()),
+               match_.remaining_seconds());
+  }
+
+  // 把阶段控制器的状态写回 SimWorld；未激活时保留场景设定的 game_status / 时间。
+  void sync_world_stage() {
+    if (!match_.active()) {
+      return;
+    }
+    world_.game_status = static_cast<int>(match_.stage());
+    world_.game_time_remaining = match_.remaining_seconds();
+  }
+
+  // 按真实秒推进阶段：计时 + 自检 -> 倒计时 -> 比赛自动切换。
+  void step_game_stage() {
+    if (!match_.active()) {
+      return;
+    }
+    const TimePoint now = SteadyClock::now();
+    while (now - last_stage_tick_ >= Duration{1000}) {
+      last_stage_tick_ += Duration{1000};
+      match_.tick_second();
+    }
+    sync_world_stage();
+  }
+
   void tick() {
     nav_.update(SteadyClock::now());
     finish_goal_if_done();
@@ -239,6 +302,7 @@ class RefereeSimNode : public rclcpp::Node {
     for (const auto& ack : actuator_.take_acks()) {
       publish_ack(ack);
     }
+    step_game_stage();
     publish_uplinks();
     publish_odom();
     step_scenario();
@@ -486,6 +550,9 @@ class RefereeSimNode : public rclcpp::Node {
   sentry_decision_sim::NavSimulator nav_;
   sentry_decision_sim::DecisionActuatorSim actuator_{2};
   SimWorld world_;
+  SimWorld initial_world_;
+  sentry_decision_sim::MatchStageController match_;
+  TimePoint last_stage_tick_{};
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
@@ -512,6 +579,7 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Subscription<sentry_interfaces::msg::DecisionCommand>::SharedPtr decision_command_sub_;
   rclcpp::Subscription<sentry_decision_msgs::msg::DecisionState>::SharedPtr decision_state_sub_;
   rclcpp::Client<sentry_decision_msgs::srv::DebugCommand>::SharedPtr debug_client_;
+  rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;

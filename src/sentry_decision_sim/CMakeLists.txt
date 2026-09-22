@@ -28,7 +28,8 @@ add_library(${PROJECT_NAME}
   src/nav_simulator.cpp
   src/decision_actuator_sim.cpp
   src/scenario.cpp
-  src/sim_world.cpp)
+  src/sim_world.cpp
+  src/match_stage.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -69,6 +70,10 @@ if(BUILD_TESTING)
   target_link_libraries(test_nav_simulator ${PROJECT_NAME})
   add_test(NAME test_nav_simulator COMMAND test_nav_simulator)
 
+  add_executable(test_match_stage test/test_match_stage.cpp)
+  target_link_libraries(test_match_stage ${PROJECT_NAME})
+  add_test(NAME test_match_stage COMMAND test_match_stage)
+
   add_executable(test_scenario test/test_scenario.cpp)
   target_link_libraries(test_scenario ${PROJECT_NAME} yaml-cpp::yaml-cpp)
   add_test(NAME test_scenario
@@ -104,6 +109,18 @@ if(BUILD_TESTING)
   set_tests_properties(intervention_smoke PROPERTIES
     ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
     TIMEOUT 90)
+
+  # 端到端：裁判仿真的比赛阶段服务（前进可快进、回退被拒、重置回未开始）。
+  add_test(NAME match_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/match_smoke_test.sh)
+  set_tests_properties(match_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 90)
+
+  # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
+  set_tests_properties(
+    scenario_full_match scenario_intervention replay_smoke intervention_smoke match_smoke
+    PROPERTIES RUN_SERIAL TRUE)
 endif()
 
 ament_package()

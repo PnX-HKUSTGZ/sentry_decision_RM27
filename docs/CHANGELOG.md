@@ -35,12 +35,15 @@
 - 新增 `tools/replay_smoke_test.sh`（录制一局场景 bag 后离线重放并校验干预复现）
 - 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
 - `referee_sim_node` 新增 `--hold`（场景时间轴跑完后不退出）与 `scenario/demo.yaml` 面板演示世界
+- `sentry_decision_msgs`：新增 `SetGameStage.srv`；`referee_sim_node` 提供 `/sentry_sim/set_game_stage` 与 ROS 无关的 `MatchStageController`（准备 / 15s自检 / 5s倒计时 / 比赛中：只可前进、按秒自动推进、可重置），网页面板新增比赛状态栏与阶段按钮
+- 新增 `tools/match_smoke_test.sh` 比赛阶段冒烟测试
 
 ### Fixed
 
 - 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE
 - `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
 - 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）
+- 战场俯视图 `mode` 文字移至右上角，避免与左上角半场标注重叠
 
 ## [v0.2.0]
 

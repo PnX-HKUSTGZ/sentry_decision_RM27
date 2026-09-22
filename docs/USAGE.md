@@ -187,6 +187,7 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 
 > 不带 `--scenario` 时裁判仿真发布的是全零世界（`referee_valid=true` 但所有数值为 0），
 > 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
+> 演示世界从「未开始」起，比赛阶段由网页面板按钮或 `/sentry_sim/set_game_stage` 服务推进。
 
 场景 YAML 结构（`full_match.yaml` 跑通巡逻→进攻→撤退→复活）：
 
@@ -260,9 +261,21 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 
 - 左侧行为树（`/decision/tree_status`，RUNNING 高亮；已完成节点保留 SUCCESS / FAILURE，
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
-- 中间战场俯视图（示意场地底图 + 己方位姿、导航目标、敌方位置）；
+- 中间战场俯视图（示意场地底图 + 己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与剩余时间；
 - 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者（每秒轮询 `list_state`）；
-- 底部干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+- 比赛阶段按钮：准备 / 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
+  「重置」回未开始，并清空决策节点的干预 / 世界覆盖 / 模块开关；
+- 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+
+比赛阶段服务由裁判仿真提供（真实比赛由裁判系统决定，故仅仿真用）：
+
+```bash
+ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameStage \
+  "{stage: 4}"   # 0 重置 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中
+```
+
+`stage` 除 0（重置）外必须大于当前阶段，否则返回 `success=false`；自检与倒计时归零后
+自动进入下一阶段。冒烟测试：`tools/match_smoke_test.sh`（也注册为 `match_smoke`）。
 
 需要镜像包含 `ros-jazzy-rosbridge-suite`（见 `docker/Dockerfile`）。纯逻辑单测：
 ```bash
@@ -346,6 +359,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--rate` | `20.0` | 发布与 tick 频率（Hz），取值 `(0, 1000]` |
 | `--scenario` | 空 | 场景 YAML 路径；为空则持续发布全零世界 |
 | `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
+| `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |
@@ -367,7 +381,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
-| 场景 / 干预 / 回放 / 面板冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh` |
+| 场景 / 干预 / 回放 / 面板 / 比赛阶段冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh` |
 | 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
 | 格式检查 | `tools/format.sh --check` |
 

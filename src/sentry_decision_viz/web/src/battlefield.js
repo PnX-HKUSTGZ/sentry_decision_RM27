@@ -115,7 +115,10 @@ export function drawBattlefield(canvas, model) {
     ctx.font = '14px monospace';
     ctx.fillText('等待定位 /odom …', 10, height - 12);
   }
+  // mode 放右上角，避免与左上角的半场标注重叠。
   ctx.fillStyle = '#8b9bab';
   ctx.font = '14px monospace';
-  ctx.fillText('mode: ' + model.mode, 10, 20);
+  ctx.textAlign = 'right';
+  ctx.fillText('mode: ' + model.mode, width - 10, 20);
+  ctx.textAlign = 'left';
 }

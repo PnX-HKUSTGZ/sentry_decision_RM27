@@ -116,6 +116,34 @@ canvas {
   border-radius: 4px;
 }
 
+.match-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #0c1116;
+}
+
+.match-stage {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.match-time {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--line);
+}
+
 .legend {
   margin-top: 6px;
   color: var(--muted);
