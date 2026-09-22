@@ -69,4 +69,22 @@ struct DecisionView {
 bool check_expect(const DecisionView& view, const std::string& field, const ScenarioValue& expected,
                   double tolerance, std::string* error);
 
+// 一次兑换对世界的改动结果，同时供动作回执 detail 使用。
+struct ExchangeResult {
+  bool accepted = false;
+  int amount = 0;      // 实际写入量（发弹量 / 血量）
+  int coin_cost = 0;   // 实际扣除金币
+  std::string detail;  // 拒绝原因或成功说明
+};
+
+// 本地兑换允许发弹量：规则 5.3.1「非远程兑换 10 金币/10 发」，即 1 金币/发。
+// value 为请求发数；金币不足或取值非法时 accepted=false。
+ExchangeResult exchange_ammo(SimWorld* world, int value);
+
+// 本地兑换血量：仿真简化为 1 金币/1 点，且不超过 max_hp；已满血或金币不足时拒绝。
+ExchangeResult exchange_hp(SimWorld* world, int value, int max_hp);
+
+// 补给区回血：按上限血量的 ratio 恢复，返回实际恢复量（已满血返回 0）。
+int supply_heal(SimWorld* world, int max_hp, double ratio);
+
 }  // namespace sentry_decision_sim

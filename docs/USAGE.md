@@ -265,11 +265,13 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
 - 中间战场俯视图（示意场地底图：己方半场 x<0 冷色 / 敌方半场 x>0 暖色，中间竖线；叠加己方位姿、
   导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
-- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执
-  （每秒轮询 `list_state`）；
+- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执 /
+  原始世界（每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
   「重置」回未开始，并清空决策节点的干预 / 世界覆盖 / 模块开关；
-- 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+- 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预；
+- 世界数值分两处：「仿真世界」直接改裁判仿真的真实世界（兑换 / 回血据此演变），
+  「决策覆盖」只钉住决策视图（不改仿真世界，供离线 / 回放测试）。
 
 > 决策只有收到 `game_status=4`（比赛中）才执行任务；未开始 / 准备 / 自检 / 倒计时 / 结算阶段输出
 > `idle`，不下发任务导航目标，因此「准备阶段不动、开始比赛后才进攻/巡逻」。
@@ -290,7 +292,8 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 | --- | --- | --- |
 | 比赛阶段 / 重置 | 推进阶段；重置回未开始并恢复机器人初始位姿 | `/sentry_sim/set_game_stage` |
 | 暂停 / 继续 | 冻结比赛计时与机器人运动（odom 保持最后位置） | `/sentry_sim/set_game_pause` |
-| 世界覆盖 设置 / 清除 | 覆盖自身 / 基地 / 前哨血量、金币、发弹量、剩余时间的决策视图 | `/decision/debug set_world` / `clear_world` |
+| 仿真世界 设置 | 直接改裁判仿真的真实世界：自身 / 基地 / 前哨血量、金币、发弹量、剩余时间 | `/sentry_sim/set_world` |
+| 决策覆盖 设置 / 清除 | 只覆盖决策视图（不改仿真世界），用于离线 / 回放测试 | `/decision/debug set_world` / `clear_world` |
 | 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `set_intent {field: tactical_mode, value: retreat}` |
 | 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `set_intent {field: tactical_mode}` |
 | 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `set_intent {field: nav_goal}` |
@@ -313,7 +316,14 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > `[action] 动作 N 已确认`。
 
 未进入「比赛中」（`game_status != 4`）时，人工意图按钮自动禁用，避免准备阶段误发干预；
-世界覆盖与「清空干预」仍可用。世界覆盖只改数值、不提升 `referee.valid`，不会绕过安全急停。
+仿真世界 / 决策覆盖与「清空干预」仍可用。决策覆盖只改数值、不提升 `referee.valid`，
+不会绕过安全急停。**注意到「决策覆盖」会钉住该字段的决策视图**：即使仿真世界在补血 / 兑换，
+面板血量也不会变；右侧「原始 血/弹/金」一行显示的才是覆盖前的真实世界。
+
+> 兑换发弹 / 血量现在会真正结算进仿真世界：按规则 5.3.1「10 金币/10 发」扣金币、加发弹量，
+> 金币不足则回执被拒（`动作回执` 行会显示 `rejected` 与原因）。补给区自动回血同理：
+> 机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的 10% / 秒回血，
+> 比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
@@ -402,6 +412,14 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
 | `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
 | `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
+| `--ros-args -p set_world_service` | `/sentry_sim/set_world` | 直接修改仿真世界的服务名 |
+| `--ros-args -p max_hp` | `400` | 哨兵上限血量（用于兑换 / 回血上限） |
+| `--ros-args -p supply_center_x` / `_y` | `-6.0` / `4.0` | 补给区圆心（默认取地图 `healing` 点） |
+| `--ros-args -p supply_radius` | `1.5` | 补给区半径（米） |
+| `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
+| `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
+| `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
+| `--ros-args -p match_duration_s` | `420` | 一局时长（用于计算已进行时间） |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |
@@ -423,7 +441,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
-| 场景 / 干预 / 回放 / 面板 / 比赛阶段冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh` |
+| 场景 / 干预 / 回放 / 面板 / 比赛阶段 / 世界结算冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh`、`tools/sim_effects_smoke_test.sh` |
 | 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
 | 格式检查 | `tools/format.sh --check` |
 

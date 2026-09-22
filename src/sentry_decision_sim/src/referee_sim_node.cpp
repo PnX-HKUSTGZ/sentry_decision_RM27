@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -20,6 +21,7 @@
 #include "sentry_decision_msgs/srv/debug_command.hpp"
 #include "sentry_decision_msgs/srv/set_game_pause.hpp"
 #include "sentry_decision_msgs/srv/set_game_stage.hpp"
+#include "sentry_decision_msgs/srv/set_world.hpp"
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/match_stage.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
@@ -68,6 +70,9 @@ Options parse_options(int argc, char** argv) {
       options.scenario = next("--scenario");
     } else if (arg == "--hold") {
       options.hold = true;
+    } else if (arg == "--ros-args") {
+      // ROS 参数 / 重映射交给 rclcpp，由 declare_parameter 读取；其后参数不再解析。
+      break;
     } else {
       std::cerr << "未知参数: " << arg << "\n";
       std::exit(2);
@@ -141,7 +146,10 @@ class RefereeSimNode : public rclcpp::Node {
     initial_world_ = world_;
     start_pose_ = scenario_.start_pose.value_or(nav_.pose());
     nav_.set_pose(start_pose_);
+    // 动作执行端在回执时把兑换结算进仿真世界（扣金币、加血量/发弹量）。
+    actuator_.bind_world(&world_, max_hp_);
     last_stage_tick_ = SteadyClock::now();
+    last_supply_tick_ = last_stage_tick_;
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -153,6 +161,17 @@ class RefereeSimNode : public rclcpp::Node {
 
  private:
   void declare_and_create_interfaces() {
+    // 补给区回血 / 血量上限：仿真近似规则 5.2.1（占领补给区每秒回上限血量的
+    // 10%，比赛 4 分钟后为 25%）。默认补给区取地图 healing 点附近，覆盖 home。
+    max_hp_ = static_cast<int>(declare_parameter<double>("max_hp", 400.0));
+    supply_center_x_ = declare_parameter<double>("supply_center_x", -6.0);
+    supply_center_y_ = declare_parameter<double>("supply_center_y", 4.0);
+    supply_radius_ = declare_parameter<double>("supply_radius", 1.5);
+    supply_heal_ratio_ = declare_parameter<double>("supply_heal_ratio", 0.10);
+    supply_heal_ratio_late_ = declare_parameter<double>("supply_heal_ratio_late", 0.25);
+    supply_heal_late_after_s_ = declare_parameter<double>("supply_heal_late_after_s", 240.0);
+    match_duration_s_ = static_cast<int>(declare_parameter<double>("match_duration_s", 420.0));
+
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
     const auto online_info_topic =
@@ -212,6 +231,16 @@ class RefereeSimNode : public rclcpp::Node {
         [this](const std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Request> request,
                std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Response> response) {
           handle_set_game_pause(*request, *response);
+        });
+
+    // 直接修改仿真世界（网页面板 / 演示用），字段同场景 set_world。
+    const auto set_world_service =
+        declare_parameter<std::string>("set_world_service", "/sentry_sim/set_world");
+    set_world_server_ = create_service<sentry_decision_msgs::srv::SetWorld>(
+        set_world_service,
+        [this](const std::shared_ptr<sentry_decision_msgs::srv::SetWorld::Request> request,
+               std::shared_ptr<sentry_decision_msgs::srv::SetWorld::Response> response) {
+          handle_set_world(*request, *response);
         });
 
     using namespace std::placeholders;
@@ -279,6 +308,9 @@ class RefereeSimNode : public rclcpp::Node {
       nav_.cancel_goal();
       match_.set_paused(false);
       nav_.set_paused(false);
+      actuator_.reset();
+      last_supply_tick_ = SteadyClock::now();
+      in_supply_ = false;
     }
     last_stage_tick_ = SteadyClock::now();
     sync_world_stage();
@@ -300,6 +332,28 @@ class RefereeSimNode : public rclcpp::Node {
     response.paused = match_.paused();
     response.message = match_.paused() ? "已暂停" : "已恢复";
     SD_LOG_ACT("sim", "比赛%s", match_.paused() ? "已暂停" : "已恢复");
+  }
+
+  // 直接修改仿真世界：字段与场景 set_world 一致，失败给出原因。
+  void handle_set_world(const sentry_decision_msgs::srv::SetWorld::Request& request,
+                        sentry_decision_msgs::srv::SetWorld::Response& response) {
+    ScenarioValue value;
+    value.type = ScenarioValue::Type::kNumber;
+    value.number = request.value;
+    std::string error;
+    if (!sentry_decision_sim::apply_world_field(&world_, request.field, value, &error)) {
+      response.success = false;
+      response.field = request.field;
+      response.value = request.value;
+      response.message = error;
+      SD_LOG_WARN("sim", "设置仿真世界被拒: %s", error.c_str());
+      return;
+    }
+    response.success = true;
+    response.field = request.field;
+    response.value = request.value;
+    response.message = "ok";
+    SD_LOG_ACT("sim", "仿真世界 %s = %.2f", request.field.c_str(), request.value);
   }
 
   // 把阶段控制器的状态写回 SimWorld；未激活时保留场景设定的 game_status / 时间。
@@ -324,6 +378,50 @@ class RefereeSimNode : public rclcpp::Node {
     sync_world_stage();
   }
 
+  // 机器人是否在补给区（以配置的圆心 + 半径判定）。
+  bool in_supply_zone() const {
+    const sentry_decision::Point2D pose = nav_.pose();
+    return std::hypot(pose.x - supply_center_x_, pose.y - supply_center_y_) <= supply_radius_;
+  }
+
+  // 比赛开始 4 分钟后的回血比例切到 25%（仿真近似规则 5.2.1）。
+  double supply_heal_ratio_for_now() const {
+    const int elapsed = std::max(0, match_duration_s_ - world_.game_time_remaining);
+    return elapsed >= static_cast<int>(supply_heal_late_after_s_) ? supply_heal_ratio_late_
+                                                                  : supply_heal_ratio_;
+  }
+
+  void apply_supply_second() {
+    if (match_.paused()) {
+      return;
+    }
+    if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
+      return;
+    }
+    const bool inside = in_supply_zone();
+    if (inside != in_supply_) {
+      in_supply_ = inside;
+      SD_LOG_ACT("sim", "%s补给区", inside ? "进入" : "离开");
+    }
+    if (!inside) {
+      return;
+    }
+    const int healed =
+        sentry_decision_sim::supply_heal(&world_, max_hp_, supply_heal_ratio_for_now());
+    if (healed > 0) {
+      SD_LOG_ACT("sim", "补给区回血 +%d -> %d/%d", healed, world_.self_hp, max_hp_);
+    }
+  }
+
+  // 按真实秒推进补给区回血；暂停时仍推进计时基准，避免恢复后补算。
+  void step_supply() {
+    const TimePoint now = SteadyClock::now();
+    while (now - last_supply_tick_ >= Duration{1000}) {
+      last_supply_tick_ += Duration{1000};
+      apply_supply_second();
+    }
+  }
+
   void tick() {
     nav_.update(SteadyClock::now());
     finish_goal_if_done();
@@ -332,6 +430,7 @@ class RefereeSimNode : public rclcpp::Node {
       publish_ack(ack);
     }
     step_game_stage();
+    step_supply();
     publish_uplinks();
     publish_odom();
     step_scenario();
@@ -583,6 +682,16 @@ class RefereeSimNode : public rclcpp::Node {
   sentry_decision_sim::MatchStageController match_;
   sentry_decision::Point2D start_pose_{};
   TimePoint last_stage_tick_{};
+  TimePoint last_supply_tick_{};
+  bool in_supply_ = false;
+  int max_hp_ = 400;
+  double supply_center_x_ = -6.0;
+  double supply_center_y_ = 4.0;
+  double supply_radius_ = 1.5;
+  double supply_heal_ratio_ = 0.10;
+  double supply_heal_ratio_late_ = 0.25;
+  double supply_heal_late_after_s_ = 240.0;
+  int match_duration_s_ = 420;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
@@ -611,6 +720,7 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Client<sentry_decision_msgs::srv::DebugCommand>::SharedPtr debug_client_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGamePause>::SharedPtr set_game_pause_server_;
+  rclcpp::Service<sentry_decision_msgs::srv::SetWorld>::SharedPtr set_world_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;

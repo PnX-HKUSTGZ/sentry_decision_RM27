@@ -207,7 +207,9 @@ class DecisionNode : public rclcpp::Node {
     const TimePoint now = SteadyClock::now();
     // 先应用上一节拍到本拍的干预命令，再取世界快照，使世界覆盖当拍生效。
     apply_intervention_commands(now);
-    context_.world = intervention_.apply_world(world_model_.snapshot(now));
+    // 覆盖前的原始世界另存一份，供 list_state 对照，避免覆盖值掩盖真实变化。
+    last_raw_world_ = world_model_.snapshot(now);
+    context_.world = intervention_.apply_world(last_raw_world_);
     context_.clear_intents();
     context_.apply_strategy(policy_.decide(context_.world));
     sentry_decision::apply_intervention_intents(intervention_, now, &context_);
@@ -339,6 +341,17 @@ class DecisionNode : public rclcpp::Node {
         << ",\"enemy_outpost_hp\":" << context_.world.referee.enemy_outpost_hp
         << ",\"enemy_base_hp\":" << context_.world.referee.enemy_base_hp
         << ",\"referee_valid\":" << (context_.world.referee.valid ? "true" : "false") << "}";
+    // 覆盖前的真实世界：面板据此识别「世界覆盖把某字段钉住」。
+    out << ",\"raw_world\":{\"self_hp\":" << last_raw_world_.referee.self_hp
+        << ",\"self_ammo\":" << last_raw_world_.referee.self_ammo
+        << ",\"coins\":" << last_raw_world_.referee.coins
+        << ",\"game_status\":" << static_cast<int>(last_raw_world_.referee.game_status)
+        << ",\"game_time_remaining\":" << last_raw_world_.referee.game_time_remaining
+        << ",\"base_hp\":" << last_raw_world_.referee.base_hp
+        << ",\"our_outpost_hp\":" << last_raw_world_.referee.our_outpost_hp
+        << ",\"enemy_outpost_hp\":" << last_raw_world_.referee.enemy_outpost_hp
+        << ",\"enemy_base_hp\":" << last_raw_world_.referee.enemy_base_hp
+        << ",\"referee_valid\":" << (last_raw_world_.referee.valid ? "true" : "false") << "}";
     out << ",\"intents\":[";
     bool first = true;
     for (const auto& intent : active) {
@@ -458,6 +471,7 @@ class DecisionNode : public rclcpp::Node {
 
   std::shared_ptr<sentry_decision_io::RosIoNode> io_;
   sentry_decision::DecisionContext context_;
+  sentry_decision::WorldState last_raw_world_;
   sentry_decision::WorldModel world_model_;
   sentry_decision::IntentArbiter arbiter_;
   sentry_decision::ActionDispatcher dispatcher_;

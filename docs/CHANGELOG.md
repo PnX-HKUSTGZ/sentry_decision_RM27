@@ -41,6 +41,10 @@
 - 准备阶段改为 3 分钟倒计时；网页面板状态栏用 `MM:SS` 白色显示
 - 网页面板新增世界覆盖表单（自身 / 基地 / 前哨血量、金币、发弹量、剩余时间，走 `/decision/debug set_world`）与「暂停 / 继续」；后者新增 `SetGamePause.srv` 与 `/sentry_sim/set_game_pause`，暂停时冻结计时与机器人运动；场景新增可选 `start_pose`
 - `list_state` 增加 `resource` / `last_action` / `last_ack`，网页面板显示资源请求、最近下发的决策动作与执行回执；`decision_node` 下发动作时记 `[action]` ACT 日志
+- `sentry_decision_msgs`：新增 `SetWorld.srv`；`referee_sim_node` 提供 `/sentry_sim/set_world`，可直接修改仿真世界的真实数值（面板「仿真世界」行）
+- `sentry_decision_sim`：`SimWorld` 新增兑换（`exchange_ammo` / `exchange_hp`，规则 5.3.1 金币结算）与补给区回血（`supply_heal`，近似规则 5.2.1）纯逻辑及 `test_sim_world`；`DecisionActuatorSim` 可在回执时把兑换结算进世界
+- `referee_sim_node` 新增补给区回血（可配置圆心 / 半径 / 回血比例 / `max_hp`），并新增 `tools/sim_effects_smoke_test.sh` 端到端校验兑换与回血
+- `list_state` 增加 `raw_world`（覆盖前的真实世界），网页面板在决策覆盖生效时显示「原始 血/弹/金」
 
 ### Fixed
 
@@ -59,6 +63,9 @@
 - 面板 `lease` 默认改为 0（持续到「清空干预」/「重置」），并修正 `lease()` 把 0 误当 5 的问题；有限 lease 按系统时间计算，暂停期间仍会到期
 - 面板 `lease` 从「模式」行移到独立「持续」行并加说明
 - 「兑换发弹 / 血量」经 `resource_request` 意图转成一次性 `DecisionCommand`，不改变任务树；现在可在面板「资源请求 / 最近动作 / 动作回执」与 `[action]` 日志中确认是否尝试 / 成功
+- 裁判仿真的 `DecisionActuatorSim` 此前只回 `DecisionAck` 而不结算：面板「兑换发弹」显示已确认但仿真世界发弹量不变；现在按金币扣减并增加发弹量 / 血量，金币不足回 `accepted=false`
+- 裁判仿真此前完全没有补给区回血逻辑；现在机器人处于补给区且比赛中时按上限血量比例回血
+- 面板「世界」控件只覆盖决策视图、不改仿真世界，容易被误读为「改了世界却没生效」；现在拆成「仿真世界」（真实生效）与「决策覆盖」（仅视图），并显示覆盖前的原始值
 
 ## [v0.2.0]
 

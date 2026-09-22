@@ -1,5 +1,6 @@
 #include "sentry_decision_sim/sim_world.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -218,6 +219,73 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
 
   *error = "未知 expect 字段: " + field;
   return false;
+}
+
+ExchangeResult exchange_ammo(SimWorld* world, int value) {
+  ExchangeResult result;
+  if (world == nullptr) {
+    result.detail = "世界为空";
+    return result;
+  }
+  if (value <= 0) {
+    result.detail = "兑换数量必须为正";
+    return result;
+  }
+  // 非远程兑换 10 金币/10 发（规则 5.3.1）。
+  const int cost = value;
+  if (world->coins < cost) {
+    result.detail =
+        "金币不足（需要 " + std::to_string(cost) + "，当前 " + std::to_string(world->coins) + "）";
+    return result;
+  }
+  world->coins -= cost;
+  world->self_ammo += value;
+  result.accepted = true;
+  result.amount = value;
+  result.coin_cost = cost;
+  result.detail = "发弹量 +" + std::to_string(value) + "，金币 -" + std::to_string(cost);
+  return result;
+}
+
+ExchangeResult exchange_hp(SimWorld* world, int value, int max_hp) {
+  ExchangeResult result;
+  if (world == nullptr) {
+    result.detail = "世界为空";
+    return result;
+  }
+  if (value <= 0) {
+    result.detail = "兑换数量必须为正";
+    return result;
+  }
+  if (world->self_hp >= max_hp) {
+    result.detail = "血量已满";
+    return result;
+  }
+  const int cost = value;
+  if (world->coins < cost) {
+    result.detail =
+        "金币不足（需要 " + std::to_string(cost) + "，当前 " + std::to_string(world->coins) + "）";
+    return result;
+  }
+  const int before = world->self_hp;
+  world->self_hp = std::min(max_hp, world->self_hp + value);
+  const int healed = world->self_hp - before;
+  world->coins -= cost;
+  result.accepted = true;
+  result.amount = healed;
+  result.coin_cost = cost;
+  result.detail = "血量 +" + std::to_string(healed) + "，金币 -" + std::to_string(cost);
+  return result;
+}
+
+int supply_heal(SimWorld* world, int max_hp, double ratio) {
+  if (world == nullptr || max_hp <= 0 || ratio <= 0.0 || world->self_hp >= max_hp) {
+    return 0;
+  }
+  const int heal = std::max(1, static_cast<int>(std::ceil(max_hp * ratio)));
+  const int before = world->self_hp;
+  world->self_hp = std::min(max_hp, world->self_hp + heal);
+  return world->self_hp - before;
 }
 
 }  // namespace sentry_decision_sim

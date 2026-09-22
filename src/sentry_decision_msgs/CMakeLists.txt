@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/DebugCommand.srv"
   "srv/SetGameStage.srv"
   "srv/SetGamePause.srv"
+  "srv/SetWorld.srv"
   DEPENDENCIES std_msgs geometry_msgs action_msgs unique_identifier_msgs)
 
 ament_export_dependencies(rosidl_default_runtime)

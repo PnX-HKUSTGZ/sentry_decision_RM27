@@ -74,6 +74,10 @@ if(BUILD_TESTING)
   target_link_libraries(test_match_stage ${PROJECT_NAME})
   add_test(NAME test_match_stage COMMAND test_match_stage)
 
+  add_executable(test_sim_world test/test_sim_world.cpp)
+  target_link_libraries(test_sim_world ${PROJECT_NAME})
+  add_test(NAME test_sim_world COMMAND test_sim_world)
+
   add_executable(test_scenario test/test_scenario.cpp)
   target_link_libraries(test_scenario ${PROJECT_NAME} yaml-cpp::yaml-cpp)
   add_test(NAME test_scenario
@@ -117,9 +121,17 @@ if(BUILD_TESTING)
     ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
     TIMEOUT 90)
 
+  # 端到端：裁判仿真的世界结算（兑换发弹真正加弹 / 扣金币，补给区自动回血）。
+  add_test(NAME sim_effects_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/sim_effects_smoke_test.sh)
+  set_tests_properties(sim_effects_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 90)
+
   # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
   set_tests_properties(
     scenario_full_match scenario_intervention replay_smoke intervention_smoke match_smoke
+    sim_effects_smoke
     PROPERTIES RUN_SERIAL TRUE)
 endif()
 

@@ -49,7 +49,7 @@ export function createIntentsPanel(el) {
         : '-';
       html += '</td></tr>';
 
-      html += '<tr><th>世界覆盖</th><td>';
+      html += '<tr><th>决策覆盖</th><td>';
       const overrides = snapshot.world_overrides || {};
       const overrideNames = Object.keys(overrides);
       html += overrideNames.length

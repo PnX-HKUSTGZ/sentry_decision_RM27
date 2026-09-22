@@ -21,7 +21,15 @@ export function createControlsPanel(el, bridge, onLog) {
   html += '<button id="btn-stage-4">开始比赛</button>';
   html += '<button id="btn-pause">暂停</button>';
   html += '<button id="btn-reset">重置</button></div>';
-  html += '<div class="row"><span>世界</span><select id="world-field">';
+  // 仿真世界：直接改裁判仿真的真实世界（兑换/回血据此演变）。
+  html += '<div class="row"><span title="直接修改裁判仿真的真实世界">仿真世界</span><select id="sim-world-field">';
+  worldFields.forEach(function (item) {
+    html += '<option value="' + item[0] + '">' + item[1] + '</option>';
+  });
+  html += '</select><input id="sim-world-value" value="400" size="4"/>';
+  html += '<button id="btn-sim-world-set">设置</button></div>';
+  // 决策覆盖：只钉住决策节点的视图，不改仿真世界（用于离线/回放测试）。
+  html += '<div class="row"><span title="只覆盖决策视图，不改仿真世界">决策覆盖</span><select id="world-field">';
   worldFields.forEach(function (item) {
     html += '<option value="' + item[0] + '">' + item[1] + '</option>';
   });
@@ -131,18 +139,36 @@ export function createControlsPanel(el, bridge, onLog) {
       });
   });
 
+  document.getElementById('btn-sim-world-set').addEventListener('click', function () {
+    const field = document.getElementById('sim-world-field').value;
+    const value = parseFloat(document.getElementById('sim-world-value').value);
+    if (!isFinite(value)) {
+      onLog('仿真世界: 取值无效');
+      return;
+    }
+    bridge
+      .setSimWorld(field, value)
+      .then(function (response) {
+        const ok = response && response.success;
+        onLog('仿真世界 ' + field + ': ' + (ok ? 'ok' : '失败 ' + (response && response.message)));
+      })
+      .catch(function (error) {
+        onLog('仿真世界设置失败: ' + error + '（裁判仿真节点未运行？）');
+      });
+  });
+
   document.getElementById('btn-world-set').addEventListener('click', function () {
     const field = document.getElementById('world-field').value;
     const value = parseFloat(document.getElementById('world-value').value);
     if (!isFinite(value)) {
-      onLog('世界覆盖: 取值无效');
+      onLog('决策覆盖: 取值无效');
       return;
     }
-    debug('set_world', '{field: ' + field + ', value: ' + value + '}', '世界覆盖 ' + field);
+    debug('set_world', '{field: ' + field + ', value: ' + value + '}', '决策覆盖 ' + field);
   });
   document.getElementById('btn-world-clear').addEventListener('click', function () {
     const field = document.getElementById('world-field').value;
-    debug('clear_world', '{field: ' + field + '}', '清除覆盖 ' + field);
+    debug('clear_world', '{field: ' + field + '}', '清除决策覆盖 ' + field);
   });
 
   document.getElementById('btn-retreat').addEventListener('click', function () {

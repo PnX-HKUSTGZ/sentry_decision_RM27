@@ -91,10 +91,23 @@ export function createBridge(options) {
     });
   }
 
+  // 直接修改裁判仿真的模拟世界（字段同场景 set_world）。
+  function setSimWorld(field, value) {
+    return new Promise(function (resolve, reject) {
+      const client = new ROSLIB.Service({
+        ros: ros,
+        name: '/sentry_sim/set_world',
+        serviceType: 'sentry_decision_msgs/srv/SetWorld',
+      });
+      client.callService({ field: field, value: value }, resolve, reject);
+    });
+  }
+
   return {
     connect: connect,
     callDebug: callDebug,
     setGameStage: setGameStage,
     setGamePause: setGamePause,
+    setSimWorld: setSimWorld,
   };
 }

@@ -616,7 +616,12 @@ result 返回是否接受；feedback 每 tick 给出该字段的 `effective` 与
 
 - 发布 `sentry_interfaces` 的五条上行消息与 odom，驱动 `decision_node`；
 - 内嵌 `NavSimulator` 作为 `NavigateToPose` action server，并在收到 `DecisionCommand` 后用
-  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；执行端绑定 `SimWorld` 后会在回执时
+  结算兑换类动作（按规则 5.3.1 扣金币、加发弹量 / 血量，金币不足回 `accepted=false` + 原因），
+  因此面板「兑换发弹」不再只是空回执；
+- 节点按真实秒在补给区回血（近似规则 5.2.1：每秒回上限血量的 10%，比赛 4 分钟后 25%，
+  上限受 `max_hp` 约束；补给区为可配置的「圆心 + 半径」）；
+- `srv/SetWorld`（`/sentry_sim/set_world`）可绕过决策覆盖直接改仿真世界，供面板做闭环测试；
 - 场景脚本 YAML 描述带时间轴的事件与断言：
 
 ```yaml
@@ -643,6 +648,9 @@ timeline:
 因此既有场景测试不受影响。场景可声明 `start_pose: [x, y, yaw]` 作为机器人初始位姿，进程启动与
 「重置」都会应用（重置同时清空导航目标）。另提供 `SetGamePause`（`/sentry_sim/set_game_pause`）：
 暂停时冻结计时与 `NavSimulator` 运动，odom 仍刷新时间戳以免被判失效，恢复后从当前时刻继续。
+`/sentry_sim/set_world` 与决策覆盖（§14.3 的 `/decision/debug set_world`）是两件事：前者改
+仿真世界的真实值，后者只钉住决策节点读到的视图；`list_state` 额外给出 `raw_world`，
+面板据此显示「覆盖生效时被钉住」的真实数值。
 
 战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
 任务树的 `MissionPatrol` 也以 `IfTacticalMode(patrol)` 门控，因此待机时不下发任务导航目标。
@@ -668,7 +676,9 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
   只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
 - 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
   统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发；
-  另外提供世界覆盖（`set_world` / `clear_world`，覆盖血量 / 金币 / 发弹 / 剩余时间）与暂停按钮；
+  另外提供「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与「决策覆盖」
+  （`set_world` / `clear_world`，只改决策视图）两组数值控件，以及暂停按钮；
+  世界状态面板在覆盖生效时额外显示「原始 血/弹/金」（来自 `list_state.raw_world'）作对照；
   未进入「比赛中」时人工意图按钮自动禁用；
   `ManualOverride` action 仍保留给 `ros2 action send_goal` 等客户端；面板不用 action 是因为
   vendored roslib 1.4.1 的 `ActionClient` 为 ROS 1 actionlib 命名，无法对接 ROS 2 action；

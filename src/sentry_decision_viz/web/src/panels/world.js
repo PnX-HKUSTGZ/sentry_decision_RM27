@@ -14,11 +14,23 @@ export function createWorldPanel(el) {
         el.textContent = '等待 /decision/world_state …';
         return;
       }
+      // 覆盖前的真实世界（list_state 轮询）；有覆盖时提示决策视图被钉住。
+      const snapshot = state.listState || {};
+      const raw = snapshot.raw_world;
+      const overrides = snapshot.world_overrides || {};
+      const overrideNames = Object.keys(overrides);
       let html = '<table>';
       html += row('模式', d ? d.modeName : '-');
       html += row('期望 / 当前姿态', (d ? d.stanceName : '-') + ' / ' + w.stanceName);
       html += row('血量 / 弹量', w.selfHp + ' / ' + w.selfAmmo);
       html += row('金币', w.coins);
+      if (raw) {
+        html += row(
+          '原始 血/弹/金',
+          raw.self_hp + ' / ' + raw.self_ammo + ' / ' + raw.coins +
+            (overrideNames.length ? '（决策覆盖生效）' : '')
+        );
+      }
       html += row('己方基地 / 前哨', w.baseHp + ' / ' + w.ourOutpostHp);
       html += row('敌方前哨 / 基地', w.enemyOutpostHp + ' / ' + w.enemyBaseHp);
       html += row('剩余时间', w.gameTime + ' s');
