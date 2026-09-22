@@ -23,9 +23,17 @@ SCENARIO="$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scena
 # 把补给区圆心设到原点并放大半径，使 demo 的初始位姿必然处于补给区，便于验证回血。
 "${SIM_BIN}" --scenario "${SCENARIO}" --hold \
   --ros-args -p supply_center_x:=0.0 -p supply_center_y:=0.0 -p supply_radius:=10.0 \
+  -p max_hp:=400 -p supply_heal_late_after_s:=240 \
   >/tmp/effects_sim.log 2>&1 & SP=$!
 trap 'kill "${DP}" "${SP}" 2>/dev/null || true' EXIT
 sleep 3
+
+# 仿真节点若因参数 / 依赖问题启动失败，尽早暴露，避免卡在 service 调用。
+if ! kill -0 "${SP}" 2>/dev/null; then
+  echo "FAIL: referee_sim_node 未启动" >&2
+  cat /tmp/effects_sim.log >&2
+  exit 1
+fi
 
 fail=0
 
@@ -40,12 +48,12 @@ game_field() {
 }
 
 call_stage() {
-  ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameStage \
+  timeout 5 ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameStage \
     "{stage: $1}" >/dev/null 2>&1 || true
 }
 
 set_world() {
-  ros2 service call /sentry_sim/set_world sentry_decision_msgs/srv/SetWorld \
+  timeout 5 ros2 service call /sentry_sim/set_world sentry_decision_msgs/srv/SetWorld \
     "{field: '$1', value: $2}" >/tmp/effects_setworld.log 2>&1 || true
 }
 
@@ -62,9 +70,14 @@ sleep 1
 ammo0="$(online_field bullets_remaining)"
 coin0="$(game_field coin_remaining)"
 
-ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
-  "{command: 'set_intent', args: \"{field: resource_request, value: {ammo: 50, hp: 0, revive: false}, lease_sec: 0, reason: 'smoke'}\"}" \
-  >/dev/null 2>&1 || true
+# 注入人工资源请求（每次注入都应视为一次新的兑换）。
+inject_exchange() {
+  timeout 5 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+    "{command: 'set_intent', args: \"{field: resource_request, value: {ammo: 50, hp: 0, revive: false}, lease_sec: 0, reason: 'smoke'}\"}" \
+    >/dev/null 2>&1 || true
+}
+
+inject_exchange
 sleep 2
 
 ammo1="$(online_field bullets_remaining)"
@@ -75,6 +88,20 @@ if [[ -z "${ammo1}" || "${ammo1}" -le "${ammo0}" ]]; then
 fi
 if [[ -z "${coin1}" || $((coin0 - coin1)) -ne 50 ]]; then
   echo "FAIL: 兑换 50 发应扣 50 金币（${coin0} -> ${coin1}）" >&2
+  fail=1
+fi
+
+# 再次注入同值请求：one-shot 记忆应被清除，可再次兑换。
+inject_exchange
+sleep 2
+ammo2="$(online_field bullets_remaining)"
+coin2="$(game_field coin_remaining)"
+if [[ -z "${ammo2}" || $((ammo2 - ammo1)) -ne 50 ]]; then
+  echo "FAIL: 重复兑换应再次增加 50 发（${ammo1} -> ${ammo2}）" >&2
+  fail=1
+fi
+if [[ -z "${coin2}" || $((coin1 - coin2)) -ne 50 ]]; then
+  echo "FAIL: 重复兑换应再扣 50 金币（${coin1} -> ${coin2}）" >&2
   fail=1
 fi
 

@@ -419,7 +419,6 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
 | `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
 | `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
-| `--ros-args -p match_duration_s` | `420` | 一局时长（用于计算已进行时间） |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

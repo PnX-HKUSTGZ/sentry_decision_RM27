@@ -110,6 +110,10 @@ std::vector<DecisionAction> ActionDispatcher::poll(TimePoint now) {
   return outgoing;
 }
 
+void ActionDispatcher::rearm(DecisionActionKind kind) {
+  slots_.erase(kind);
+}
+
 void ActionDispatcher::reset() {
   slots_.clear();
   next_request_id_ = 1;

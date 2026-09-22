@@ -452,6 +452,26 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
+  // 人工资源请求按「每次注入算一次」：重新注入时清掉派发器的 one-shot 记忆，
+  // 否则同值请求会被去重，面板重复点「兑换发弹 / 血量」不会再次下发。
+  void rearm_intervention_resource() {
+    for (const auto& intent : context_.intents) {
+      if (intent.field != sentry_decision::IntentField::kResourceRequest ||
+          intent.source != sentry_decision::SourceId::kIntervention) {
+        continue;
+      }
+      if (has_resource_intent_stamp_ && intent.stamp == last_resource_intent_stamp_) {
+        return;
+      }
+      last_resource_intent_stamp_ = intent.stamp;
+      has_resource_intent_stamp_ = true;
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kAmmoExchange);
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kHpExchange);
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kFreeResurrect);
+      return;
+    }
+  }
+
   // 资源请求 -> 决策动作：交给派发器处理 one-shot / polled 与 ack，再下发。
   void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
     for (const auto& ack : io_->take_acks()) {
@@ -459,6 +479,7 @@ class DecisionNode : public rclcpp::Node {
       last_ack_ = ack;
       has_last_ack_ = true;
     }
+    rearm_intervention_resource();
     sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
     for (const auto& action : dispatcher_.poll(now)) {
       io_->send_action(action);
@@ -484,6 +505,8 @@ class DecisionNode : public rclcpp::Node {
   sentry_decision::NavGoalTracker nav_tracker_;
   bool has_last_action_ = false;
   sentry_decision::DecisionAction last_action_;
+  sentry_decision::TimePoint last_resource_intent_stamp_{};
+  bool has_resource_intent_stamp_ = false;
   bool has_last_ack_ = false;
   sentry_decision::ActionAck last_ack_;
   bool safety_emergency_ = false;

@@ -127,7 +127,12 @@ class RefereeSimNode : public rclcpp::Node {
   using GoalHandle = rclcpp_action::ServerGoalHandle<NavigateToPose>;
 
   RefereeSimNode(const Options& options, Scenario scenario, bool has_scenario)
-      : Node("sentry_referee_sim"),
+      // 自动声明 -p 覆盖：数值参数可能是整数或浮点写法（如 max_hp:=400），
+      // 先按覆盖的原生类型声明，再由 declare_number_param 统一读成 double，
+      // 避免 declare_parameter<double> 因类型不匹配在启动时抛异常。
+      : Node("sentry_referee_sim", rclcpp::NodeOptions()
+                                       .allow_undeclared_parameters(true)
+                                       .automatically_declare_parameters_from_overrides(true)),
         nav_(2.0, 0.2),
         scenario_(std::move(scenario)),
         has_scenario_(has_scenario),
@@ -160,17 +165,33 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
  private:
+  // 读取数值参数：同时接受整数与浮点写法。带 -p 覆盖时参数已按覆盖类型自动声明，
+  // 这里按实际类型取值；没有覆盖时再以 double 默认值声明。
+  double declare_number_param(const std::string& name, double fallback) {
+    if (!has_parameter(name)) {
+      declare_parameter(name, fallback);
+      return fallback;
+    }
+    const rclcpp::Parameter parameter = get_parameter(name);
+    if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+      return static_cast<double>(parameter.as_int());
+    }
+    if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
+      return parameter.as_double();
+    }
+    return fallback;
+  }
+
   void declare_and_create_interfaces() {
     // 补给区回血 / 血量上限：仿真近似规则 5.2.1（占领补给区每秒回上限血量的
     // 10%，比赛 4 分钟后为 25%）。默认补给区取地图 healing 点附近，覆盖 home。
-    max_hp_ = static_cast<int>(declare_parameter<double>("max_hp", 400.0));
-    supply_center_x_ = declare_parameter<double>("supply_center_x", -6.0);
-    supply_center_y_ = declare_parameter<double>("supply_center_y", 4.0);
-    supply_radius_ = declare_parameter<double>("supply_radius", 1.5);
-    supply_heal_ratio_ = declare_parameter<double>("supply_heal_ratio", 0.10);
-    supply_heal_ratio_late_ = declare_parameter<double>("supply_heal_ratio_late", 0.25);
-    supply_heal_late_after_s_ = declare_parameter<double>("supply_heal_late_after_s", 240.0);
-    match_duration_s_ = static_cast<int>(declare_parameter<double>("match_duration_s", 420.0));
+    max_hp_ = static_cast<int>(declare_number_param("max_hp", 400.0));
+    supply_center_x_ = declare_number_param("supply_center_x", -6.0);
+    supply_center_y_ = declare_number_param("supply_center_y", 4.0);
+    supply_radius_ = declare_number_param("supply_radius", 1.5);
+    supply_heal_ratio_ = declare_number_param("supply_heal_ratio", 0.10);
+    supply_heal_ratio_late_ = declare_number_param("supply_heal_ratio_late", 0.25);
+    supply_heal_late_after_s_ = declare_number_param("supply_heal_late_after_s", 240.0);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -385,8 +406,11 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   // 比赛开始 4 分钟后的回血比例切到 25%（仿真近似规则 5.2.1）。
+  // 已进行时间由「比赛时长 - 当前剩余」得到，时长与 MatchStageController 保持一致。
   double supply_heal_ratio_for_now() const {
-    const int elapsed = std::max(0, match_duration_s_ - world_.game_time_remaining);
+    const int total =
+        sentry_decision_sim::stage_duration_seconds(sentry_decision_sim::MatchStage::kRunning);
+    const int elapsed = std::max(0, total - world_.game_time_remaining);
     return elapsed >= static_cast<int>(supply_heal_late_after_s_) ? supply_heal_ratio_late_
                                                                   : supply_heal_ratio_;
   }
@@ -691,7 +715,6 @@ class RefereeSimNode : public rclcpp::Node {
   double supply_heal_ratio_ = 0.10;
   double supply_heal_ratio_late_ = 0.25;
   double supply_heal_late_after_s_ = 240.0;
-  int match_duration_s_ = 420;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;

@@ -48,6 +48,8 @@
 
 ### Fixed
 
+- `referee_sim_node` 的数值参数改为自动声明 `-p` 覆盖、按实际类型读取：此前 `declare_parameter<double>` 遇到 CLI 的整数写法（如 `-p max_hp:=400`）会在启动时抛类型异常；同时移除并未真正改变比赛时长的 `match_duration_s` 参数，已进行时间改由 `MatchStageController` 的时长推导
+- 人工资源请求改为「每次注入算一次」：重新注入时清除派发器的 one-shot 记忆，此前面板重复点「兑换发弹 / 血量」因同值去重而不再下发
 - 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE
 - `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
 - 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）

@@ -35,6 +35,9 @@ class ActionDispatcher {
   void submit(const DecisionAction& action);
   void on_ack(const ActionAck& ack);
   std::vector<DecisionAction> poll(TimePoint now);
+  // 清除某个动作的 one-shot「已发送」记忆，使下一次同值提交视为新请求。
+  // 人工干预（如面板重复点「兑换发弹」）需要它：意图持续存在时同值请求本会被去重。
+  void rearm(DecisionActionKind kind);
   void reset();
 
  private:

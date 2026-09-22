@@ -81,6 +81,25 @@ void test_one_shot_rearms_after_gap() {
   CHECK(dispatcher.poll(t0 + Duration{100}).size() == 1);
 }
 
+// 人工重复触发：rearm 清除 one-shot 记忆后，同值可再次发送。
+void test_rearm_allows_same_value_again() {
+  ActionDispatcher dispatcher;
+  const TimePoint t0{};
+  const DecisionAction action =
+      make_action(DecisionActionKind::kAmmoExchange, ActionMode::kOneShot, 50);
+
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0).size() == 1);
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0 + Duration{50}).empty());
+
+  dispatcher.rearm(DecisionActionKind::kAmmoExchange);
+  dispatcher.submit(action);
+  const auto outgoing = dispatcher.poll(t0 + Duration{100});
+  CHECK(outgoing.size() == 1);
+  CHECK(outgoing[0].value == 50);
+}
+
 void test_polled_resends_at_interval() {
   ActionDispatcher dispatcher;
   const TimePoint t0{};
@@ -164,6 +183,7 @@ void test_unknown_ack_warns() {
 int main() {
   test_one_shot_sends_once();
   test_one_shot_rearms_after_gap();
+  test_rearm_allows_same_value_again();
   test_polled_resends_at_interval();
   test_polled_zero_interval_every_tick();
   test_one_shot_timeout_warns();
