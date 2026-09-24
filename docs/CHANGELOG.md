@@ -11,6 +11,7 @@
 
 ### Added
 
+- 新增 `tools/demo.sh` 一键启动脚本：一条命令拉起「网页面板 + 裁判仿真 + 决策节点」，三个进程 stdout 加 `[viz]` / `[sim]` / `[decision]` 前缀并各写日志，`Ctrl+C` 整组停止；宿主运行时自动起容器并映射 8080/9090，`docker/entrypoint.sh` 增加 `demo` 子命令
 - 新增 `docs/ARCHITECTURE.md` §14「可视化与仿真」，以及 `docs/ROADMAP.md` P3 子阶段规划：树状态 `TreeStatus`、Groot2 可选接入、干预 action / service、裁判仿真与场景脚本、干预回放、rosbridge 网页面板。
 - `sentry_decision_msgs`：新增 `TreeNodeStatus` / `TreeStatus` 消息
 - 新增 `sentry_decision_viz` 包：`TreeStatePublisher`（发布 `/decision/tree_status`）与可选 Groot2 桥

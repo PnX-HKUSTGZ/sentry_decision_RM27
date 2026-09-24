@@ -16,12 +16,16 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentr
 docker run -it --rm -p 8080:8080 -p 9090:9090 \
   -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy shell
 source .docker-build/install/setup.bash
+
+# 一键起「网页面板 + 裁判仿真 + 决策节点」（宿主直接运行；Ctrl+C 停止全部）
+tools/demo.sh
 ```
 
 容器内常用命令：
 
 | 想做什么 | 命令 |
 | --- | --- |
+| 一键仿真演示（面板 + 仿真 + 决策，见 §4.0） | `tools/demo.sh`（宿主或容器内均可） |
 | 本地最小闭环（无需 MCU / 导航） | `ros2 run sentry_decision_bringup decision_main` |
 | 真实 IO 决策闭环 | `ros2 run sentry_decision_bringup decision_node` |
 | 裁判仿真（持续发布世界状态） | `ros2 run sentry_decision_sim referee_sim_node` |
@@ -95,6 +99,30 @@ docker run -it --rm -v "$PWD":/ws -w /ws \
 # 容器内：
 source .docker-build/install/setup.bash
 ```
+
+### 4.0 一键启动仿真演示（推荐）
+
+不想每次开三个终端，用一条命令拉起「网页面板 + 裁判仿真 + 决策节点」：
+
+```bash
+tools/demo.sh            # 宿主直接运行；自动起容器并映射 8080/9090
+```
+
+- 三个进程的 stdout 汇到当前终端，分别加 `[viz]` / `[sim]` / `[decision]` 前缀；
+  同时各写一份到 `.docker-build/demo_logs/<name>.log`，可另开终端 `tail -f` 它们。
+- `Ctrl+C` 停止全部（脚本会终止整组进程）。
+- 常用变体：
+
+  | 命令 | 作用 |
+  | --- | --- |
+  | `tools/demo.sh --no-viz` | 只起裁判仿真 + 决策（不起 rosbridge / 静态页） |
+  | `tools/demo.sh --build` | 先 `colcon build` 再启动 |
+  | `tools/demo.sh --scenario <容器内路径>` | 指定场景（默认 `demo.yaml`） |
+  | `tools/demo.sh --rate 20` | 仿真频率 |
+
+- 已经在容器里时同样可用：`tools/demo.sh` 会自动识别容器环境；也可用
+  `docker/entrypoint.sh demo`。
+- 宿主运行需镜像已构建、8080/9090 空闲；面板地址 `http://localhost:8080`。
 
 ### 4.1 最小决策闭环
 
