@@ -78,8 +78,17 @@ bool parse_resource(const YAML::Node& node, ResourceRequest* out) {
     if (node["hp"]) {
       out->hp = node["hp"].as<int>();
     }
+    if (node["remote_ammo"]) {
+      out->remote_ammo = node["remote_ammo"].as<int>();
+    }
+    if (node["remote_hp"]) {
+      out->remote_hp = node["remote_hp"].as<int>();
+    }
     if (node["revive"]) {
       out->revive = node["revive"].as<bool>();
+    }
+    if (node["instant_revive"]) {
+      out->instant_revive = node["instant_revive"].as<bool>();
     }
   } catch (const std::exception&) {
     return false;

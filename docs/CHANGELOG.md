@@ -11,6 +11,7 @@
 
 ### Added
 
+- 资源请求打通远程 / 立即复活：`ResourceRequest` 新增 `remote_ammo` / `remote_hp` / `instant_revive`，`submit_resource_requests` 映射到 `kRemoteAmmoExchange` / `kRemoteHpExchange` / `kInstantResurrect`；资源树改为「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」，血量按规则只走脱战远程兑换，新增 `IfCanInstantResurrect` / `IfNotOccupyingGainPoint` / `RequestInstantRevive` / `RequestRemoteHpExchange` / `RequestRemoteAmmoExchange`；新增配置 `resource.remote_hp_times` / `resource.remote_ammo_times` / `resource.remote_ammo_min_coins`；面板「资源请求」与 `list_state` 展示远程次数与复活方式
 - 补给区免费发弹量（规则 5.3.2）：`SimWorld` 记录已领取的「整分钟」，`claim_supply_ammo()` 在机器人进入补给区时一次性发放累积的 100 发/分钟（金币不足也能补弹），`referee_sim_node` 每秒结算并记 ACT 日志
 - 远程兑换 6 秒延迟（规则 5.3.2 / 5.2.1）：`execute_action` 确认时立即扣金币并入队 `pending_remote`，`step_pending_remote()` 6 秒后才加发弹量 / 血量；远程兑换血量在 6 秒内战亡则作废且金币不返还
 - 增益点区域默认启用（补给 1.5m，基地 / 前哨 / 堡垒 1.0m），地图新增 `our_outpost` 命名点；`test_sim_world` 覆盖补给发弹与远程延迟，`test_resource` 覆盖 RMUL 补给位

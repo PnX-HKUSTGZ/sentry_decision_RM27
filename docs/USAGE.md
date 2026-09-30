@@ -355,14 +355,22 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 >   （由 `event_code` 位段表示，仿真按机器人位置生成）；
 > - **兑换血量**按规则只允许**脱战**远程兑换（`sentry_info_2.disengaged`）。
 >
-> 决策树也加了对应门控（`IfOccupyingGainPoint` / `IfDisengaged`），低弹量在野外不会再空发
-> 非法兑换。金币不足同样会被拒绝（`动作回执` 行显示 `rejected` 与原因）。
+> 资源树按「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」求值
+> （`tree/resource/root.xml`）：
+> - **血量兑换按规则只走远程**（`IfDisengaged` + 金币 + `RequestRemoteHpExchange`），
+>   本地血量兑换只保留给面板人工注入 / 调试；
+> - **本地兑换发弹量**需占领增益点（`IfOccupyingGainPoint`）；不在增益点且脱战时改走
+>   **远程兑换发弹量**（`IfNotOccupyingGainPoint`）；
+> - **立即复活**需 `can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则确认免费复活。
+>
+> 金币不足 / 未脱战 / 不在增益点都会被裁判拒绝（`动作回执` 行显示 `rejected` 与原因）。
 > 补给区自动回血：机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的
 > 10% / 秒回血，比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
 > 补给区还会按规则 5.3.2 发放免费发弹量：**比赛每满 1 分钟累积 100 发，进入补给区时一次性
 > 领取全部累积值**（与金币无关，金币不足时也能补弹）。
-> 远程兑换（若下发）按规则延迟生效：确认时扣金币，**6 秒后**才加发弹量 / 血量；远程兑换血量
-> 在 6 秒内战亡则作废且金币不返还。
+> 远程兑换按规则延迟生效：确认时扣金币，**6 秒后**才加发弹量 / 血量；远程兑换血量
+> 在 6 秒内战亡则作废且金币不返还。相关次数 / 金币阈值见 `resource.remote_*_times` /
+> `resource.remote_ammo_min_coins`。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。

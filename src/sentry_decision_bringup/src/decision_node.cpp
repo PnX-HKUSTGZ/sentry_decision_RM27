@@ -412,7 +412,11 @@ class DecisionNode : public rclcpp::Node {
     }
     out << "},\"resource\":{\"ammo\":" << result.output.resource.ammo
         << ",\"hp\":" << result.output.resource.hp
-        << ",\"revive\":" << (result.output.resource.revive ? "true" : "false") << "}";
+        << ",\"remote_ammo\":" << result.output.resource.remote_ammo
+        << ",\"remote_hp\":" << result.output.resource.remote_hp
+        << ",\"revive\":" << (result.output.resource.revive ? "true" : "false")
+        << ",\"instant_revive\":" << (result.output.resource.instant_revive ? "true" : "false")
+        << "}";
     out << ",\"last_action\":";
     if (has_last_action_) {
       out << "{\"kind\":\"" << action_kind_name(last_action_.kind)

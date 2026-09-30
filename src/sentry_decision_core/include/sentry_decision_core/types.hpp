@@ -82,9 +82,16 @@ struct Quaternion {
 };
 
 struct ResourceRequest {
+  // 本地兑换允许发弹量（需占领补给区 / 基地 / 前哨站增益点），单位：发。
   int ammo = 0;
+  // 本地兑换血量：规则只允许远程兑换，此字段仅保留给人工注入 / 调试，决策树不再主动产出。
   int hp = 0;
-  bool revive = false;
+  // 远程兑换允许发弹量次数（需脱战），单位：次。
+  int remote_ammo = 0;
+  // 远程兑换血量次数（需脱战），单位：次。
+  int remote_hp = 0;
+  bool revive = false;          // 确认免费复活
+  bool instant_revive = false;  // 兑换立即复活（需 can_instant_resurrect 且金币足够）
 };
 
 // 意图载荷；具体用哪一项由 Intent::field 决定。

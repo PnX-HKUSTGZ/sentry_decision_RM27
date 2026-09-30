@@ -121,6 +121,43 @@ BT::NodeStatus IfDisengaged::tick() {
                                                  : BT::NodeStatus::FAILURE;
 }
 
+// [IfNotOccupyingGainPoint]
+IfNotOccupyingGainPoint::IfNotOccupyingGainPoint(const std::string& name,
+                                                 const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList IfNotOccupyingGainPoint::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus IfNotOccupyingGainPoint::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.referee.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  return context->world.referee.event.local_ammo_exchange_point() ? BT::NodeStatus::FAILURE
+                                                                  : BT::NodeStatus::SUCCESS;
+}
+
+// [IfCanInstantResurrect]
+IfCanInstantResurrect::IfCanInstantResurrect(const std::string& name, const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList IfCanInstantResurrect::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus IfCanInstantResurrect::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.referee.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  const RefereeState& referee = context->world.referee;
+  const bool affordable = referee.coins >= static_cast<int>(referee.info1.instant_resurrect_cost);
+  return (referee.info1.can_instant_resurrect && affordable) ? BT::NodeStatus::SUCCESS
+                                                             : BT::NodeStatus::FAILURE;
+}
+
 // [RequestFreeRevive]
 RequestFreeRevive::RequestFreeRevive(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
@@ -140,30 +177,85 @@ BT::NodeStatus RequestFreeRevive::tick() {
   return BT::NodeStatus::SUCCESS;
 }
 
-// [RequestHpExchange]
-RequestHpExchange::RequestHpExchange(const std::string& name, const BT::NodeConfig& config)
-    : BT::SyncActionNode(name, config) {}
+namespace {
 
-BT::PortsList RequestHpExchange::providedPorts() {
-  return {BT::InputPort<std::string>("amount_key")};
+// 读取一个「次数」配置 key，非正或缺失返回 false。
+bool times_from_config(const BT::NodeConfig& config, const std::string& key, const char* node,
+                       int* out) {
+  DecisionContext* context = context_from(config);
+  if (context == nullptr || context->config == nullptr) {
+    return false;
+  }
+  const auto value = context->config->number(key);
+  if (!value.has_value() || value.value() <= 0.0) {
+    SD_LOG_WARN("resource", "%s 缺少或非法配置 key: %s", node, key.c_str());
+    return false;
+  }
+  *out = static_cast<int>(value.value());
+  return true;
 }
 
-BT::NodeStatus RequestHpExchange::tick() {
-  const auto key = getInput<std::string>("amount_key");
-  if (!key) {
+}  // namespace
+
+// [RequestRemoteHpExchange]
+RequestRemoteHpExchange::RequestRemoteHpExchange(const std::string& name,
+                                                 const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList RequestRemoteHpExchange::providedPorts() {
+  return {BT::InputPort<std::string>("times_key")};
+}
+
+BT::NodeStatus RequestRemoteHpExchange::tick() {
+  const auto key = getInput<std::string>("times_key");
+  int times = 0;
+  if (!key || !times_from_config(config(), key.value(), "RequestRemoteHpExchange", &times)) {
     return BT::NodeStatus::FAILURE;
   }
   DecisionContext* context = context_from(config());
-  if (context == nullptr || context->config == nullptr) {
+  ResourceRequest request;
+  request.remote_hp = times;
+  emit_resource(context, request);
+  return BT::NodeStatus::SUCCESS;
+}
+
+// [RequestRemoteAmmoExchange]
+RequestRemoteAmmoExchange::RequestRemoteAmmoExchange(const std::string& name,
+                                                     const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList RequestRemoteAmmoExchange::providedPorts() {
+  return {BT::InputPort<std::string>("times_key")};
+}
+
+BT::NodeStatus RequestRemoteAmmoExchange::tick() {
+  const auto key = getInput<std::string>("times_key");
+  int times = 0;
+  if (!key || !times_from_config(config(), key.value(), "RequestRemoteAmmoExchange", &times)) {
     return BT::NodeStatus::FAILURE;
   }
-  const auto amount = context->config->number(key.value());
-  if (!amount.has_value()) {
-    SD_LOG_WARN("resource", "RequestHpExchange 缺少配置 key: %s", key.value().c_str());
+  DecisionContext* context = context_from(config());
+  ResourceRequest request;
+  request.remote_ammo = times;
+  emit_resource(context, request);
+  return BT::NodeStatus::SUCCESS;
+}
+
+// [RequestInstantRevive]
+RequestInstantRevive::RequestInstantRevive(const std::string& name, const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList RequestInstantRevive::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus RequestInstantRevive::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr) {
     return BT::NodeStatus::FAILURE;
   }
   ResourceRequest request;
-  request.hp = static_cast<int>(amount.value());
+  request.instant_revive = true;
   emit_resource(context, request);
   return BT::NodeStatus::SUCCESS;
 }
@@ -202,8 +294,12 @@ void register_resource_nodes(BT::BehaviorTreeFactory& factory) {
   factory.registerNodeType<IfCoinsAtLeast>("IfCoinsAtLeast");
   factory.registerNodeType<IfOccupyingGainPoint>("IfOccupyingGainPoint");
   factory.registerNodeType<IfDisengaged>("IfDisengaged");
+  factory.registerNodeType<IfNotOccupyingGainPoint>("IfNotOccupyingGainPoint");
+  factory.registerNodeType<IfCanInstantResurrect>("IfCanInstantResurrect");
   factory.registerNodeType<RequestFreeRevive>("RequestFreeRevive");
-  factory.registerNodeType<RequestHpExchange>("RequestHpExchange");
+  factory.registerNodeType<RequestInstantRevive>("RequestInstantRevive");
+  factory.registerNodeType<RequestRemoteHpExchange>("RequestRemoteHpExchange");
+  factory.registerNodeType<RequestRemoteAmmoExchange>("RequestRemoteAmmoExchange");
   factory.registerNodeType<RequestAmmoExchange>("RequestAmmoExchange");
 }
 

@@ -31,9 +31,11 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"nav.supply_ammo", {true, true}},
       {"nav.patrol_dwell_s", {false, true}},
       {"resource.exchange_ammo_step", {true, true}},
-      {"resource.exchange_hp_step", {true, true}},
       {"resource.hp_exchange_threshold", {true, true}},
       {"resource.min_coins", {true, true}},
+      {"resource.remote_hp_times", {true, true}},
+      {"resource.remote_ammo_times", {true, true}},
+      {"resource.remote_ammo_min_coins", {true, true}},
       {"strategic.attack_window_min_remaining", {true, true}},
       {"strategic.attack_window_max_remaining", {true, true}},
   };

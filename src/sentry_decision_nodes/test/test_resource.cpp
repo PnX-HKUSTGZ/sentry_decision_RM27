@@ -25,21 +25,32 @@ const char* kTree = R"xml(
 <root BTCPP_format="4">
   <BehaviorTree ID="MainTree">
     <ReactiveFallback name="root">
-      <Sequence name="revive">
+      <Sequence name="instant">
+        <IfCanInstantResurrect/>
+        <RequestInstantRevive/>
+      </Sequence>
+      <Sequence name="free">
         <IfCanFreeResurrect/>
         <RequestFreeRevive/>
       </Sequence>
-      <Sequence name="hp">
+      <Sequence name="remote_hp">
         <IfLowHp hp_key="resource.hp_exchange_threshold"/>
         <IfDisengaged/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
-        <RequestHpExchange amount_key="resource.exchange_hp_step"/>
+        <RequestRemoteHpExchange times_key="resource.remote_hp_times"/>
       </Sequence>
-      <Sequence name="ammo">
+      <Sequence name="local_ammo">
         <IfLowAmmo ammo_key="nav.low_ammo"/>
         <IfOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
         <RequestAmmoExchange amount_key="resource.exchange_ammo_step"/>
+      </Sequence>
+      <Sequence name="remote_ammo">
+        <IfLowAmmo ammo_key="nav.low_ammo"/>
+        <IfDisengaged/>
+        <IfNotOccupyingGainPoint/>
+        <IfCoinsAtLeast coins_key="resource.remote_ammo_min_coins"/>
+        <RequestRemoteAmmoExchange times_key="resource.remote_ammo_times"/>
       </Sequence>
     </ReactiveFallback>
   </BehaviorTree>
@@ -50,8 +61,10 @@ PolicyConfig make_config() {
   PolicyConfig config;
   config.numbers["resource.hp_exchange_threshold"] = 50.0;
   config.numbers["resource.min_coins"] = 100.0;
-  config.numbers["resource.exchange_hp_step"] = 50.0;
   config.numbers["resource.exchange_ammo_step"] = 50.0;
+  config.numbers["resource.remote_hp_times"] = 1.0;
+  config.numbers["resource.remote_ammo_times"] = 1.0;
+  config.numbers["resource.remote_ammo_min_coins"] = 150.0;
   config.numbers["nav.low_ammo"] = 50.0;
   return config;
 }
@@ -71,7 +84,7 @@ WorldState make_world() {
   world.referee.self_hp = 400;
   world.referee.self_ammo = 100;
   world.referee.coins = 200;
-  world.referee.event.supply_zone_occupied = true;  // 默认在可兑换增益点
+  world.referee.event.supply_zone_occupied = true;  // 默认在可本地兑换的增益点
   world.referee.info2.disengaged = true;            // 默认脱战
   return world;
 }
@@ -90,7 +103,8 @@ void test_free_revive() {
   CHECK(std::get<ResourceRequest>(context.intents[0].value).revive);
 }
 
-void test_hp_exchange() {
+// 血量兑换按规则只走远程：脱战 + 金币够 -> remote_hp 次数。
+void test_remote_hp_exchange() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
@@ -101,11 +115,44 @@ void test_hp_exchange() {
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
   const auto& request = std::get<ResourceRequest>(context.intents[0].value);
-  CHECK(request.hp == 50);
+  CHECK(request.remote_hp == 1);
+  CHECK(request.hp == 0);
   CHECK(request.ammo == 0);
 }
 
-void test_ammo_exchange() {
+// 立即复活优先，且金币不足时不请求。
+void test_instant_revive() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_hp = 0;
+  context.world.referee.info1.can_instant_resurrect = true;
+  context.world.referee.info1.instant_resurrect_cost = 120;
+  context.world.referee.coins = 200;
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.size() == 1);
+  CHECK(std::get<ResourceRequest>(context.intents[0].value).instant_revive);
+}
+
+void test_instant_revive_blocked_without_coins() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_hp = 0;
+  context.world.referee.info1.can_instant_resurrect = true;
+  context.world.referee.info1.instant_resurrect_cost = 120;
+  context.world.referee.coins = 50;  // 不足以立即复活 / 远程血量 / 本地兑换
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.empty());
+}
+
+void test_local_ammo_exchange() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
@@ -117,6 +164,39 @@ void test_ammo_exchange() {
   CHECK(context.intents.size() == 1);
   const auto& request = std::get<ResourceRequest>(context.intents[0].value);
   CHECK(request.ammo == 50);
+  CHECK(request.remote_ammo == 0);
+}
+
+// 不在增益点且脱战时，改走远程兑换发弹量。
+void test_remote_ammo_exchange_without_gain_point() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_ammo = 10;
+  context.world.referee.event = {};
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.size() == 1);
+  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
+  CHECK(request.remote_ammo == 1);
+  CHECK(request.ammo == 0);
+}
+
+// 远程兑换发弹量金币不足（100 < 150）时不请求。
+void test_remote_ammo_blocked_when_coins_low() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_ammo = 10;
+  context.world.referee.event = {};
+  context.world.referee.coins = 100;
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.empty());
 }
 
 void test_no_coins_no_exchange() {
@@ -132,39 +212,24 @@ void test_no_coins_no_exchange() {
   CHECK(context.intents.empty());
 }
 
-// 前置条件：不在增益点时不请求本地兑换发弹量。
-void test_ammo_exchange_blocked_without_gain_point() {
+// RMUC 场次的补给区占用走 event bit 0，视为可本地兑换增益点。
+void test_ammo_exchange_accepts_supply_bit() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
   context.world.referee.self_ammo = 10;
   context.world.referee.event = {};
-  BT::Tree tree = make_tree(&context);
-  context.clear_intents();
-  tree.tickOnce();
-  CHECK(context.intents.empty());
-}
-
-// 前置条件：RMUL 场次的补给区占用走 event bit 2，也应视为可兑换增益点。
-void test_ammo_exchange_accepts_rmul_supply_bit() {
-  PolicyConfig config = make_config();
-  DecisionContext context;
-  context.config = &config;
-  context.world = make_world();
-  context.world.referee.self_ammo = 10;
-  context.world.referee.event = {};
-  context.world.referee.event.supply_zone_occupied_rmul = true;  // RMUL bit 2
+  context.world.referee.event.supply_zone_occupied = true;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
-  CHECK(request.ammo == 50);
+  CHECK(std::get<ResourceRequest>(context.intents[0].value).ammo == 50);
 }
 
-// 前置条件：未脱战时不请求兑换血量。
-void test_hp_exchange_blocked_when_engaged() {
+// 前置条件：未脱战时不请求远程兑换血量 / 发弹量。
+void test_remote_exchange_blocked_when_engaged() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
@@ -181,12 +246,15 @@ void test_hp_exchange_blocked_when_engaged() {
 
 int main() {
   test_free_revive();
-  test_hp_exchange();
-  test_ammo_exchange();
+  test_remote_hp_exchange();
+  test_instant_revive();
+  test_instant_revive_blocked_without_coins();
+  test_local_ammo_exchange();
+  test_remote_ammo_exchange_without_gain_point();
+  test_remote_ammo_blocked_when_coins_low();
   test_no_coins_no_exchange();
-  test_ammo_exchange_blocked_without_gain_point();
-  test_ammo_exchange_accepts_rmul_supply_bit();
-  test_hp_exchange_blocked_when_engaged();
+  test_ammo_exchange_accepts_supply_bit();
+  test_remote_exchange_blocked_when_engaged();
   if (g_failures == 0) {
     std::printf("all resource tests passed\n");
     return 0;

@@ -62,8 +62,18 @@ export function createIntentsPanel(el) {
       html += '</td></tr>';
 
       const resource = snapshot.resource || {};
-      html += '<tr><th>资源请求</th><td>ammo=' + (resource.ammo || 0) + ' hp=' + (resource.hp || 0) +
-        ' revive=' + (resource.revive ? 'true' : 'false') + '</td></tr>';
+      html +=
+        '<tr><th>资源请求</th><td>本地弹=' +
+        (resource.ammo || 0) +
+        ' 本地血=' +
+        (resource.hp || 0) +
+        ' 远程弹=' +
+        (resource.remote_ammo || 0) +
+        ' 远程血=' +
+        (resource.remote_hp || 0) +
+        ' 复活=' +
+        (resource.instant_revive ? '立即' : resource.revive ? '免费' : '否') +
+        '</td></tr>';
 
       const action = snapshot.last_action;
       html += '<tr><th>最近动作</th><td>';
