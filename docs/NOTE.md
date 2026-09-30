@@ -19,10 +19,11 @@
 
 ### 进行中
 
-- 进行中：P3.7 资源动作接入 + 场地口径——`ResourceRequest` 增 `remote_ammo` / `remote_hp` / `instant_revive`，
-  资源树按「立即复活 > 免费复活 > 远程血 > 本地弹 > 远程弹」重写，血量按规则只走脱战远程兑换；
-  确认规则手册为 RMUC（战场 28×15m），`map_profile: RMUL26` 及现有点位为占位，待按图 4-5 重新标定，
-  并与导航仓库 `RMUC2026` 地图原点 / 朝向对齐后再接真实场地图。
+- 已完成（本地）：P3.7 资源动作接入 + 场地标定——`ResourceRequest` 增 `remote_ammo` / `remote_hp` / `instant_revive`，
+  资源树按「立即复活 > 免费复活 > 远程血 > 本地弹 > 远程弹」重写，血量只走脱战远程兑换；
+  场地口径确认为 RMUC（战场 28×15m），地图 profile 更名 `RMUC26`，网页面板「场地标定」工具完成标定，
+  主面板战场俯视图改用导航仓库 `RMUC2026.pgm` 底图（0.05 m/px、origin [-14.6,-5.86]）；
+  仿真增益点默认坐标、场景 start_pose / expect 与相关冒烟同步到新点位。
 - 已完成（本地）：P3.6 仿真机制补全 + 鲁棒性审查——补给区免费发弹量（规则 5.3.2，按整分钟累积、进区领取）、
   远程兑换 6 秒延迟（含远程血量 6 秒内战亡作废）、增益点区域默认启用并补 `our_outpost` 坐标；
   修复 `local_ammo_exchange_point()` 漏判 RMUL 补给位（bit 2）、`NavigateToPose` 旧 goal 悬挂、网页面板位姿空值崩溃；
@@ -61,7 +62,7 @@
 - 分支 `p2-strategy`（基于 `main` @ `4958c8b`）。
 - 文档已同步：`ARCHITECTURE.md` §3.2 / §6 / §7.3 / §7.5 / §11 / §15；`ROADMAP.md` P2 子阶段与状态。
 - **P2.0 完成（本地）**：
-  - `config/`：单一入口 `profiles.yaml` + `maps/RMUL26.yaml` + `policies/rmuc26.yaml`；core `PolicyConfig` 纯结构；bringup `config_loader` 用 yaml-cpp 加载并校验。
+  - `config/`：单一入口 `profiles.yaml` + `maps/RMUC26.yaml`（P2 时曾用 `RMUL26.yaml`）+ `policies/rmuc26.yaml`；core `PolicyConfig` 纯结构；bringup `config_loader` 用 yaml-cpp 加载并校验。
   - `tree/`：`root.xml` → `mission/root.xml`（优先级）→ `mission/nav/*` + `skill/goto_named_point.xml`；命名规范 `If*` / `Mission*` / `Emit*` 落地。
   - `tree_manifest.yaml` + `tree_loader`：builtin 模块注册、`*_key` / `*point` 引用的配置启动校验。
   - 节点：`CheckLowHp` → `IfLowHp`（`hp_key`），新增 `EmitNavGoalFromPoint`（命名点）；删除 `demo_tree.xml`。

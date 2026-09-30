@@ -20,9 +20,10 @@ SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_
 SCENARIO="$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml"
 
 "${DECISION_BIN}" --ticks 0 >/tmp/effects_decision.log 2>&1 & DP=$!
-# 把补给区圆心设到原点并放大半径，使 demo 的初始位姿必然处于补给区，便于验证回血。
+# 把补给区设成覆盖全场的圆，保证机器人整局都在补给区内，便于验证回血 / 兑换。
+# （RMUC 场地约 29×15m，机器人会直奔远处目标，半径太小会中途离开增益点。）
 "${SIM_BIN}" --scenario "${SCENARIO}" --hold \
-  --ros-args -p supply_center_x:=0.0 -p supply_center_y:=0.0 -p supply_radius:=10.0 \
+  --ros-args -p supply_center_x:=0.0 -p supply_center_y:=0.0 -p supply_radius:=40.0 \
   -p max_hp:=400 -p supply_heal_late_after_s:=240 \
   >/tmp/effects_sim.log 2>&1 & SP=$!
 trap 'kill "${DP}" "${SP}" 2>/dev/null || true' EXIT

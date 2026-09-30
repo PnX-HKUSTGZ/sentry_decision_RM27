@@ -97,12 +97,12 @@ fi
 ros2 service call /sentry_sim/set_game_pause sentry_decision_msgs/srv/SetGamePause \
   "{paused: false}" >/dev/null 2>&1 || true
 
-# 重置位置：demo 的 start_pose 为 (-5, 3)。
+# 重置位置：demo 的 start_pose 为 home (-11.47, -4.40)。
 call_stage 0
 sleep 0.5
 pose="$(odom_pose)"
-if [[ "${pose}" != "-5.0 3.0" ]]; then
-  echo "FAIL: 重置后位姿应为 (-5.0, 3.0)，实际 ${pose}" >&2
+if ! python3 -c "import sys; x, y = map(float, sys.argv[1].split()); sys.exit(0 if abs(x + 11.47) < 0.05 and abs(y + 4.40) < 0.05 else 1)" "${pose}"; then
+  echo "FAIL: 重置后位姿应为 (-11.47, -4.40)，实际 ${pose}" >&2
   fail=1
 fi
 

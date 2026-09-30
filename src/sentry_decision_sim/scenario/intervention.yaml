@@ -12,7 +12,7 @@ world:
   enemy_outpost_hp: 1500
 
 timeline:
-  # 巡逻（移动姿态），默认去 patrol_a (0, 1.1)。
+  # 巡逻（移动姿态），默认去 patrol_a (-3.82, 5.93)。
   - at: 2.0
     expect: { tactical_mode: patrol, stance: move, has_nav_goal: true }
 

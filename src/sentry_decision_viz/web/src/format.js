@@ -1,6 +1,8 @@
 // 纯函数：把 ROS 消息展平成面板视图模型。
 // 不碰 DOM / ROSLIB，因此可在 node 下直接单测（web/test/format.test.mjs）。
 
+import { fieldExtent } from './field.js';
+
 export const NODE_STATUS = ['IDLE', 'RUNNING', 'SUCCESS', 'FAILURE', 'SKIPPED'];
 export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn', 'idle'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
@@ -106,10 +108,10 @@ export function decisionToView(msg) {
   };
 }
 
-// 战场模型：固定地图范围（RMUL 场地约 ±8 m）。
+// 战场模型：范围取自 RMUC 场地底图（origin/resolution/尺寸见 field.js）。
 export function battlefieldModel(world, decision) {
   return {
-    extent: { minX: -8, maxX: 8, minY: -8, maxY: 8 },
+    extent: fieldExtent(),
     self: world && world.selfValid ? { x: world.posX, y: world.posY, yaw: world.yaw } : null,
     goal: decision && decision.hasNavGoal ? { x: decision.navGoalX, y: decision.navGoalY } : null,
     enemy: world && world.enemyValid && world.hasEnemy ? { x: world.enemyX, y: world.enemyY } : null,

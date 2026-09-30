@@ -221,7 +221,7 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 
 ```yaml
 name: full_match
-start_pose: [-5.0, 3.0, 0.0]    # 机器人初始位姿（可选，重置时也会恢复）
+start_pose: [-11.47, -4.40, 0.0]  # 机器人初始位姿（可选，重置时也会恢复）
 world:                          # 初始世界（时间轴之前应用）
   self_hp: 400
   self_ammo: 100
@@ -291,8 +291,8 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 
 - 左侧行为树（`/decision/tree_status`，RUNNING 高亮；已完成节点保留 SUCCESS / FAILURE，
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
-- 中间战场俯视图（示意场地底图：己方半场 x<0 冷色 / 敌方半场 x>0 暖色，中间竖线；叠加己方位姿、
-  导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
+- 中间战场俯视图（RMUC2026 场地底图，来源导航仓库 `RMUC2026.pgm`，0.05 m/px、origin `[-14.6, -5.86]`；
+  叠加己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
 - 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执 /
   原始世界（每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
@@ -475,14 +475,14 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
 | `--ros-args -p set_world_service` | `/sentry_sim/set_world` | 直接修改仿真世界的服务名 |
 | `--ros-args -p max_hp` | `400` | 哨兵上限血量（用于兑换 / 回血上限） |
-| `--ros-args -p supply_center_x` / `_y` | `-6.0` / `4.0` | 补给区圆心（默认取地图 `healing` 点） |
+| `--ros-args -p supply_center_x` / `_y` | `-12.36` / `-3.47` | 补给区圆心（默认取地图 `healing` 点） |
 | `--ros-args -p supply_radius` | `1.5` | 补给区半径（米） |
 | `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
 | `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
 | `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
-| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `1.0` | 己方基地增益点区域（默认 `home` 点；半径 0 = 不启用） |
-| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-1.1` / `1.1` / `1.0` | 己方前哨站增益点区域（默认取地图 `our_outpost` 点） |
-| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `1.0` | 己方堡垒增益点区域（默认 `fort` 点） |
+| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-11.47` / `-4.40` / `1.0` | 己方基地增益点区域（默认 `home` 点；半径 0 = 不启用） |
+| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-2.55` / `-2.21` / `1.0` | 己方前哨站增益点区域（默认取地图 `our_outpost` 点） |
+| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-7.37` / `1.60` / `1.0` | 己方堡垒增益点区域（默认 `fort` 点） |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

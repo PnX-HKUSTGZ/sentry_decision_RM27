@@ -1,70 +1,57 @@
 import { worldToCanvas } from './format.js';
+import { FIELD } from './field.js';
 
-// 场地底图：网格 + 边界 + 中线 / 中圈 + 半场标注。
-// 目前只做示意（未接入真实地图），目的是让俯视图不再空白、便于判断坐标方向。
+// 场地底图：RMUC2026（由导航仓库 RMUC2026.pgm 转换）。世界坐标 -> 像素映射见 field.js。
+// 半场：RMUC 长边为 x 轴，己方在 x<0（左）。
+const fieldImage = new Image();
+fieldImage.src = FIELD.image;
+let lastCanvas = null;
+let lastModel = null;
+fieldImage.onload = function () {
+  if (lastCanvas && lastModel) {
+    drawBattlefield(lastCanvas, lastModel);
+  }
+};
+
+function extentRect(extent, width, height) {
+  const a = worldToCanvas({ x: extent.minX, y: extent.maxY }, extent, width, height);
+  const b = worldToCanvas({ x: extent.maxX, y: extent.minY }, extent, width, height);
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y),
+  };
+}
+
+function label(ctx, text, x, y, align) {
+  ctx.save();
+  ctx.font = '13px monospace';
+  ctx.textAlign = align || 'left';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(238, 242, 246, 0.9)';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = '#1d2833';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 function drawField(ctx, extent, width, height) {
-  const a = worldToCanvas({ x: extent.minX, y: extent.minY }, extent, width, height);
-  const b = worldToCanvas({ x: extent.maxX, y: extent.maxY }, extent, width, height);
-  const left = Math.min(a.x, b.x);
-  const right = Math.max(a.x, b.x);
-  const top = Math.min(a.y, b.y);
-  const bottom = Math.max(a.y, b.y);
-
-  ctx.fillStyle = '#0d151c';
-  ctx.fillRect(left, top, right - left, bottom - top);
-
-  // 半场底色：己方（x<0）冷色、敌方（x>0）暖色，让 x 轴分界一眼可见。
-  const half = worldToCanvas({ x: 0, y: 0 }, extent, width, height);
-  ctx.fillStyle = 'rgba(74, 163, 255, 0.08)';
-  ctx.fillRect(left, top, half.x - left, bottom - top);
-  ctx.fillStyle = 'rgba(224, 90, 90, 0.08)';
-  ctx.fillRect(half.x, top, right - half.x, bottom - top);
-
-  // 1m 网格
-  ctx.strokeStyle = '#1d2833';
-  ctx.lineWidth = 1;
-  for (let gx = Math.ceil(extent.minX); gx <= extent.maxX; gx += 1) {
-    const p = worldToCanvas({ x: gx, y: 0 }, extent, width, height);
-    ctx.beginPath();
-    ctx.moveTo(p.x, top);
-    ctx.lineTo(p.x, bottom);
-    ctx.stroke();
+  ctx.fillStyle = '#0b1015';
+  ctx.fillRect(0, 0, width, height);
+  const rect = extentRect(extent, width, height);
+  if (fieldImage.complete && fieldImage.naturalWidth) {
+    ctx.drawImage(fieldImage, rect.x, rect.y, rect.width, rect.height);
+  } else {
+    ctx.fillStyle = '#8b9bab';
+    ctx.font = '14px monospace';
+    ctx.fillText('加载场地地图…', rect.x + 10, rect.y + 20);
   }
-  for (let gy = Math.ceil(extent.minY); gy <= extent.maxY; gy += 1) {
-    const p = worldToCanvas({ x: 0, y: gy }, extent, width, height);
-    ctx.beginPath();
-    ctx.moveTo(left, p.y);
-    ctx.lineTo(right, p.y);
-    ctx.stroke();
-  }
-
-  // 中线（世界 x = 0，己方半场在 x<0）与中圈。
-  const center = half;
-  ctx.strokeStyle = '#5b86c0';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([7, 6]);
-  ctx.beginPath();
-  ctx.moveTo(center.x, top);
-  ctx.lineTo(center.x, bottom);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, 26, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 边界
   ctx.strokeStyle = '#4a5d70';
   ctx.lineWidth = 2;
-  ctx.strokeRect(left + 1, top + 1, right - left - 2, bottom - top - 2);
-
-  // 半场标注（底边）：己方在 x<0（左），敌方在 x>0（右）。
-  ctx.fillStyle = '#5f7285';
-  ctx.font = '13px monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText('己方半场', left + 8, bottom - 8);
-  ctx.textAlign = 'right';
-  ctx.fillText('敌方半场', right - 8, bottom - 8);
-  ctx.textAlign = 'left';
+  ctx.strokeRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
+  label(ctx, '己方半场（x<0）', rect.x + 8, rect.y + rect.height - 8, 'left');
+  label(ctx, '敌方半场（x>0）', rect.x + rect.width - 8, rect.y + rect.height - 8, 'right');
 }
 
 function drawGoal(ctx, point, extent, width, height) {
@@ -106,6 +93,8 @@ function drawSelf(ctx, self, extent, width, height) {
 }
 
 export function drawBattlefield(canvas, model) {
+  lastCanvas = canvas;
+  lastModel = model;
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
@@ -121,14 +110,8 @@ export function drawBattlefield(canvas, model) {
   if (model.self) {
     drawSelf(ctx, model.self, extent, width, height);
   } else {
-    ctx.fillStyle = '#8b9bab';
-    ctx.font = '14px monospace';
-    ctx.fillText('等待定位 /odom …', 10, height - 12);
+    label(ctx, '等待定位 /odom …', 10, height - 12, 'left');
   }
-  // mode 放右上角，避免与左上角的半场标注重叠。
-  ctx.fillStyle = '#8b9bab';
-  ctx.font = '14px monospace';
-  ctx.textAlign = 'right';
-  ctx.fillText('mode: ' + model.mode, width - 10, 20);
-  ctx.textAlign = 'left';
+  // mode 放右上角，避免与半场标注重叠。
+  label(ctx, 'mode: ' + model.mode, width - 10, 20, 'right');
 }

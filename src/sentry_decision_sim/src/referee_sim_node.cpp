@@ -185,23 +185,24 @@ class RefereeSimNode : public rclcpp::Node {
 
   void declare_and_create_interfaces() {
     // 补给区回血 / 血量上限：仿真近似规则 5.2.1（占领补给区每秒回上限血量的
-    // 10%，比赛 4 分钟后为 25%）。默认补给区取地图 healing 点附近，覆盖 home。
+    // 10%，比赛 4 分钟后为 25%）。以下增益点默认坐标与 config/maps/RMUC26.yaml 一致
+    // （supply=healing / base_buff=home / our_outpost_buff=our_outpost / fort_buff=fort）。
     max_hp_ = static_cast<int>(declare_number_param("max_hp", 400.0));
-    supply_center_x_ = declare_number_param("supply_center_x", -6.0);
-    supply_center_y_ = declare_number_param("supply_center_y", 4.0);
+    supply_center_x_ = declare_number_param("supply_center_x", -12.36);
+    supply_center_y_ = declare_number_param("supply_center_y", -3.47);
     supply_radius_ = declare_number_param("supply_radius", 1.5);
     supply_heal_ratio_ = declare_number_param("supply_heal_ratio", 0.10);
     supply_heal_ratio_late_ = declare_number_param("supply_heal_ratio_late", 0.25);
     supply_heal_late_after_s_ = declare_number_param("supply_heal_late_after_s", 240.0);
     // 其余己方增益点区域（半径 <= 0 表示不启用）；用于「本地兑换发弹量」的前置判定。
-    base_buff_center_x_ = declare_number_param("base_buff_center_x", -5.0);
-    base_buff_center_y_ = declare_number_param("base_buff_center_y", 3.0);
+    base_buff_center_x_ = declare_number_param("base_buff_center_x", -11.47);
+    base_buff_center_y_ = declare_number_param("base_buff_center_y", -4.40);
     base_buff_radius_ = declare_number_param("base_buff_radius", 1.0);
-    our_outpost_center_x_ = declare_number_param("our_outpost_center_x", -1.1);
-    our_outpost_center_y_ = declare_number_param("our_outpost_center_y", 1.1);
+    our_outpost_center_x_ = declare_number_param("our_outpost_center_x", -2.55);
+    our_outpost_center_y_ = declare_number_param("our_outpost_center_y", -2.21);
     our_outpost_radius_ = declare_number_param("our_outpost_radius", 1.0);
-    fort_buff_center_x_ = declare_number_param("fort_buff_center_x", -5.0);
-    fort_buff_center_y_ = declare_number_param("fort_buff_center_y", 3.0);
+    fort_buff_center_x_ = declare_number_param("fort_buff_center_x", -7.37);
+    fort_buff_center_y_ = declare_number_param("fort_buff_center_y", 1.60);
     fort_buff_radius_ = declare_number_param("fort_buff_radius", 1.0);
 
     const auto game_info_topic =
@@ -782,21 +783,21 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_remote_tick_{};
   bool in_supply_ = false;
   int max_hp_ = 400;
-  double supply_center_x_ = -6.0;
-  double supply_center_y_ = 4.0;
+  double supply_center_x_ = -12.36;
+  double supply_center_y_ = -3.47;
   double supply_radius_ = 1.5;
   double supply_heal_ratio_ = 0.10;
   double supply_heal_ratio_late_ = 0.25;
   double supply_heal_late_after_s_ = 240.0;
-  double base_buff_center_x_ = -5.0;
-  double base_buff_center_y_ = 3.0;
-  double base_buff_radius_ = 0.0;
-  double our_outpost_center_x_ = -1.1;
-  double our_outpost_center_y_ = 1.1;
-  double our_outpost_radius_ = 0.0;
-  double fort_buff_center_x_ = -5.0;
-  double fort_buff_center_y_ = 3.0;
-  double fort_buff_radius_ = 0.0;
+  double base_buff_center_x_ = -11.47;
+  double base_buff_center_y_ = -4.40;
+  double base_buff_radius_ = 1.0;
+  double our_outpost_center_x_ = -2.55;
+  double our_outpost_center_y_ = -2.21;
+  double our_outpost_radius_ = 1.0;
+  double fort_buff_center_x_ = -7.37;
+  double fort_buff_center_y_ = 1.60;
+  double fort_buff_radius_ = 1.0;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;

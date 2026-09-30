@@ -1,0 +1,12 @@
+# RMUC 地图点位（map 坐标系，单位米）。
+# 由网页面板「场地标定」生成：/calibrate.html
+frame_id: map
+points:
+  home:             [-11.47, -4.40, 0.00]
+  healing:          [-12.36, -3.47, 0.00]
+  patrol_a:         [-3.82, 5.93, 0.00]
+  patrol_b:         [-6.17, -1.44, 0.00]
+  enemy_outpost:    [1.39, 6.08, 0.00]
+  our_outpost:      [-2.55, -2.21, 0.00]
+  central_highland: [-1.56, 3.97, 0.00]
+  fort:             [-7.37, 1.60, 0.00]
