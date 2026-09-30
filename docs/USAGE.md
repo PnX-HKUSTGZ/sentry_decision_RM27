@@ -381,6 +381,20 @@ node src/sentry_decision_viz/web/test/format.test.mjs
 ```
 端到端冒烟：`tools/viz_smoke_test.sh`（也注册为 `viz_smoke`；未装 rosbridge 时跳过）。
 
+#### 4.8.1 场地标定工具（/calibrate.html）
+
+用于在地图上标定 `config/maps/*.yaml` 的命名点坐标：左侧 RMUC 底图，右侧点位列表。
+
+- 打开 `http://<宿主>:8080/calibrate.html`（与面板同一个静态服务，**不需要 rosbridge / 决策节点**）。
+- 底图来自导航仓库 `RMUC2026.pgm`（583×300，0.05 m/px，origin `[-14.6, -5.86]`），
+  世界坐标->像素映射集中在 `web/src/field.js`。
+- 交互：点地图移动当前选中点 / 拖动标记 / 右侧改数值 / 添加或删除点；鼠标位置实时显示世界坐标。
+  点位本地存 `localStorage`（键 `sentry.fieldPoints.v1`）。
+- 「导出 YAML」生成可直接覆盖 `config/maps/RMUC26.yaml` 的 `points:` 片段；
+  「从文本导入」可粘贴现有 yaml 片段继续编辑。
+- 纯逻辑（`fieldExtent` / `worldToImage` / `imageToWorld`）由 `web/test/format.test.mjs` 覆盖。
+
+
 ### 4.9 离线回放（replay_main）
 
 `decision_node` 与 `referee_sim_node` 运行时用 rosbag 录下上行与干预，赛后用 `replay_main` 离线重放：

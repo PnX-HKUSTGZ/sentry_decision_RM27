@@ -13,6 +13,7 @@ import {
   worldStateToView,
   worldToCanvas,
 } from '../src/format.js';
+import { FIELD, fieldExtent, imageToWorld, worldToImage } from '../src/field.js';
 
 let failures = 0;
 
@@ -79,6 +80,18 @@ const center = worldToCanvas({ x: 0, y: 0 }, extent, 320, 320);
 check(center.x === 160 && center.y === 160, 'worldToCanvas center');
 const corner = worldToCanvas({ x: -8, y: 8 }, extent, 320, 320);
 check(corner.x === 0 && corner.y === 0, 'worldToCanvas corner');
+
+const field = fieldExtent(FIELD);
+check(Math.abs(field.maxX - 14.55) < 1e-9, 'field extent maxX');
+check(Math.abs(field.maxY - 9.14) < 1e-9, 'field extent maxY');
+const originPoint = { x: FIELD.origin.x, y: FIELD.origin.y };
+const originPx = worldToImage(originPoint, FIELD, 2);
+check(originPx.x === 0 && originPx.y === FIELD.heightPx * 2, 'field origin maps to bottom-left');
+const roundTrip = imageToWorld(originPx.x, originPx.y, FIELD, 2);
+check(
+  Math.abs(roundTrip.x - originPoint.x) < 1e-9 && Math.abs(roundTrip.y - originPoint.y) < 1e-9,
+  'field round trip'
+);
 
 check(parseListState('{"a":1}').a === 1, 'parseListState');
 check(parseListState('not json') === null, 'parseListState invalid');

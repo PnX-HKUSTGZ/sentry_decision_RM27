@@ -61,7 +61,8 @@ wait_echo() {
   return 1
 }
 
-for path in / /index.html /style.css /src/main.js /vendor/roslib.min.js; do
+for path in / /index.html /calibrate.html /style.css /src/main.js /src/calibrate.js /src/field.js \
+  /assets/field-rmuc2026.png /vendor/roslib.min.js; do
   check "200" "$(http_status "http://127.0.0.1:8080${path}")" "静态资源 ${path}"
 done
 

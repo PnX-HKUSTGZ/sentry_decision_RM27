@@ -242,3 +242,98 @@ th {
   font-size: 12px;
   white-space: pre-wrap;
 }
+
+/* ---- 场地标定工具（/calibrate.html）---- */
+.calib {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(340px, 1fr);
+  gap: 10px;
+  padding: 10px;
+  align-items: start;
+}
+
+.calib-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.calib-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+#field {
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.calib-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calib-list {
+  max-height: 55vh;
+  overflow: auto;
+}
+
+.pt-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pt-row.selected {
+  background: rgba(74, 163, 255, 0.16);
+}
+
+.pt-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pt-row input {
+  background: #0c1116;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.pt-name {
+  flex: 1 1 32%;
+}
+
+.pt-num {
+  flex: 0 0 18%;
+  width: 18%;
+}
+
+.pt-del {
+  flex: 0 0 auto;
+  padding: 0 7px;
+}
+
+#io {
+  width: 100%;
+  height: 140px;
+  background: #0c1116;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px;
+  font: 12px monospace;
+  resize: vertical;
+}
+

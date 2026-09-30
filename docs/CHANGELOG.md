@@ -11,6 +11,7 @@
 
 ### Added
 
+- 网页面板新增**场地标定工具** `calibrate.html`（面板页链接「场地标定」）：在 RMUC 底图（来自导航仓库 `RMUC2026.pgm`，0.05 m/px、origin [-14.6, -5.86]）上点选 / 拖拽命名点，右侧列表编辑 x/y/yaw，支持添加 / 删除 / 导入 / 导出 `config/maps` 用的 YAML 片段，点位存 `localStorage`；`web/src/field.js` 提供世界坐标↔像素换算（`format.test.mjs` 覆盖），`viz_smoke` 校验新静态资源
 - 新增 `docs/BELIEF.md`（信念层字段字典）：逐字段记录 `WorldState` / `RefereeState` / `SelfState` / `NavState` / `EnemyState` 的含义、单位、来源裁判消息字段、解码位置与有效性判定；并明确 `EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行）
 - 资源请求打通远程 / 立即复活：`ResourceRequest` 新增 `remote_ammo` / `remote_hp` / `instant_revive`，`submit_resource_requests` 映射到 `kRemoteAmmoExchange` / `kRemoteHpExchange` / `kInstantResurrect`；资源树改为「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」，血量按规则只走脱战远程兑换，新增 `IfCanInstantResurrect` / `IfNotOccupyingGainPoint` / `RequestInstantRevive` / `RequestRemoteHpExchange` / `RequestRemoteAmmoExchange`；新增配置 `resource.remote_hp_times` / `resource.remote_ammo_times` / `resource.remote_ammo_min_coins`；面板「资源请求」与 `list_state` 展示远程次数与复活方式
 - 补给区免费发弹量（规则 5.3.2）：`SimWorld` 记录已领取的「整分钟」，`claim_supply_ammo()` 在机器人进入补给区时一次性发放累积的 100 发/分钟（金币不足也能补弹），`referee_sim_node` 每秒结算并记 ACT 日志
