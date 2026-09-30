@@ -11,6 +11,7 @@
 
 ### Added
 
+- 新增 `docs/BELIEF.md`（信念层字段字典）：逐字段记录 `WorldState` / `RefereeState` / `SelfState` / `NavState` / `EnemyState` 的含义、单位、来源裁判消息字段、解码位置与有效性判定；并明确 `EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行）
 - 资源请求打通远程 / 立即复活：`ResourceRequest` 新增 `remote_ammo` / `remote_hp` / `instant_revive`，`submit_resource_requests` 映射到 `kRemoteAmmoExchange` / `kRemoteHpExchange` / `kInstantResurrect`；资源树改为「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」，血量按规则只走脱战远程兑换，新增 `IfCanInstantResurrect` / `IfNotOccupyingGainPoint` / `RequestInstantRevive` / `RequestRemoteHpExchange` / `RequestRemoteAmmoExchange`；新增配置 `resource.remote_hp_times` / `resource.remote_ammo_times` / `resource.remote_ammo_min_coins`；面板「资源请求」与 `list_state` 展示远程次数与复活方式
 - 补给区免费发弹量（规则 5.3.2）：`SimWorld` 记录已领取的「整分钟」，`claim_supply_ammo()` 在机器人进入补给区时一次性发放累积的 100 发/分钟（金币不足也能补弹），`referee_sim_node` 每秒结算并记 ACT 日志
 - 远程兑换 6 秒延迟（规则 5.3.2 / 5.2.1）：`execute_action` 确认时立即扣金币并入队 `pending_remote`，`step_pending_remote()` 6 秒后才加发弹量 / 血量；远程兑换血量在 6 秒内战亡则作废且金币不返还
@@ -58,6 +59,7 @@
 
 ### Fixed
 
+- `RosIoNode` 此前只要收到 5 条裁判消息中任意一条就把 `RefereeState` 判为有效，只到单条时缺失字段会以默认 0 参与决策（可能被误判为「0 血 / 阵亡」）；现要求 `GameInfo` + `SentryInfoOnline` 都出现过才判有效（`referee_sources_ready` + 单测）
 - `EventCode::local_ammo_exchange_point()` 漏判 RMUL 的补给区占用位（bit 2）：RMUL 场次下补给区占领只置 bit 2，此前会被误判为「不在增益点」而拒绝本地兑换，现已同时判 bit 0 / bit 2
 - `referee_sim_node` 的 `NavigateToPose` action server 收到新目标时未中止旧 goal，旧 handle 会悬挂、永远收不到结果；现在接受新目标前先 `abort` 旧目标
 - 网页面板「位姿」行对缺失的 `pos_x` / `pos_y` 直接调用 `toFixed` 会抛异常，已做空值保护

@@ -27,6 +27,11 @@ void merge(const SentryInfoOfflineMsg& msg, sentry_decision::RefereeState* out);
 void merge(const TeamInfoMsg& msg, sentry_decision::RefereeState* out);
 void merge(const RadarInfoMsg& msg, sentry_decision::RefereeState* out);
 
+// 决策必需的裁判上行来源是否就绪：必须同时收到 GameInfo（阶段 / 经济）与
+// SentryInfoOnline（自身血量 / 弹量 / 兑换位段）。只到其中一条时不应把 RefereeState
+// 当作有效，否则缺失字段会以默认 0 参与决策（被误判为「0 血 / 阵亡」）。
+bool referee_sources_ready(bool has_game_info, bool has_online_info);
+
 // 下行动作 -> DecisionCommand（header 由调用方补）。
 sentry_interfaces::msg::DecisionCommand to_msg(const sentry_decision::DecisionAction& action);
 

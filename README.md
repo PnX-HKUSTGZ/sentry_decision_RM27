@@ -63,6 +63,7 @@ sentry_decision_RM27/
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：技术架构设计（单一事实来源）
 - [docs/USAGE.md](docs/USAGE.md)：使用说明（命令与参数）
+- [docs/BELIEF.md](docs/BELIEF.md)：信念层（WorldState）字段字典与有效性判定
 - [docs/INTERFACES.md](docs/INTERFACES.md)：上位机接口契约（auto-aim ↔ 决策）
 - [docs/ROADMAP.md](docs/ROADMAP.md)：开发路线图（阶段、顺序、验收）
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md)：代码与文档规范

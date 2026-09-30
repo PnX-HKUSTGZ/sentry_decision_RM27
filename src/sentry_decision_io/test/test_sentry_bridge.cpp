@@ -118,6 +118,14 @@ void test_apply_offline_team_radar() {
   CHECK(state.enemy_outpost_sensed);
 }
 
+// 裁判来源就绪判定：缺 GameInfo 或 SentryInfoOnline 都视为未就绪。
+void test_referee_sources_ready() {
+  CHECK(!referee_sources_ready(false, false));
+  CHECK(!referee_sources_ready(true, false));
+  CHECK(!referee_sources_ready(false, true));
+  CHECK(referee_sources_ready(true, true));
+}
+
 void test_decision_command_mapping() {
   DecisionAction action;
   action.kind = DecisionActionKind::kInstantResurrect;
@@ -145,6 +153,7 @@ int main() {
   test_apply_game_info();
   test_apply_online_decodes_bitfields();
   test_apply_offline_team_radar();
+  test_referee_sources_ready();
   test_decision_command_mapping();
   if (g_failures == 0) {
     std::printf("all io sentry_bridge tests passed\n");

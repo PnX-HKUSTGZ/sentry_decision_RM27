@@ -61,6 +61,10 @@ class RosIoNode : public rclcpp::Node,
 
   mutable std::mutex referee_mutex_;
   sentry_decision::RefereeState referee_;
+  // 必需上行来源是否出现过：GameInfo（阶段/经济）与 SentryInfoOnline（自身）。
+  // 两者都到之前 referee() 返回未就绪，避免缺失字段被当作 0 参与决策。
+  bool has_game_info_ = false;
+  bool has_online_info_ = false;
 
   mutable std::mutex odometry_mutex_;
   sentry_decision::SelfState odometry_;

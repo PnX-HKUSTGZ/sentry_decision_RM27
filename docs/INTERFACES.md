@@ -64,6 +64,10 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 `sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用 `core/referee_protocol.hpp` 解码
 （已按 2026 规则 / 通信协议补齐：场地事件全字段、兑换与复活、姿态与姿态剩余时长）。
 `detect_color` 为视觉/MCU 字段，裁判与通信协议文档中未定义编码，仍待 auto-aim 确认，当前留空。
+决策侧对每条上行字段的接收、单位与有效性判定见 `docs/BELIEF.md`。当前 `SentryInfoOffline` 的视觉锁定字段
+（`is_get` / `armor_pos` / `armor_num`）与 `RadarInfo.enemies[6]` / `TeamInfo.allies[4]` 尚未接入
+`EnemyState` / `WorldState.allies`，属于已知缺口（P3 暂留空）；决策侧要求 `GameInfo` + `SentryInfoOnline`
+都出现过才判 `referee.valid`。
 
 ## 5. 下行 ROS 消息（决策发布）
 

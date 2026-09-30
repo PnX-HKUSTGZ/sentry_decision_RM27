@@ -36,6 +36,7 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
         merge(*msg, &referee_);
         referee_.stamp = sentry_decision::SteadyClock::now();
         referee_.valid = true;
+        has_game_info_ = true;
       });
 
   online_info_sub_ = create_subscription<sentry_interfaces::msg::SentryInfoOnline>(
@@ -44,6 +45,7 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
         merge(*msg, &referee_);
         referee_.stamp = sentry_decision::SteadyClock::now();
         referee_.valid = true;
+        has_online_info_ = true;
       });
 
   offline_info_sub_ = create_subscription<sentry_interfaces::msg::SentryInfoOffline>(
@@ -112,7 +114,10 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
 bool RosIoNode::referee(sentry_decision::RefereeState* out) const {
   std::lock_guard<std::mutex> lock(referee_mutex_);
   *out = referee_;
-  return referee_.valid;
+  // 只到其中一条裁判消息时，缺失字段会以默认 0 参与决策（例如被误判为「0 血 / 阵亡」），
+  // 因此必须 GameInfo + SentryInfoOnline 都出现过才判有效；此后由 stamp 超时决定失效。
+  return referee_.valid &&
+         sentry_decision_io::referee_sources_ready(has_game_info_, has_online_info_);
 }
 
 bool RosIoNode::odometry(sentry_decision::SelfState* out) const {

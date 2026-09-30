@@ -82,6 +82,10 @@ std::uint8_t to_msg_mode(sentry_decision::ActionMode mode) {
 
 }  // namespace
 
+bool referee_sources_ready(bool has_game_info, bool has_online_info) {
+  return has_game_info && has_online_info;
+}
+
 sentry_interfaces::msg::DecisionCommand to_msg(const sentry_decision::DecisionAction& action) {
   sentry_interfaces::msg::DecisionCommand msg;
   msg.request_id = action.request_id;
