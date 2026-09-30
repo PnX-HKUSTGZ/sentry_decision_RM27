@@ -35,7 +35,8 @@ struct SimWorld {
   int energy_ratio = 0;
   double speed_monitor_angle = 0.0;
   unsigned int sentry_info_1 = 0;
-  int sentry_info_2 = 0;
+  // bit 0 = 脱战状态。仿真没有交战模型，默认脱战；可用 set_world {disengaged: 0} 覆盖。
+  int sentry_info_2 = 1;
   std::uint64_t sentry_info_3 = 0;
 
   // TeamInfo
@@ -86,5 +87,63 @@ ExchangeResult exchange_hp(SimWorld* world, int value, int max_hp);
 
 // 补给区回血：按上限血量的 ratio 恢复，返回实际恢复量（已满血返回 0）。
 int supply_heal(SimWorld* world, int max_hp, double ratio);
+
+// ---- 增益点占领判定（裁判侧）----
+
+// 一个增益点区域（圆）。radius <= 0 表示不启用。
+struct GainZone {
+  double x = 0.0;
+  double y = 0.0;
+  double radius = 0.0;
+
+  bool contains(double px, double py) const {
+    return radius > 0.0 && ((px - x) * (px - x) + (py - y) * (py - y)) <= radius * radius;
+  }
+};
+
+// 仿真场上的己方增益点区域。
+struct GainZones {
+  GainZone supply;            // 己方补给区
+  GainZone base_buff;         // 己方基地增益点
+  GainZone our_outpost_buff;  // 己方前哨站增益点
+  GainZone fort_buff;         // 己方堡垒增益点
+};
+
+struct Occupancy {
+  bool supply = false;
+  bool base_buff = false;
+  bool our_outpost_buff = false;
+  bool fort_buff = false;
+
+  // 规则表 5-8：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点之一。
+  bool local_ammo_exchange_point() const {
+    return supply || base_buff || our_outpost_buff;
+  }
+};
+
+// 按机器人位置判定占领了哪些增益点。
+Occupancy evaluate_occupancy(const GainZones& zones, double x, double y);
+
+// 把占领状态写回 SimWorld 的 event_code 位段（只改占领相关位，保留其它位）。
+void apply_occupancy(SimWorld* world, const Occupancy& occupancy);
+
+// ---- 裁判侧动作前置校验与结算 ----
+
+// 动作结算结果：accepted=false 时世界不变，detail 为拒绝原因（回执 + 日志）。
+struct ActionOutcome {
+  bool accepted = false;
+  std::uint8_t code = 0;  // 0 成功 / 1 参数非法 / 2 前置条件不满足 / 3 金币不足
+  std::string detail;
+};
+
+// 裁判侧结算一个决策动作（非法动作不修改世界）：
+//   kAmmoExchange       本地兑换发弹量：需占领增益点（表 5-8），1 金币/发
+//   kHpExchange         兑换血量：需脱战（规则 5.2.1 仅允许远程兑换），1 金币/点（简化）
+//   kFreeResurrect      需 info1.can_free_resurrect
+//   kInstantResurrect   需 info1.can_instant_resurrect 且金币 >= 所需
+//   kRemoteAmmoExchange 需脱战；value = 次数，150 金币/次、每次 +100 发
+//   kRemoteHpExchange   需脱战；value = 次数，按规则公式计费、+60% 上限血量
+ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAction& action,
+                             int max_hp);
 
 }  // namespace sentry_decision_sim

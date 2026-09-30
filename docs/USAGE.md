@@ -348,10 +348,16 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 不会绕过安全急停。**注意到「决策覆盖」会钉住该字段的决策视图**：即使仿真世界在补血 / 兑换，
 面板血量也不会变；右侧「原始 血/弹/金」一行显示的才是覆盖前的真实世界。
 
-> 兑换发弹 / 血量现在会真正结算进仿真世界：按规则 5.3.1「10 金币/10 发」扣金币、加发弹量，
-> 金币不足则回执被拒（`动作回执` 行会显示 `rejected` 与原因）。补给区自动回血同理：
-> 机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的 10% / 秒回血，
-> 比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
+> 兑换会真正结算进仿真世界，且**裁判侧会校验前置条件**：非法动作不改变世界、回执 `rejected`，
+> 并在仿真日志打印「裁判拒绝动作 ...」。规则依据：
+> - **兑换发弹量**（本地兑换，10 金币/10 发）要求**占领补给区 / 基地增益点 / 前哨站增益点**
+>   （由 `event_code` 位段表示，仿真按机器人位置生成）；
+> - **兑换血量**按规则只允许**脱战**远程兑换（`sentry_info_2.disengaged`）。
+>
+> 决策树也加了对应门控（`IfOccupyingGainPoint` / `IfDisengaged`），低弹量在野外不会再空发
+> 非法兑换。金币不足同样会被拒绝（`动作回执` 行显示 `rejected` 与原因）。
+> 补给区自动回血：机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的
+> 10% / 秒回血，比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
@@ -447,6 +453,9 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
 | `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
 | `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
+| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `0` | 己方基地增益点区域（半径 0 = 不启用） |
+| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-1.1` / `1.1` / `0` | 己方前哨站增益点区域 |
+| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `0` | 己方堡垒增益点区域 |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

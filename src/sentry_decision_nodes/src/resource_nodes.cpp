@@ -87,6 +87,40 @@ BT::NodeStatus IfCoinsAtLeast::tick() {
                                                            : BT::NodeStatus::FAILURE;
 }
 
+// [IfOccupyingGainPoint]
+IfOccupyingGainPoint::IfOccupyingGainPoint(const std::string& name, const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList IfOccupyingGainPoint::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus IfOccupyingGainPoint::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.referee.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  return context->world.referee.event.local_ammo_exchange_point() ? BT::NodeStatus::SUCCESS
+                                                                  : BT::NodeStatus::FAILURE;
+}
+
+// [IfDisengaged]
+IfDisengaged::IfDisengaged(const std::string& name, const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList IfDisengaged::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus IfDisengaged::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.referee.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  return context->world.referee.info2.disengaged ? BT::NodeStatus::SUCCESS
+                                                 : BT::NodeStatus::FAILURE;
+}
+
 // [RequestFreeRevive]
 RequestFreeRevive::RequestFreeRevive(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
@@ -166,6 +200,8 @@ void register_resource_nodes(BT::BehaviorTreeFactory& factory) {
   factory.registerNodeType<IfCanFreeResurrect>("IfCanFreeResurrect");
   factory.registerNodeType<IfLowAmmo>("IfLowAmmo");
   factory.registerNodeType<IfCoinsAtLeast>("IfCoinsAtLeast");
+  factory.registerNodeType<IfOccupyingGainPoint>("IfOccupyingGainPoint");
+  factory.registerNodeType<IfDisengaged>("IfDisengaged");
   factory.registerNodeType<RequestFreeRevive>("RequestFreeRevive");
   factory.registerNodeType<RequestHpExchange>("RequestHpExchange");
   factory.registerNodeType<RequestAmmoExchange>("RequestAmmoExchange");

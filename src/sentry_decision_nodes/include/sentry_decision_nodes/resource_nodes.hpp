@@ -52,6 +52,34 @@ class IfCoinsAtLeast : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
+// Node:         IfOccupyingGainPoint
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断是否占领可本地兑换发弹量的增益点（补给区 / 基地 / 前哨站）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, event)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> AmmoExchange
+class IfOccupyingGainPoint : public BT::SyncActionNode {
+ public:
+  IfOccupyingGainPoint(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         IfDisengaged
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断是否脱战（远程兑换血量的前置条件）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, info2.disengaged)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> HpExchange
+class IfDisengaged : public BT::SyncActionNode {
+ public:
+  IfDisengaged(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
 // Node:         RequestFreeRevive
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求确认免费复活。

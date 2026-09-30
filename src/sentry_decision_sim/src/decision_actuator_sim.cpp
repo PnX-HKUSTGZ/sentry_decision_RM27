@@ -30,11 +30,10 @@ void DecisionActuatorSim::update() {
   in_flight_.swap(still_in_flight);
 }
 
-// 兑换类动作在仿真执行端结算：扣金币、加血量/发弹量，失败时给出拒绝回执。
+// 裁判侧结算：校验每个动作的前置条件，非法动作不修改世界并给出拒绝原因。
 // 未绑定世界时保持历史上「无条件成功」的语义，供纯 ack 闭环测试使用。
 sentry_decision::ActionAck DecisionActuatorSim::resolve(
     const sentry_decision::DecisionAction& action) {
-  using K = sentry_decision::DecisionActionKind;
   sentry_decision::ActionAck ack;
   ack.request_id = action.request_id;
   if (world_ == nullptr) {
@@ -42,31 +41,10 @@ sentry_decision::ActionAck DecisionActuatorSim::resolve(
     ack.code = 0;
     return ack;
   }
-  switch (action.kind) {
-    case K::kAmmoExchange: {
-      const ExchangeResult result = exchange_ammo(world_, action.value);
-      ack.accepted = result.accepted;
-      ack.code = result.accepted ? 0 : 2;
-      ack.detail = result.detail;
-      break;
-    }
-    case K::kHpExchange: {
-      const ExchangeResult result = exchange_hp(world_, action.value, max_hp_);
-      ack.accepted = result.accepted;
-      ack.code = result.accepted ? 0 : 2;
-      ack.detail = result.detail;
-      break;
-    }
-    case K::kInstantResurrect:
-      world_->self_hp = max_hp_;
-      ack.accepted = true;
-      ack.detail = "立即复活：血量回满";
-      break;
-    default:
-      // 免费复活 / 远程兑换等由真实协议决定，仿真只回执成功。
-      ack.accepted = true;
-      break;
-  }
+  const ActionOutcome outcome = execute_action(world_, action, max_hp_);
+  ack.accepted = outcome.accepted;
+  ack.code = outcome.code;
+  ack.detail = outcome.detail;
   return ack;
 }
 

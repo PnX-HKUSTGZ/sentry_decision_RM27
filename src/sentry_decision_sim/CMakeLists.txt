@@ -128,10 +128,17 @@ if(BUILD_TESTING)
     ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
     TIMEOUT 90)
 
+  # 端到端：裁判系统按前置条件拒绝非法动作（未占领增益点 / 未脱战）并打印日志。
+  add_test(NAME referee_guard_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/referee_guard_smoke_test.sh)
+  set_tests_properties(referee_guard_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
+    TIMEOUT 90)
+
   # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
   set_tests_properties(
     scenario_full_match scenario_intervention replay_smoke intervention_smoke match_smoke
-    sim_effects_smoke
+    sim_effects_smoke referee_guard_smoke
     PROPERTIES RUN_SERIAL TRUE)
 endif()
 

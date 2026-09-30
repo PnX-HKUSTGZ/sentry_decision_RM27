@@ -31,11 +31,13 @@ const char* kTree = R"xml(
       </Sequence>
       <Sequence name="hp">
         <IfLowHp hp_key="resource.hp_exchange_threshold"/>
+        <IfDisengaged/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
         <RequestHpExchange amount_key="resource.exchange_hp_step"/>
       </Sequence>
       <Sequence name="ammo">
         <IfLowAmmo ammo_key="nav.low_ammo"/>
+        <IfOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
         <RequestAmmoExchange amount_key="resource.exchange_ammo_step"/>
       </Sequence>
@@ -69,6 +71,8 @@ WorldState make_world() {
   world.referee.self_hp = 400;
   world.referee.self_ammo = 100;
   world.referee.coins = 200;
+  world.referee.event.supply_zone_occupied = true;  // 默认在可兑换增益点
+  world.referee.info2.disengaged = true;            // 默认脱战
   return world;
 }
 
@@ -128,6 +132,34 @@ void test_no_coins_no_exchange() {
   CHECK(context.intents.empty());
 }
 
+// 前置条件：不在增益点时不请求本地兑换发弹量。
+void test_ammo_exchange_blocked_without_gain_point() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_ammo = 10;
+  context.world.referee.event = {};
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.empty());
+}
+
+// 前置条件：未脱战时不请求兑换血量。
+void test_hp_exchange_blocked_when_engaged() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_hp = 30;
+  context.world.referee.info2.disengaged = false;
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.empty());
+}
+
 }  // namespace
 
 int main() {
@@ -135,6 +167,8 @@ int main() {
   test_hp_exchange();
   test_ammo_exchange();
   test_no_coins_no_exchange();
+  test_ammo_exchange_blocked_without_gain_point();
+  test_hp_exchange_blocked_when_engaged();
   if (g_failures == 0) {
     std::printf("all resource tests passed\n");
     return 0;

@@ -4,6 +4,8 @@
 #include <cmath>
 #include <string>
 
+#include "sentry_decision_core/referee_protocol.hpp"
+
 namespace sentry_decision_sim {
 namespace {
 
@@ -109,6 +111,28 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
     } else {
       world->sentry_info_2 &= ~(1 << 15);
     }
+  } else if (field == "disengaged") {
+    // 语义字段：写入 sentry_info_2 的 bit 0（脱战状态）。
+    if (number != 0.0) {
+      world->sentry_info_2 |= (1 << 0);
+    } else {
+      world->sentry_info_2 &= ~(1 << 0);
+    }
+  } else if (field == "can_free_resurrect") {
+    if (number != 0.0) {
+      world->sentry_info_1 |= (1u << 19);
+    } else {
+      world->sentry_info_1 &= ~(1u << 19);
+    }
+  } else if (field == "can_instant_resurrect") {
+    if (number != 0.0) {
+      world->sentry_info_1 |= (1u << 20);
+    } else {
+      world->sentry_info_1 &= ~(1u << 20);
+    }
+  } else if (field == "instant_resurrect_cost") {
+    const unsigned int cost = static_cast<unsigned int>(as_int) & 0x3FFu;
+    world->sentry_info_1 = (world->sentry_info_1 & ~(0x3FFu << 21)) | (cost << 21);
   } else if (field == "base_hp") {
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {
@@ -286,6 +310,156 @@ int supply_heal(SimWorld* world, int max_hp, double ratio) {
   const int before = world->self_hp;
   world->self_hp = std::min(max_hp, world->self_hp + heal);
   return world->self_hp - before;
+}
+
+Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
+  Occupancy occupancy;
+  occupancy.supply = zones.supply.contains(x, y);
+  occupancy.base_buff = zones.base_buff.contains(x, y);
+  occupancy.our_outpost_buff = zones.our_outpost_buff.contains(x, y);
+  occupancy.fort_buff = zones.fort_buff.contains(x, y);
+  return occupancy;
+}
+
+namespace {
+
+// 写 event_code 的 [shift, shift+width) 位，保留其它位。
+void set_bits(unsigned int* value, unsigned shift, unsigned width, unsigned bits_value) {
+  const unsigned mask = ((1u << width) - 1u) << shift;
+  *value = (*value & ~mask) | ((bits_value << shift) & mask);
+}
+
+ActionOutcome reject(std::uint8_t code, const std::string& detail) {
+  ActionOutcome outcome;
+  outcome.accepted = false;
+  outcome.code = code;
+  outcome.detail = detail;
+  return outcome;
+}
+
+}  // namespace
+
+void apply_occupancy(SimWorld* world, const Occupancy& occupancy) {
+  if (world == nullptr) {
+    return;
+  }
+  unsigned int event = world->event_code;
+  set_bits(&event, 0, 1, occupancy.supply ? 1u : 0u);  // 己方补给区已占领
+  set_bits(&event, 2, 1, occupancy.supply ? 1u : 0u);  // RMUL 同义位
+  set_bits(&event, 25, 2, occupancy.fort_buff ? 1u : 0u);
+  set_bits(&event, 27, 2, occupancy.our_outpost_buff ? 1u : 0u);
+  set_bits(&event, 29, 1, occupancy.base_buff ? 1u : 0u);
+  world->event_code = event;
+}
+
+ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAction& action,
+                             int max_hp) {
+  using K = sentry_decision::DecisionActionKind;
+  ActionOutcome outcome;
+  if (world == nullptr) {
+    return reject(1, "世界为空");
+  }
+  const sentry_decision::EventCode event =
+      sentry_decision::decode_event_code(static_cast<std::uint32_t>(world->event_code));
+  const sentry_decision::SentryInfo1 info1 =
+      sentry_decision::decode_sentry_info1(static_cast<std::uint32_t>(world->sentry_info_1));
+  const sentry_decision::SentryInfo2 info2 =
+      sentry_decision::decode_sentry_info2(static_cast<std::uint16_t>(world->sentry_info_2));
+
+  switch (action.kind) {
+    case K::kAmmoExchange: {
+      if (action.value <= 0) {
+        return reject(1, "兑换数量必须为正");
+      }
+      if (!event.local_ammo_exchange_point()) {
+        return reject(2, "未占领可兑换增益点（补给区/基地/前哨站）");
+      }
+      const ExchangeResult result = exchange_ammo(world, action.value);
+      outcome.accepted = result.accepted;
+      outcome.code = result.accepted ? 0 : 3;
+      outcome.detail = result.detail;
+      return outcome;
+    }
+    case K::kHpExchange: {
+      if (action.value <= 0) {
+        return reject(1, "兑换数量必须为正");
+      }
+      if (!info2.disengaged) {
+        return reject(2, "未脱战，不能兑换血量");
+      }
+      const ExchangeResult result = exchange_hp(world, action.value, max_hp);
+      outcome.accepted = result.accepted;
+      outcome.code = result.accepted ? 0 : 3;
+      outcome.detail = result.detail;
+      return outcome;
+    }
+    case K::kFreeResurrect: {
+      if (!info1.can_free_resurrect) {
+        return reject(2, "当前不可确认免费复活");
+      }
+      outcome.accepted = true;
+      outcome.detail = "确认免费复活";
+      return outcome;
+    }
+    case K::kInstantResurrect: {
+      if (!info1.can_instant_resurrect) {
+        return reject(2, "当前不可兑换立即复活");
+      }
+      const int cost = static_cast<int>(info1.instant_resurrect_cost);
+      if (world->coins < cost) {
+        return reject(3, "金币不足（立即复活需要 " + std::to_string(cost) + "）");
+      }
+      world->coins -= cost;
+      world->self_hp = max_hp;
+      outcome.accepted = true;
+      outcome.detail = "立即复活：血量回满，金币 -" + std::to_string(cost);
+      return outcome;
+    }
+    case K::kRemoteAmmoExchange: {
+      if (action.value <= 0) {
+        return reject(1, "兑换次数必须为正");
+      }
+      if (!info2.disengaged) {
+        return reject(2, "未脱战，不能远程兑换发弹量");
+      }
+      const int cost = 150 * action.value;
+      if (world->coins < cost) {
+        return reject(3, "金币不足（远程兑换需要 " + std::to_string(cost) + "）");
+      }
+      world->coins -= cost;
+      world->self_ammo += 100 * action.value;
+      outcome.accepted = true;
+      outcome.detail = "远程兑换发弹量 +" + std::to_string(100 * action.value) + "，金币 -" +
+                       std::to_string(cost);
+      return outcome;
+    }
+    case K::kRemoteHpExchange: {
+      if (action.value <= 0) {
+        return reject(1, "兑换次数必须为正");
+      }
+      if (!info2.disengaged) {
+        return reject(2, "未脱战，不能远程兑换血量");
+      }
+      // 规则表 5-6：血量远程兑换 50 + ROUNDUP((420-剩余)/60 * 20) 金币/次。
+      const int remaining = std::max(0, world->game_time_remaining);
+      const int per_cost = static_cast<int>(std::ceil(50.0 + (420 - remaining) / 60.0 * 20.0));
+      const int cost = per_cost * action.value;
+      if (world->coins < cost) {
+        return reject(3, "金币不足（远程兑换血量需要 " + std::to_string(cost) + "）");
+      }
+      world->coins -= cost;
+      const int heal = static_cast<int>(std::ceil(max_hp * 0.6)) * action.value;
+      const int before = world->self_hp;
+      world->self_hp = std::min(max_hp, world->self_hp + heal);
+      outcome.accepted = true;
+      outcome.detail = "远程兑换血量 +" + std::to_string(world->self_hp - before) + "，金币 -" +
+                       std::to_string(cost);
+      return outcome;
+    }
+    case K::kNone:
+    default:
+      return reject(1, "未知动作类型");
+  }
 }
 
 }  // namespace sentry_decision_sim

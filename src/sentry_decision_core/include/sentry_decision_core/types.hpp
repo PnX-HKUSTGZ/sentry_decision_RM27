@@ -115,12 +115,12 @@ struct DecisionOutput {
 // 决策动作类型（下行给下位机）。
 enum class DecisionActionKind {
   kNone,
-  kAmmoExchange,        // 本地兑换允许发弹量，value = 数量
-  kHpExchange,          // 本地兑换血量，value = 数量
-  kFreeResurrect,       // 确认免费复活
-  kInstantResurrect,    // 兑换立即复活
-  kRemoteAmmoExchange,  // 远程兑换发弹量，value = 次数
-  kRemoteHpExchange,    // 远程兑换血量，value = 次数
+  kAmmoExchange,  // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站），value = 数量
+  kHpExchange,        // 兑换血量：需脱战（规则仅允许远程兑换），value = 数量
+  kFreeResurrect,     // 确认免费复活：需 can_free_resurrect
+  kInstantResurrect,  // 兑换立即复活：需 can_instant_resurrect 且金币足够
+  kRemoteAmmoExchange,  // 远程兑换发弹量：需脱战，value = 次数
+  kRemoteHpExchange,    // 远程兑换血量：需脱战，value = 次数
 };
 
 // 动作发送模式：配置动作时必须显式选择。

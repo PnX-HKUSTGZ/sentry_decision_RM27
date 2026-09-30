@@ -61,6 +61,8 @@ void test_exchange_applied_to_world() {
   SimWorld world;
   world.coins = 100;
   world.self_ammo = 10;
+  // 本地兑换发弹量要求占领增益点（规则表 5-8）。
+  world.event_code |= 1u;  // 己方补给区已占领
   DecisionActuatorSim actuator(1);
   actuator.bind_world(&world, 400);
 

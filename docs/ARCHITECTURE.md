@@ -616,9 +616,14 @@ result 返回是否接受；feedback 每 tick 给出该字段的 `effective` 与
 
 - 发布 `sentry_interfaces` 的五条上行消息与 odom，驱动 `decision_node`；
 - 内嵌 `NavSimulator` 作为 `NavigateToPose` action server，并在收到 `DecisionCommand` 后用
-  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；执行端绑定 `SimWorld` 后会在回执时
-  结算兑换类动作（按规则 5.3.1 扣金币、加发弹量 / 血量，金币不足回 `accepted=false` + 原因），
-  因此面板「兑换发弹」不再只是空回执；
+  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+- **动作前置校验**：执行端 `execute_action()` 是动作合法性的权威，校验通过才会改世界；非法动作
+  返回 `accepted=false` + `code`/`detail`，节点在 `publish_ack` 打印「裁判拒绝动作 ...」。
+  规则依据：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点（表 5-8）；兑换血量与远程兑换
+  要求脱战（5.2.1 / 表 5-6）；复活要求对应 `info1` 标志与金币。合法时按 10 金币/10 发等结算；
+- 节点每拍按机器人位姿对可配置的增益点区域（补给区 / 基地 / 前哨站 / 堡垒）判定占领状态，
+  写回 `event_code` 位段（`supply_zone_occupied` 等），供决策端 `IfOccupyingGainPoint` 门控；
+  `sentry_info_2.disengaged` 默认脱战（可用 `set_world {disengaged: 0}` 覆盖）；
 - 节点按真实秒在补给区回血（近似规则 5.2.1：每秒回上限血量的 10%，比赛 4 分钟后 25%，
   上限受 `max_hp` 约束；补给区为可配置的「圆心 + 半径」）；
 - `srv/SetWorld`（`/sentry_sim/set_world`）可绕过决策覆盖直接改仿真世界，供面板做闭环测试；

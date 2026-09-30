@@ -11,6 +11,9 @@
 
 ### Added
 
+- 裁判动作前置校验（`sim::execute_action`）：`DecisionActuatorSim` 在改世界前按动作类型校验前置条件，非法动作回 `accepted=false` + 原因，`referee_sim_node` 打印「裁判拒绝动作 ...」；`referee_sim_node` 每拍按机器人位姿判定增益点占领并写回 `event_code`，`SimWorld` 支持 `disengaged` / `can_free_resurrect` / `can_instant_resurrect` / `instant_resurrect_cost` 语义字段与可配置增益点区域
+- 决策树资源节点 `IfOccupyingGainPoint` / `IfDisengaged`，兑换发弹量 / 血量前先判前置条件
+- 新增 `tools/referee_guard_smoke_test.sh` 端到端校验裁判拒绝非法动作并打印日志
 - 新增 `tools/demo.sh` 一键启动脚本：一条命令拉起「网页面板 + 裁判仿真 + 决策节点」，三个进程 stdout 加 `[viz]` / `[sim]` / `[decision]` 前缀并各写日志，`Ctrl+C` 整组停止；宿主运行时自动起容器并映射 8080/9090，`docker/entrypoint.sh` 增加 `demo` 子命令
 - 新增 `docs/ARCHITECTURE.md` §14「可视化与仿真」，以及 `docs/ROADMAP.md` P3 子阶段规划：树状态 `TreeStatus`、Groot2 可选接入、干预 action / service、裁判仿真与场景脚本、干预回放、rosbridge 网页面板。
 - `sentry_decision_msgs`：新增 `TreeNodeStatus` / `TreeStatus` 消息
@@ -49,6 +52,7 @@
 
 ### Fixed
 
+- 本地兑换发弹量此前不判「是否真的占领增益点」，仿真裁判也照单全收，导致机器人可在场上任意位置按 10 金币/10 发买弹；现在决策端 `IfOccupyingGainPoint` 门控 + 裁判端 `execute_action` 校验（未占领增益点直接拒绝并打印日志），兑换血量同样要求脱战。此前「低弹量切补给又瞬间折返」的现象随之前置条件补齐而消失（无需再按金币抑制补给）
 - `referee_sim_node` 的数值参数改为自动声明 `-p` 覆盖、按实际类型读取：此前 `declare_parameter<double>` 遇到 CLI 的整数写法（如 `-p max_hp:=400`）会在启动时抛类型异常；同时移除并未真正改变比赛时长的 `match_duration_s` 参数，已进行时间改由 `MatchStageController` 的时长推导
 - 人工资源请求改为「每次注入算一次」：重新注入时清除派发器的 one-shot 记忆，此前面板重复点「兑换发弹 / 血量」因同值去重而不再下发
 - 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE

@@ -38,6 +38,11 @@ struct EventCode {
   std::uint8_t fort_occupation_status = 0;   // bit 25-26：己方堡垒增益点占领状态
   std::uint8_t our_outpost_buff_status = 0;  // bit 27-28：己方前哨站增益点占领状态
   bool base_buff_occupied = false;           // bit 29：己方基地增益点已占领
+
+  // 本地兑换发弹量（规则表 5-8）要求占领补给区 / 基地增益点 / 前哨站增益点之一。
+  bool local_ammo_exchange_point() const {
+    return supply_zone_occupied || base_buff_occupied || our_outpost_buff_status != 0;
+  }
 };
 
 // SentryInfoOnline.sentry_info_1：兑换与复活信息。

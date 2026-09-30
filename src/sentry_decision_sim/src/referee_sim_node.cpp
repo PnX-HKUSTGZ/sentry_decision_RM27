@@ -192,6 +192,16 @@ class RefereeSimNode : public rclcpp::Node {
     supply_heal_ratio_ = declare_number_param("supply_heal_ratio", 0.10);
     supply_heal_ratio_late_ = declare_number_param("supply_heal_ratio_late", 0.25);
     supply_heal_late_after_s_ = declare_number_param("supply_heal_late_after_s", 240.0);
+    // 其余己方增益点区域（半径 <= 0 表示不启用）；用于「本地兑换发弹量」的前置判定。
+    base_buff_center_x_ = declare_number_param("base_buff_center_x", -5.0);
+    base_buff_center_y_ = declare_number_param("base_buff_center_y", 3.0);
+    base_buff_radius_ = declare_number_param("base_buff_radius", 0.0);
+    our_outpost_center_x_ = declare_number_param("our_outpost_center_x", -1.1);
+    our_outpost_center_y_ = declare_number_param("our_outpost_center_y", 1.1);
+    our_outpost_radius_ = declare_number_param("our_outpost_radius", 0.0);
+    fort_buff_center_x_ = declare_number_param("fort_buff_center_x", -5.0);
+    fort_buff_center_y_ = declare_number_param("fort_buff_center_y", 3.0);
+    fort_buff_radius_ = declare_number_param("fort_buff_radius", 0.0);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -446,8 +456,22 @@ class RefereeSimNode : public rclcpp::Node {
     }
   }
 
+  // 按机器人位置生成「占领增益点」状态并写回世界事件位（供上行消息与裁判校验）。
+  void update_occupancy() {
+    sentry_decision_sim::GainZones zones;
+    zones.supply = {supply_center_x_, supply_center_y_, supply_radius_};
+    zones.base_buff = {base_buff_center_x_, base_buff_center_y_, base_buff_radius_};
+    zones.our_outpost_buff = {our_outpost_center_x_, our_outpost_center_y_, our_outpost_radius_};
+    zones.fort_buff = {fort_buff_center_x_, fort_buff_center_y_, fort_buff_radius_};
+    const sentry_decision::Point2D pose = nav_.pose();
+    const sentry_decision_sim::Occupancy occupancy =
+        sentry_decision_sim::evaluate_occupancy(zones, pose.x, pose.y);
+    sentry_decision_sim::apply_occupancy(&world_, occupancy);
+  }
+
   void tick() {
     nav_.update(SteadyClock::now());
+    update_occupancy();
     finish_goal_if_done();
     actuator_.update();
     for (const auto& ack : actuator_.take_acks()) {
@@ -478,6 +502,11 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void publish_ack(const sentry_decision::ActionAck& ack) {
+    if (!ack.accepted) {
+      // 裁判系统是动作合法性的权威：拒绝时必须留下日志。
+      SD_LOG_WARN("sim", "裁判拒绝动作 request_id=%u code=%u %s", ack.request_id,
+                  static_cast<unsigned>(ack.code), ack.detail.c_str());
+    }
     sentry_interfaces::msg::DecisionAck msg;
     msg.header.stamp = now();
     msg.request_id = ack.request_id;
@@ -715,6 +744,15 @@ class RefereeSimNode : public rclcpp::Node {
   double supply_heal_ratio_ = 0.10;
   double supply_heal_ratio_late_ = 0.25;
   double supply_heal_late_after_s_ = 240.0;
+  double base_buff_center_x_ = -5.0;
+  double base_buff_center_y_ = 3.0;
+  double base_buff_radius_ = 0.0;
+  double our_outpost_center_x_ = -1.1;
+  double our_outpost_center_y_ = 1.1;
+  double our_outpost_radius_ = 0.0;
+  double fort_buff_center_x_ = -5.0;
+  double fort_buff_center_y_ = 3.0;
+  double fort_buff_radius_ = 0.0;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
