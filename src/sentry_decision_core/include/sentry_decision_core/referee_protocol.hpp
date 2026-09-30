@@ -40,8 +40,10 @@ struct EventCode {
   bool base_buff_occupied = false;           // bit 29：己方基地增益点已占领
 
   // 本地兑换发弹量（规则表 5-8）要求占领补给区 / 基地增益点 / 前哨站增益点之一。
+  // 补给区占用在 RMUC 走 bit 0、在 RMUL 走 bit 2，两者都要判，避免 RMUL 场次漏判。
   bool local_ammo_exchange_point() const {
-    return supply_zone_occupied || base_buff_occupied || our_outpost_buff_status != 0;
+    return supply_zone_occupied || supply_zone_occupied_rmul || base_buff_occupied ||
+           our_outpost_buff_status != 0;
   }
 };
 

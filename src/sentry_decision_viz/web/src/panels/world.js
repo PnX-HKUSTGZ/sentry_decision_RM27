@@ -35,8 +35,12 @@ export function createWorldPanel(el) {
       html += row('敌方前哨 / 基地', w.enemyOutpostHp + ' / ' + w.enemyBaseHp);
       html += row('剩余时间', w.gameTime + ' s');
       html += row('比赛阶段', w.gameStatus);
-      html += row('位姿', w.posX.toFixed(2) + ', ' + w.posY.toFixed(2) + ' @ ' + (w.yaw || 0).toFixed(2));
-      html += row('导航目标', w.hasNavGoal ? w.navGoalX.toFixed(2) + ', ' + w.navGoalY.toFixed(2) : '无');
+      const fmt = function (value) {
+        const number = Number(value);
+        return (isFinite(number) ? number : 0).toFixed(2);
+      };
+      html += row('位姿', fmt(w.posX) + ', ' + fmt(w.posY) + ' @ ' + fmt(w.yaw));
+      html += row('导航目标', w.hasNavGoal ? fmt(w.navGoalX) + ', ' + fmt(w.navGoalY) : '无');
       html += row('有效', (w.refereeValid ? 'referee ' : '') + (w.selfValid ? 'odom ' : '') + (w.enemyValid ? 'enemy' : ''));
       html += row('敌方', w.enemyCount + ' 个 / 锁定 ' + (w.hasEnemy ? '是' : '否'));
       html += '</table>';

@@ -303,6 +303,7 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
 
 > 决策只有收到 `game_status=4`（比赛中）才执行任务；未开始 / 准备 / 自检 / 倒计时 / 结算阶段输出
 > `idle`，不下发任务导航目标，因此「准备阶段不动、开始比赛后才进攻/巡逻」。
+> 比赛 420s 耗尽后阶段自动进入「比赛结算」（`game_status=5`），结算展示 10s 后停表。
 
 比赛阶段服务由裁判仿真提供（真实比赛由裁判系统决定，故仅仿真用）：
 
@@ -358,6 +359,10 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > 非法兑换。金币不足同样会被拒绝（`动作回执` 行显示 `rejected` 与原因）。
 > 补给区自动回血：机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的
 > 10% / 秒回血，比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
+> 补给区还会按规则 5.3.2 发放免费发弹量：**比赛每满 1 分钟累积 100 发，进入补给区时一次性
+> 领取全部累积值**（与金币无关，金币不足时也能补弹）。
+> 远程兑换（若下发）按规则延迟生效：确认时扣金币，**6 秒后**才加发弹量 / 血量；远程兑换血量
+> 在 6 秒内战亡则作废且金币不返还。
 
 人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
 「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
@@ -453,9 +458,9 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
 | `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
 | `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
-| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `0` | 己方基地增益点区域（半径 0 = 不启用） |
-| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-1.1` / `1.1` / `0` | 己方前哨站增益点区域 |
-| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `0` | 己方堡垒增益点区域 |
+| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `1.0` | 己方基地增益点区域（默认 `home` 点；半径 0 = 不启用） |
+| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-1.1` / `1.1` / `1.0` | 己方前哨站增益点区域（默认取地图 `our_outpost` 点） |
+| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-5.0` / `3.0` / `1.0` | 己方堡垒增益点区域（默认 `fort` 点） |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

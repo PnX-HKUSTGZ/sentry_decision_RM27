@@ -12,7 +12,7 @@ CORE_SOURCES=("$CORE/src/action_dispatcher.cpp" "$CORE/src/arbiter.cpp" "$CORE/s
   "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/referee_protocol.cpp"
   "$CORE/src/replay.cpp" "$CORE/src/safety_supervisor.cpp" "$CORE/src/world_model.cpp")
 SIM_SOURCES=("$SIM/src/referee_simulator.cpp" "$SIM/src/nav_simulator.cpp"
-  "$SIM/src/decision_actuator_sim.cpp" "$SIM/src/sim_world.cpp")
+  "$SIM/src/decision_actuator_sim.cpp" "$SIM/src/sim_world.cpp" "$SIM/src/match_stage.cpp")
 
 for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay test_config test_action_dispatcher test_safety_supervisor test_intervention test_nav_goal_tracker; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "${CORE_SOURCES[@]}" \
@@ -26,7 +26,7 @@ g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" -I"$NODES/include" \
   -o "$OUT/test_strategic_policy"
 "$OUT/test_strategic_policy"
 
-for test in test_referee_simulator test_nav_simulator test_decision_actuator_sim test_sim_world; do
+for test in test_referee_simulator test_nav_simulator test_decision_actuator_sim test_sim_world test_match_stage; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" -I"$SIM/include" \
     "${CORE_SOURCES[@]}" "${SIM_SOURCES[@]}" "$SIM/test/$test.cpp" -o "$OUT/$test"
   "$OUT/$test"

@@ -155,6 +155,7 @@ class RefereeSimNode : public rclcpp::Node {
     actuator_.bind_world(&world_, max_hp_);
     last_stage_tick_ = SteadyClock::now();
     last_supply_tick_ = last_stage_tick_;
+    last_remote_tick_ = last_stage_tick_;
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -195,13 +196,13 @@ class RefereeSimNode : public rclcpp::Node {
     // 其余己方增益点区域（半径 <= 0 表示不启用）；用于「本地兑换发弹量」的前置判定。
     base_buff_center_x_ = declare_number_param("base_buff_center_x", -5.0);
     base_buff_center_y_ = declare_number_param("base_buff_center_y", 3.0);
-    base_buff_radius_ = declare_number_param("base_buff_radius", 0.0);
+    base_buff_radius_ = declare_number_param("base_buff_radius", 1.0);
     our_outpost_center_x_ = declare_number_param("our_outpost_center_x", -1.1);
     our_outpost_center_y_ = declare_number_param("our_outpost_center_y", 1.1);
-    our_outpost_radius_ = declare_number_param("our_outpost_radius", 0.0);
+    our_outpost_radius_ = declare_number_param("our_outpost_radius", 1.0);
     fort_buff_center_x_ = declare_number_param("fort_buff_center_x", -5.0);
     fort_buff_center_y_ = declare_number_param("fort_buff_center_y", 3.0);
-    fort_buff_radius_ = declare_number_param("fort_buff_radius", 0.0);
+    fort_buff_radius_ = declare_number_param("fort_buff_radius", 1.0);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -298,6 +299,11 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void handle_accepted(const std::shared_ptr<GoalHandle>& handle) {
+    // 新目标抢占旧目标：先 abort 旧 handle，避免其悬挂、永远收不到结果。
+    if (goal_handle_) {
+      auto previous = std::make_shared<NavigateToPose::Result>();
+      goal_handle_->abort(previous);
+    }
     goal_handle_ = handle;
     sentry_decision::Point2D goal;
     goal.x = handle->get_goal()->pose.pose.position.x;
@@ -318,6 +324,12 @@ class RefereeSimNode : public rclcpp::Node {
     view.resource_revive = msg.output.resource_revive;
     last_decision_ = view;
     has_decision_ = true;
+    // 仿真近似：下位机执行决策姿态后，裁判上报的「当前姿态」应与期望一致
+    // （真实系统由 MCU 反馈，这里直接把决策姿态回写到 sentry_info_2 的 bit 12-13）。
+    if (view.stance != 0) {
+      const int stance = view.stance & 0x3;
+      world_.sentry_info_2 = (world_.sentry_info_2 & ~(0x3 << 12)) | (stance << 12);
+    }
   }
 
   // 比赛阶段：网页面板 / 手动设置的入口。stage=0 重置到未开始，其余只允许前进。
@@ -341,6 +353,7 @@ class RefereeSimNode : public rclcpp::Node {
       nav_.set_paused(false);
       actuator_.reset();
       last_supply_tick_ = SteadyClock::now();
+      last_remote_tick_ = last_supply_tick_;
       in_supply_ = false;
     }
     last_stage_tick_ = SteadyClock::now();
@@ -415,14 +428,18 @@ class RefereeSimNode : public rclcpp::Node {
     return std::hypot(pose.x - supply_center_x_, pose.y - supply_center_y_) <= supply_radius_;
   }
 
-  // 比赛开始 4 分钟后的回血比例切到 25%（仿真近似规则 5.2.1）。
-  // 已进行时间由「比赛时长 - 当前剩余」得到，时长与 MatchStageController 保持一致。
-  double supply_heal_ratio_for_now() const {
+  // 比赛已进行秒数：由「比赛时长 - 当前剩余」得到，时长与 MatchStageController 保持一致。
+  int match_elapsed_seconds() const {
     const int total =
         sentry_decision_sim::stage_duration_seconds(sentry_decision_sim::MatchStage::kRunning);
-    const int elapsed = std::max(0, total - world_.game_time_remaining);
-    return elapsed >= static_cast<int>(supply_heal_late_after_s_) ? supply_heal_ratio_late_
-                                                                  : supply_heal_ratio_;
+    return std::max(0, total - world_.game_time_remaining);
+  }
+
+  // 比赛开始 4 分钟后的回血比例切到 25%（仿真近似规则 5.2.1）。
+  double supply_heal_ratio_for_now() const {
+    return match_elapsed_seconds() >= static_cast<int>(supply_heal_late_after_s_)
+               ? supply_heal_ratio_late_
+               : supply_heal_ratio_;
   }
 
   void apply_supply_second() {
@@ -444,6 +461,31 @@ class RefereeSimNode : public rclcpp::Node {
         sentry_decision_sim::supply_heal(&world_, max_hp_, supply_heal_ratio_for_now());
     if (healed > 0) {
       SD_LOG_ACT("sim", "补给区回血 +%d -> %d/%d", healed, world_.self_hp, max_hp_);
+    }
+    // 规则 5.3.2：占领补给区时领取累积的免费发弹量（每满 1 分钟 100 发）。
+    const int gained =
+        sentry_decision_sim::claim_supply_ammo(&world_, match_elapsed_seconds(), true);
+    if (gained > 0) {
+      SD_LOG_ACT("sim", "补给区免费发弹量 +%d -> %d", gained, world_.self_ammo);
+    }
+  }
+
+  // 按真实时间推进远程兑换延迟队列（6s 生效）。
+  void step_remote_exchanges() {
+    const TimePoint now = SteadyClock::now();
+    const Duration dt = std::chrono::duration_cast<Duration>(now - last_remote_tick_);
+    last_remote_tick_ = now;
+    const sentry_decision_sim::RemoteStepResult step =
+        sentry_decision_sim::step_pending_remote(&world_, static_cast<int>(dt.count()), max_hp_);
+    if (step.ammo_delivered > 0) {
+      SD_LOG_ACT("sim", "远程兑换发弹量生效 +%d -> %d", step.ammo_delivered, world_.self_ammo);
+    }
+    if (step.hp_delivered > 0) {
+      SD_LOG_ACT("sim", "远程兑换血量生效 +%d -> %d/%d", step.hp_delivered, world_.self_hp,
+                 max_hp_);
+    }
+    if (step.voided > 0) {
+      SD_LOG_WARN("sim", "远程兑换血量因战亡作废（%d 次，金币不返还）", step.voided);
     }
   }
 
@@ -477,6 +519,7 @@ class RefereeSimNode : public rclcpp::Node {
     for (const auto& ack : actuator_.take_acks()) {
       publish_ack(ack);
     }
+    step_remote_exchanges();
     step_game_stage();
     step_supply();
     publish_uplinks();
@@ -736,6 +779,7 @@ class RefereeSimNode : public rclcpp::Node {
   sentry_decision::Point2D start_pose_{};
   TimePoint last_stage_tick_{};
   TimePoint last_supply_tick_{};
+  TimePoint last_remote_tick_{};
   bool in_supply_ = false;
   int max_hp_ = 400;
   double supply_center_x_ = -6.0;

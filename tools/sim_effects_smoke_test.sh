@@ -57,6 +57,23 @@ set_world() {
     "{field: '$1', value: $2}" >/tmp/effects_setworld.log 2>&1 || true
 }
 
+# 补给区免费发弹量（规则 5.3.2）：比赛已进行 60s 时，在补给区应一次 +100 发（与金币无关）。
+# 此处不激活 MatchStageController，否则它会用自身计时覆盖 game_time_remaining。
+set_world coins 0.0
+set_world self_ammo 0.0
+set_world game_status 4.0
+set_world game_time_remaining 360.0
+sleep 2
+supply_ammo="$(online_field bullets_remaining)"
+if [[ -z "${supply_ammo}" || "${supply_ammo}" -lt 100 ]]; then
+  echo "FAIL: 补给区免费发弹量未发放（期望 >=100，实际 ${supply_ammo}）" >&2
+  fail=1
+fi
+if ! grep -q "补给区免费发弹量" /tmp/effects_sim.log; then
+  echo "FAIL: 仿真日志缺少补给区免费发弹量记录" >&2
+  fail=1
+fi
+
 # 进入比赛中。
 call_stage 0
 sleep 0.5
@@ -102,6 +119,34 @@ if [[ -z "${ammo2}" || $((ammo2 - ammo1)) -ne 50 ]]; then
 fi
 if [[ -z "${coin2}" || $((coin1 - coin2)) -ne 50 ]]; then
   echo "FAIL: 重复兑换应再扣 50 金币（${coin1} -> ${coin2}）" >&2
+  fail=1
+fi
+
+# 远程兑换延迟（规则 5.3.2）：确认即扣金币，发弹量 6s 后才到账。
+# 关闭 resource 模块，避免决策树在低弹量时自行发起本地兑换干扰观测。
+timeout 5 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+  "{command: 'set_module', args: '{module: resource, enabled: false}'}" >/dev/null 2>&1 || true
+set_world coins 500.0
+set_world self_ammo 100.0
+set_world sentry_info_2 1.0
+sleep 0.5
+remote_before="$(online_field bullets_remaining)"
+timeout 5 ros2 topic pub --once /sentry/decision_command sentry_interfaces/msg/DecisionCommand \
+  "{request_id: 9001, action: {kind: 5, mode: 0, interval_ms: 0, value: 1}}" >/dev/null 2>&1 || true
+sleep 2
+remote_mid="$(online_field bullets_remaining)"
+if [[ -z "${remote_mid}" || "${remote_mid}" -ne "${remote_before}" ]]; then
+  echo "FAIL: 远程兑换不应立即生效（${remote_before} -> ${remote_mid}）" >&2
+  fail=1
+fi
+sleep 5
+remote_after="$(online_field bullets_remaining)"
+if [[ -z "${remote_after}" || $((remote_after - remote_before)) -ne 100 ]]; then
+  echo "FAIL: 远程兑换应在 6s 后 +100 发（${remote_before} -> ${remote_after}）" >&2
+  fail=1
+fi
+if ! grep -q "远程兑换发弹量生效" /tmp/effects_sim.log; then
+  echo "FAIL: 仿真日志缺少远程兑换生效记录" >&2
   fail=1
 fi
 

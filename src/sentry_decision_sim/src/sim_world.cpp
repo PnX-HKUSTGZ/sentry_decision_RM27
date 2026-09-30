@@ -312,6 +312,56 @@ int supply_heal(SimWorld* world, int max_hp, double ratio) {
   return world->self_hp - before;
 }
 
+int claim_supply_ammo(SimWorld* world, int match_elapsed_seconds, bool in_supply) {
+  if (world == nullptr || !in_supply || match_elapsed_seconds < 0) {
+    return 0;
+  }
+  const int available_minutes = match_elapsed_seconds / 60;
+  const int claimable = available_minutes - world->supply_ammo_claimed_minutes;
+  if (claimable <= 0) {
+    return 0;
+  }
+  // 未领取的份额累积在 (available - claimed) 里，占领时一次性领取，符合规则 5.3.2 示例。
+  world->supply_ammo_claimed_minutes = available_minutes;
+  const int gain = claimable * 100;
+  world->self_ammo += gain;
+  return gain;
+}
+
+RemoteStepResult step_pending_remote(SimWorld* world, int elapsed_ms, int max_hp) {
+  RemoteStepResult result;
+  if (world == nullptr || elapsed_ms < 0) {
+    return result;
+  }
+  std::vector<PendingRemoteExchange> still_pending;
+  still_pending.reserve(world->pending_remote.size());
+  for (auto& item : world->pending_remote) {
+    item.remaining_ms -= elapsed_ms;
+    if (item.remaining_ms > 0) {
+      still_pending.push_back(item);
+      continue;
+    }
+    using K = sentry_decision::DecisionActionKind;
+    if (item.kind == K::kRemoteAmmoExchange) {
+      const int ammo = 100 * item.value;
+      world->self_ammo += ammo;
+      result.ammo_delivered += ammo;
+    } else if (item.kind == K::kRemoteHpExchange) {
+      if (world->self_hp <= 0) {
+        // 规则 5.2.1：确认后 6 秒内战亡，远程兑换血量无效且金币不返还。
+        result.voided += item.value;
+      } else {
+        const int heal = static_cast<int>(std::ceil(max_hp * 0.6)) * item.value;
+        const int before = world->self_hp;
+        world->self_hp = std::min(max_hp, world->self_hp + heal);
+        result.hp_delivered += world->self_hp - before;
+      }
+    }
+  }
+  world->pending_remote.swap(still_pending);
+  return result;
+}
+
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
   Occupancy occupancy;
   occupancy.supply = zones.supply.contains(x, y);
@@ -427,10 +477,12 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
         return reject(3, "金币不足（远程兑换需要 " + std::to_string(cost) + "）");
       }
       world->coins -= cost;
-      world->self_ammo += 100 * action.value;
+      // 规则 5.3.2：远程兑换成功后 6 秒生效，先入延迟队列。
+      world->pending_remote.push_back(
+          PendingRemoteExchange{K::kRemoteAmmoExchange, action.value, 6000});
       outcome.accepted = true;
-      outcome.detail = "远程兑换发弹量 +" + std::to_string(100 * action.value) + "，金币 -" +
-                       std::to_string(cost);
+      outcome.detail = "远程兑换发弹量 +" + std::to_string(100 * action.value) +
+                       " 将于 6s 后生效，金币 -" + std::to_string(cost);
       return outcome;
     }
     case K::kRemoteHpExchange: {
@@ -448,12 +500,11 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
         return reject(3, "金币不足（远程兑换血量需要 " + std::to_string(cost) + "）");
       }
       world->coins -= cost;
-      const int heal = static_cast<int>(std::ceil(max_hp * 0.6)) * action.value;
-      const int before = world->self_hp;
-      world->self_hp = std::min(max_hp, world->self_hp + heal);
+      // 规则 5.2.1：确定远程兑换血量 6 秒后 +60% 上限血量；期间战亡则作废。
+      world->pending_remote.push_back(
+          PendingRemoteExchange{K::kRemoteHpExchange, action.value, 6000});
       outcome.accepted = true;
-      outcome.detail = "远程兑换血量 +" + std::to_string(world->self_hp - before) + "，金币 -" +
-                       std::to_string(cost);
+      outcome.detail = "远程兑换血量将于 6s 后生效，金币 -" + std::to_string(cost);
       return outcome;
     }
     case K::kNone:

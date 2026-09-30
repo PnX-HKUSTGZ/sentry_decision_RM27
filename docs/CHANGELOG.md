@@ -11,6 +11,11 @@
 
 ### Added
 
+- 补给区免费发弹量（规则 5.3.2）：`SimWorld` 记录已领取的「整分钟」，`claim_supply_ammo()` 在机器人进入补给区时一次性发放累积的 100 发/分钟（金币不足也能补弹），`referee_sim_node` 每秒结算并记 ACT 日志
+- 远程兑换 6 秒延迟（规则 5.3.2 / 5.2.1）：`execute_action` 确认时立即扣金币并入队 `pending_remote`，`step_pending_remote()` 6 秒后才加发弹量 / 血量；远程兑换血量在 6 秒内战亡则作废且金币不返还
+- 增益点区域默认启用（补给 1.5m，基地 / 前哨 / 堡垒 1.0m），地图新增 `our_outpost` 命名点；`test_sim_world` 覆盖补给发弹与远程延迟，`test_resource` 覆盖 RMUL 补给位
+- 裁判仿真把决策下发的姿态回写到 `sentry_info_2` 的 bit 12-13，使网页面板「当前姿态」随决策变化（真实系统由 MCU 反馈，这里为仿真近似）
+- `MatchStageController` 新增结算阶段：比赛 420s 耗尽后自动从「比赛中」进入「比赛结算」（`game_status=5`），决策转入 idle；这是“完整比赛”闭环的最后一段
 - 裁判动作前置校验（`sim::execute_action`）：`DecisionActuatorSim` 在改世界前按动作类型校验前置条件，非法动作回 `accepted=false` + 原因，`referee_sim_node` 打印「裁判拒绝动作 ...」；`referee_sim_node` 每拍按机器人位姿判定增益点占领并写回 `event_code`，`SimWorld` 支持 `disengaged` / `can_free_resurrect` / `can_instant_resurrect` / `instant_resurrect_cost` 语义字段与可配置增益点区域
 - 决策树资源节点 `IfOccupyingGainPoint` / `IfDisengaged`，兑换发弹量 / 血量前先判前置条件
 - 新增 `tools/referee_guard_smoke_test.sh` 端到端校验裁判拒绝非法动作并打印日志
@@ -52,6 +57,9 @@
 
 ### Fixed
 
+- `EventCode::local_ammo_exchange_point()` 漏判 RMUL 的补给区占用位（bit 2）：RMUL 场次下补给区占领只置 bit 2，此前会被误判为「不在增益点」而拒绝本地兑换，现已同时判 bit 0 / bit 2
+- `referee_sim_node` 的 `NavigateToPose` action server 收到新目标时未中止旧 goal，旧 handle 会悬挂、永远收不到结果；现在接受新目标前先 `abort` 旧目标
+- 网页面板「位姿」行对缺失的 `pos_x` / `pos_y` 直接调用 `toFixed` 会抛异常，已做空值保护
 - 本地兑换发弹量此前不判「是否真的占领增益点」，仿真裁判也照单全收，导致机器人可在场上任意位置按 10 金币/10 发买弹；现在决策端 `IfOccupyingGainPoint` 门控 + 裁判端 `execute_action` 校验（未占领增益点直接拒绝并打印日志），兑换血量同样要求脱战。此前「低弹量切补给又瞬间折返」的现象随之前置条件补齐而消失（无需再按金币抑制补给）
 - `referee_sim_node` 的数值参数改为自动声明 `-p` 覆盖、按实际类型读取：此前 `declare_parameter<double>` 遇到 CLI 的整数写法（如 `-p max_hp:=400`）会在启动时抛类型异常；同时移除并未真正改变比赛时长的 `match_duration_s` 参数，已进行时间改由 `MatchStageController` 的时长推导
 - 人工资源请求改为「每次注入算一次」：重新注入时清除派发器的 one-shot 记忆，此前面板重复点「兑换发弹 / 血量」因同值去重而不再下发

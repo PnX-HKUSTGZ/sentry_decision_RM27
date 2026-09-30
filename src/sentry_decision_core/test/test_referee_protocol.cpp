@@ -57,6 +57,21 @@ void test_decode_event_code() {
   CHECK(all.enemy_dart_last_target == 7);
   CHECK(all.fort_occupation_status == 3);
   CHECK(all.base_buff_occupied);
+
+  // 本地兑换发弹量的增益点判定：RMUC bit 0 / RMUL bit 2 / 基地 / 前哨站都要认。
+  EventCode point{};
+  CHECK(!point.local_ammo_exchange_point());
+  point.supply_zone_occupied = true;
+  CHECK(point.local_ammo_exchange_point());
+  point = {};
+  point.supply_zone_occupied_rmul = true;
+  CHECK(point.local_ammo_exchange_point());
+  point = {};
+  point.base_buff_occupied = true;
+  CHECK(point.local_ammo_exchange_point());
+  point = {};
+  point.our_outpost_buff_status = 1;
+  CHECK(point.local_ammo_exchange_point());
 }
 
 void test_decode_sentry_info1() {

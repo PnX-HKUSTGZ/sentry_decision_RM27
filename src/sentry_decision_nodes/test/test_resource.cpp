@@ -146,6 +146,23 @@ void test_ammo_exchange_blocked_without_gain_point() {
   CHECK(context.intents.empty());
 }
 
+// 前置条件：RMUL 场次的补给区占用走 event bit 2，也应视为可兑换增益点。
+void test_ammo_exchange_accepts_rmul_supply_bit() {
+  PolicyConfig config = make_config();
+  DecisionContext context;
+  context.config = &config;
+  context.world = make_world();
+  context.world.referee.self_ammo = 10;
+  context.world.referee.event = {};
+  context.world.referee.event.supply_zone_occupied_rmul = true;  // RMUL bit 2
+  BT::Tree tree = make_tree(&context);
+  context.clear_intents();
+  tree.tickOnce();
+  CHECK(context.intents.size() == 1);
+  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
+  CHECK(request.ammo == 50);
+}
+
 // 前置条件：未脱战时不请求兑换血量。
 void test_hp_exchange_blocked_when_engaged() {
   PolicyConfig config = make_config();
@@ -168,6 +185,7 @@ int main() {
   test_ammo_exchange();
   test_no_coins_no_exchange();
   test_ammo_exchange_blocked_without_gain_point();
+  test_ammo_exchange_accepts_rmul_supply_bit();
   test_hp_exchange_blocked_when_engaged();
   if (g_failures == 0) {
     std::printf("all resource tests passed\n");

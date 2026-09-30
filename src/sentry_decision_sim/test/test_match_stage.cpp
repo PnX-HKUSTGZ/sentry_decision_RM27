@@ -69,6 +69,14 @@ void test_auto_advance() {
   for (int i = 0; i < 420; ++i) {
     controller.tick_second();
   }
+  // 比赛时间耗尽后自动进入结算，并继续倒数结算展示时长。
+  CHECK(controller.stage() == MatchStage::kSettling);
+  CHECK(controller.remaining_seconds() == 10);
+  CHECK(controller.counting());
+  for (int i = 0; i < 10; ++i) {
+    controller.tick_second();
+  }
+  CHECK(controller.stage() == MatchStage::kSettling);
   CHECK(controller.remaining_seconds() == 0);
   CHECK(!controller.counting());
 }

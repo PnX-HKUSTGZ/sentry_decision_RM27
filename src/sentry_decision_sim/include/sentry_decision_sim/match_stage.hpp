@@ -12,6 +12,7 @@ enum class MatchStage : std::uint8_t {
   kSelfCheck = 2,
   kCountdown = 3,
   kRunning = 4,
+  kSettling = 5,  // 比赛结算中：比赛时间耗尽后自动进入
 };
 
 // 阶段的默认展示时长（秒）；0 表示不计时。

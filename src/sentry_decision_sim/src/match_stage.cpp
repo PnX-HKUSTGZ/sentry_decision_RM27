@@ -12,6 +12,8 @@ int stage_duration_seconds(MatchStage stage) {
       return 5;
     case MatchStage::kRunning:
       return 420;
+    case MatchStage::kSettling:
+      return 10;  // 结算展示时长（近似）
     case MatchStage::kNotStarted:
     default:
       return 0;
@@ -22,11 +24,12 @@ void MatchStageController::enter(MatchStage stage) {
   stage_ = stage;
   remaining_ = stage_duration_seconds(stage);
   counting_ = stage == MatchStage::kPreparation || stage == MatchStage::kSelfCheck ||
-              stage == MatchStage::kCountdown || stage == MatchStage::kRunning;
+              stage == MatchStage::kCountdown || stage == MatchStage::kRunning ||
+              stage == MatchStage::kSettling;
 }
 
 bool MatchStageController::set(std::uint8_t stage, std::string* error) {
-  if (stage > static_cast<std::uint8_t>(MatchStage::kRunning)) {
+  if (stage > static_cast<std::uint8_t>(MatchStage::kSettling)) {
     if (error != nullptr) {
       *error = "未知比赛阶段: " + std::to_string(stage);
     }
@@ -68,6 +71,8 @@ void MatchStageController::tick_second() {
     enter(MatchStage::kCountdown);
   } else if (stage_ == MatchStage::kCountdown) {
     enter(MatchStage::kRunning);
+  } else if (stage_ == MatchStage::kRunning) {
+    enter(MatchStage::kSettling);  // 比赛时间耗尽 -> 结算
   } else {
     counting_ = false;
   }

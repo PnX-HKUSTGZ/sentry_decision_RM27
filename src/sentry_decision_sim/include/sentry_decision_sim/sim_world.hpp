@@ -2,10 +2,18 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "sentry_decision_sim/scenario.hpp"
 
 namespace sentry_decision_sim {
+
+// 远程兑换延迟结算项：确认时已扣金币，规则要求 6 秒后才把效果写入世界。
+struct PendingRemoteExchange {
+  sentry_decision::DecisionActionKind kind = sentry_decision::DecisionActionKind::kNone;
+  int value = 0;         // 兑换次数
+  int remaining_ms = 0;  // 距离生效还剩的毫秒
+};
 
 // 消息级仿真世界：字段与 sentry_interfaces 上行消息一一对应。
 //
@@ -38,6 +46,13 @@ struct SimWorld {
   // bit 0 = 脱战状态。仿真没有交战模型，默认脱战；可用 set_world {disengaged: 0} 覆盖。
   int sentry_info_2 = 1;
   std::uint64_t sentry_info_3 = 0;
+
+  // ---- 仿真专属的裁判机制状态（不进入上行消息）----
+  // 补给区免费发弹量（规则 5.3.2）：比赛每满 1 分钟累积 100 发，占领补给区时领取；
+  // 这里记录已领取的整分钟数，未领取部分由 (已进行分钟 - 已领取) 隐式累积。
+  int supply_ammo_claimed_minutes = 0;
+  // 远程兑换延迟队列（规则 5.3.2 发弹量 / 5.2.1 血量：确认后 6 秒生效）。
+  std::vector<PendingRemoteExchange> pending_remote;
 
   // TeamInfo
   int base_hp = 0;
@@ -87,6 +102,20 @@ ExchangeResult exchange_hp(SimWorld* world, int value, int max_hp);
 
 // 补给区回血：按上限血量的 ratio 恢复，返回实际恢复量（已满血返回 0）。
 int supply_heal(SimWorld* world, int max_hp, double ratio);
+
+// 领取补给区免费发弹量：比赛每满 1 分钟累积 100 发，占领补给区时一次性领取未领取部分。
+// match_elapsed_seconds 为比赛已进行秒数；返回本次实际增加的发弹量（0 表示无可领取）。
+int claim_supply_ammo(SimWorld* world, int match_elapsed_seconds, bool in_supply);
+
+// 远程兑换延迟结算结果。
+struct RemoteStepResult {
+  int ammo_delivered = 0;  // 本次到期发放的发弹量
+  int hp_delivered = 0;    // 本次到期发放的血量
+  int voided = 0;          // 因战亡作废的远程兑换血量次数（金币不返还）
+};
+
+// 推进远程兑换延迟：到期项生效。远程血量在 6 秒内战亡则作废，金币不返还。
+RemoteStepResult step_pending_remote(SimWorld* world, int elapsed_ms, int max_hp);
 
 // ---- 增益点占领判定（裁判侧）----
 

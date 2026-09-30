@@ -24,6 +24,8 @@ SCENARIO="$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scena
 # 补给区挪到远处，机器人（demo 起点）不在任何增益点，便于验证非法兑换被拒。
 "${SIM_BIN}" --scenario "${SCENARIO}" --hold \
   --ros-args -p supply_center_x:=100.0 -p supply_center_y:=100.0 -p supply_radius:=1.0 \
+  -p base_buff_center_x:=100.0 -p base_buff_center_y:=100.0 -p base_buff_radius:=1.0 \
+  -p our_outpost_center_x:=100.0 -p our_outpost_center_y:=100.0 -p our_outpost_radius:=1.0 \
   >/tmp/guard_sim.log 2>&1 & SP=$!
 trap 'kill "${DP}" "${SP}" 2>/dev/null || true' EXIT
 sleep 3

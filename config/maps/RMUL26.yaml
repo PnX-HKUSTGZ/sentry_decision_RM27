@@ -6,6 +6,7 @@ points:
   patrol_a:         [ 0.0,  1.1, 0.0]
   patrol_b:         [-1.1, -1.1, 0.0]
   enemy_outpost:    [ 1.1,  1.1, 0.0]
+  our_outpost:      [-1.1,  1.1, 0.0]
   central_highland: [-1.1, -1.1, 0.0]
   fort:             [-5.0,  3.0, 0.0]
   fort_staging:     [-5.8,  3.8, 0.0]

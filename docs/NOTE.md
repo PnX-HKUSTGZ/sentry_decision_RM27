@@ -19,6 +19,10 @@
 
 ### 进行中
 
+- 已完成（本地）：P3.6 仿真机制补全 + 鲁棒性审查——补给区免费发弹量（规则 5.3.2，按整分钟累积、进区领取）、
+  远程兑换 6 秒延迟（含远程血量 6 秒内战亡作废）、增益点区域默认启用并补 `our_outpost` 坐标；
+  修复 `local_ammo_exchange_point()` 漏判 RMUL 补给位（bit 2）、`NavigateToPose` 旧 goal 悬挂、网页面板位姿空值崩溃；
+  `test_sim_world` / `test_resource` 扩测，`sim_effects_smoke` 增加补给发弹与远程延迟端到端断言。
 - 文档已同步：`ARCHITECTURE.md` §14（可视化与仿真）与 §5 / §10.6 / §12 / §17 引用；`ROADMAP.md` P3 子阶段与状态；`CHANGELOG.md` Unreleased。
 - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 包与 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过，`format.sh --check` 通过。
 - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。

@@ -189,7 +189,7 @@ void test_execute_action_preconditions() {
     CHECK(world.self_hp == 400);
     CHECK(world.coins == 80);
   }
-  // 远程兑换发弹量：未脱战 -> 拒绝；脱战 + 金币足 -> 成功。
+  // 远程兑换发弹量：未脱战 -> 拒绝；脱战 + 金币足 -> 确认成功但 6s 后才生效。
   {
     SimWorld world;
     world.coins = 1000;
@@ -200,14 +200,77 @@ void test_execute_action_preconditions() {
     const ActionOutcome out =
         execute_action(&world, make_action(DecisionActionKind::kRemoteAmmoExchange, 1), 400);
     CHECK(out.accepted);
+    CHECK(world.coins == 850);    // 金币立即扣除
+    CHECK(world.self_ammo == 0);  // 发弹量延迟
+    CHECK(world.pending_remote.size() == 1);
+    CHECK(step_pending_remote(&world, 5999, 400).ammo_delivered == 0);
+    CHECK(world.self_ammo == 0);
+    CHECK(step_pending_remote(&world, 1, 400).ammo_delivered == 100);
     CHECK(world.self_ammo == 100);
-    CHECK(world.coins == 850);
+    CHECK(world.pending_remote.empty());
   }
   // 未知动作 -> 拒绝。
   {
     SimWorld world;
     CHECK(!execute_action(&world, make_action(DecisionActionKind::kNone, 0), 400).accepted);
   }
+}
+
+// 补给区免费发弹量（规则 5.3.2）：每满 1 分钟累积 100，占领时领取。
+void test_supply_ammo() {
+  SimWorld world;
+  world.self_ammo = 0;
+  // 未占领：不增加，已进行 90s（应累积 1 分钟的份额但不发放）。
+  CHECK(claim_supply_ammo(&world, 90, false) == 0);
+  CHECK(world.self_ammo == 0);
+  // 占领：领取 1 分钟。
+  CHECK(claim_supply_ammo(&world, 90, true) == 100);
+  CHECK(world.self_ammo == 100);
+  // 同一分钟不重复领取。
+  CHECK(claim_supply_ammo(&world, 119, true) == 0);
+  // 离开期间继续累积：到 390s 时共 6 分钟，已领 1 分钟 -> 再领 500（规则示例）。
+  CHECK(claim_supply_ammo(&world, 390, true) == 500);
+  CHECK(world.self_ammo == 600);
+  // 同一分钟内再次调用不重复领取。
+  CHECK(claim_supply_ammo(&world, 419, true) == 0);
+  CHECK(world.self_ammo == 600);
+  // 跨过 420s 边界再累积 1 分钟。
+  CHECK(claim_supply_ammo(&world, 420, true) == 100);
+  CHECK(world.self_ammo == 700);
+}
+
+// 远程兑换血量延迟：6s 后 +60% 上限；期间战亡则作废且金币不返还。
+void test_remote_hp_delay() {
+  SimWorld world;
+  world.coins = 500;
+  world.self_hp = 100;
+  world.sentry_info_2 = 1;
+  world.game_time_remaining = 420;
+  const ActionOutcome out =
+      execute_action(&world, make_action(DecisionActionKind::kRemoteHpExchange, 1), 400);
+  CHECK(out.accepted);
+  const int coins_after = world.coins;
+  CHECK(coins_after == 450);  // 50 + ROUNDUP((420-420)/60*20) = 50
+  CHECK(world.self_hp == 100);
+  const RemoteStepResult step = step_pending_remote(&world, 6000, 400);
+  CHECK(step.hp_delivered == 240);  // 60% * 400
+  CHECK(world.self_hp == 340);
+  CHECK(world.coins == coins_after);
+}
+
+// 远程兑换血量在 6s 内战亡 -> 作废，金币不返还。
+void test_remote_hp_void_on_death() {
+  SimWorld world;
+  world.coins = 500;
+  world.self_hp = 0;  // 已战亡
+  world.sentry_info_2 = 1;
+  world.game_time_remaining = 420;
+  CHECK(
+      execute_action(&world, make_action(DecisionActionKind::kRemoteHpExchange, 1), 400).accepted);
+  const RemoteStepResult step = step_pending_remote(&world, 6000, 400);
+  CHECK(step.voided == 1);
+  CHECK(step.hp_delivered == 0);
+  CHECK(world.self_hp == 0);
 }
 
 }  // namespace
@@ -217,6 +280,9 @@ int main() {
   test_exchange_hp();
   test_supply_heal();
   test_occupancy();
+  test_supply_ammo();
+  test_remote_hp_delay();
+  test_remote_hp_void_on_death();
   test_execute_action_preconditions();
   if (g_failures == 0) {
     std::printf("all sim world tests passed\n");
