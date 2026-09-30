@@ -246,9 +246,9 @@ th {
 /* ---- 场地标定工具（/calibrate.html）---- */
 .calib {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(340px, 1fr);
-  gap: 10px;
-  padding: 10px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 8px;
+  padding: 8px;
   align-items: start;
 }
 
@@ -283,11 +283,19 @@ th {
   overflow: auto;
 }
 
+/* 一行一个点位：色点 | 名称 | x | y | yaw | 删除 */
 .pt-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 12px minmax(48px, 1fr) 62px 62px 56px 26px;
   align-items: center;
   gap: 4px;
-  padding: 2px 4px;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pt-head {
+  color: var(--muted);
+  font-size: 11px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -303,6 +311,7 @@ th {
 }
 
 .pt-row input {
+  width: 100%;
   background: #0c1116;
   color: var(--text);
   border: 1px solid var(--line);
@@ -311,18 +320,12 @@ th {
   min-width: 0;
 }
 
-.pt-name {
-  flex: 1 1 32%;
-}
-
 .pt-num {
-  flex: 0 0 18%;
-  width: 18%;
+  text-align: right;
 }
 
 .pt-del {
-  flex: 0 0 auto;
-  padding: 0 7px;
+  padding: 0;
 }
 
 #io {

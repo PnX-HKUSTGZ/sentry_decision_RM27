@@ -9,7 +9,7 @@ import {
 } from './field.js';
 
 const STORAGE_KEY = 'sentry.fieldPoints.v1';
-const SCALE = 2; // 画布 = 底图 * 2
+const SCALE = 3; // 画布 = 底图 * 3
 const PALETTE = ['#4aa3ff', '#49c46a', '#e0a44a', '#e05a5a', '#b07cff', '#4ad0c4', '#ff8fb0', '#8bd450', '#ffd24a'];
 
 const canvas = document.getElementById('field');
@@ -79,11 +79,25 @@ function draw() {
   });
 }
 
+// 画带描边的文字：深色底 + 浅描边，或浅色底 + 深描边，保证在浅色地胶和深色障碍上都可读。
+function drawLabel(text, x, y, font, fill, halo) {
+  ctx.save();
+  ctx.font = font;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = halo;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawGridLabel(text, x, y) {
+  drawLabel(text, x, y, '13px monospace', '#1d2833', 'rgba(238, 242, 246, 0.92)');
+}
+
 function drawGrid() {
   const extent = fieldExtent();
   ctx.strokeStyle = 'rgba(74, 163, 255, 0.18)';
-  ctx.fillStyle = '#5f7285';
-  ctx.font = '11px monospace';
   ctx.lineWidth = 1;
   let gx = Math.ceil(extent.minX / 5) * 5;
   for (; gx <= extent.maxX; gx += 5) {
@@ -93,7 +107,7 @@ function drawGrid() {
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
-    ctx.fillText('x=' + gx, a.x + 2, canvas.height - 4);
+    drawGridLabel('x=' + gx, a.x + 3, canvas.height - 8);
   }
   let gy = Math.ceil(extent.minY / 5) * 5;
   for (; gy <= extent.maxY; gy += 5) {
@@ -103,7 +117,7 @@ function drawGrid() {
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
-    ctx.fillText('y=' + gy, 4, a.y - 2);
+    drawGridLabel('y=' + gy, 6, a.y - 5);
   }
 }
 
@@ -119,14 +133,27 @@ function drawMarker(point, index) {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
-  ctx.fillStyle = active ? '#ffffff' : '#dfe7ef';
-  ctx.font = (active ? 'bold ' : '') + '13px monospace';
-  ctx.fillText(point.name, p.x + 9, p.y - 6);
+  drawLabel(
+    point.name,
+    p.x + 13,
+    p.y - 9,
+    (active ? 'bold ' : '') + '16px monospace',
+    active ? '#ffffff' : '#eaf2fb',
+    'rgba(11, 16, 21, 0.92)'
+  );
 }
 
 function renderList() {
   rowRefs.length = 0;
   listEl.textContent = '';
+  const head = document.createElement('div');
+  head.className = 'pt-row pt-head';
+  ['', '名称', 'x', 'y', 'yaw', ''].forEach(function (text) {
+    const cell = document.createElement('span');
+    cell.textContent = text;
+    head.appendChild(cell);
+  });
+  listEl.appendChild(head);
   points.forEach(function (point, index) {
     const row = document.createElement('div');
     row.className = 'pt-row' + (index === selected ? ' selected' : '');
