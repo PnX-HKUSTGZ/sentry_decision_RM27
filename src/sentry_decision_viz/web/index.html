@@ -9,7 +9,7 @@
   <body>
     <header>
       <span class="title">RM27 哨兵决策面板</span>
-      <a class="calib-link" href="calibrate.html">场地标定</a>
+      <a class="calib-link" href="calibrate.html" target="_blank" rel="noopener">场地标定</a>
       <span id="conn" class="conn conn-off">未连接</span>
       <label class="ws">
         rosbridge
@@ -18,36 +18,40 @@
       <button id="connect">连接</button>
     </header>
 
-    <main>
-      <section class="panel">
-        <h2>行为树 <span id="tree-meta" class="meta"></span></h2>
-        <div id="tree" class="scroll"></div>
-      </section>
+    <main class="dashboard">
+      <div class="dashboard-left">
+        <section class="panel">
+          <h2>战场俯视图</h2>
+          <div class="match-status">
+            <span id="match-stage" class="match-stage">未开始</span>
+            <span id="match-time" class="match-time">--</span>
+          </div>
+          <canvas id="battlefield" width="1166" height="600"></canvas>
+          <div class="legend">
+            <span class="dot self"></span>己方
+            <span class="dot goal"></span>导航目标
+            <span class="dot enemy"></span>敌方
+          </div>
+        </section>
 
-      <section class="panel">
-        <h2>战场俯视图</h2>
-        <div class="match-status">
-          <span id="match-stage" class="match-stage">未开始</span>
-          <span id="match-time" class="match-time">--</span>
-        </div>
-        <canvas id="battlefield" width="1166" height="600"></canvas>
-        <div class="legend">
-          <span class="dot self"></span>己方
-          <span class="dot goal"></span>导航目标
-          <span class="dot enemy"></span>敌方
-        </div>
-      </section>
+        <section class="panel">
+          <h2>行为树 <span id="tree-meta" class="meta"></span></h2>
+          <div id="tree" class="scroll"></div>
+        </section>
+      </div>
 
-      <section class="panel">
-        <h2>世界状态</h2>
-        <div id="world" class="scroll short"></div>
+      <div class="dashboard-right">
+        <section class="panel">
+          <h2>世界状态</h2>
+          <div id="world" class="scroll short"></div>
 
-        <h2>模块与干预</h2>
-        <div id="intents" class="scroll short"></div>
+          <h2>模块与干预</h2>
+          <div id="intents" class="scroll short"></div>
 
-        <h2>人工干预</h2>
-        <div id="controls"></div>
-      </section>
+          <h2>人工干预</h2>
+          <div id="controls"></div>
+        </section>
+      </div>
     </main>
 
     <script src="vendor/roslib.min.js"></script>

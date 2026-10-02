@@ -410,7 +410,19 @@ class DecisionNode : public rclcpp::Node {
       first = false;
       out << "\"" << sentry_decision_io::world_field_name(entry.first) << "\":" << entry.second;
     }
-    out << "},\"resource\":{\"ammo\":" << result.output.resource.ammo
+    out << "},\"points\":[";
+    first = true;
+    if (context_.config != nullptr) {
+      for (const auto& entry : context_.config->points) {
+        if (!first) {
+          out << ",";
+        }
+        first = false;
+        out << "{\"name\":\"" << json_escape(entry.first) << "\",\"x\":" << entry.second.x
+            << ",\"y\":" << entry.second.y << "}";
+      }
+    }
+    out << "],\"resource\":{\"ammo\":" << result.output.resource.ammo
         << ",\"hp\":" << result.output.resource.hp
         << ",\"remote_ammo\":" << result.output.resource.remote_ammo
         << ",\"remote_hp\":" << result.output.resource.remote_hp

@@ -11,6 +11,8 @@
 
 ### Added
 
+- 仿真参数外置：新增 `config/sim.yaml`（`max_hp` / 补给区 / 增益点 / 导航速度），`referee_sim_node` 源码不再硬编码这些默认值；新增 `--sim-config`（缺省回退相对路径），`-p` 仍逐项覆盖；增益点圆心按其引用的 `map:` 命名点解析
+- 面板布局调整：左列（60%）战场俯视图在上 + 行为树，右列（40%）世界状态 / 模块 / 人工干预；「场地标定」链接改为新标签页打开；俯视图用 RMUC 底图并叠加命名点（来自 `list_state`，重置后重新读取）
 - 地图切换为 RMUC：`map_profile` 更名 `RMUL26`→`RMUC26`，`config/maps/RMUC26.yaml` 使用网页面板「场地标定」标定出的点位；主面板战场俯视图改用导航仓库 `RMUC2026.pgm` 底图（583×300、0.05 m/px、origin [-14.6, -5.86]），战场 extent 由 `web/src/field.js` 统一；仿真增益点默认坐标、`demo.yaml` `start_pose`、`full_match.yaml` / `intervention.yaml` 断言与 `match_smoke` / `sim_effects_smoke` 同步到新坐标
 - 网页面板新增**场地标定工具** `calibrate.html`（面板页链接「场地标定」）：在 RMUC 底图（来自导航仓库 `RMUC2026.pgm`，0.05 m/px、origin [-14.6, -5.86]）上点选 / 拖拽命名点，右侧列表编辑 x/y/yaw，支持添加 / 删除 / 导入 / 导出 `config/maps` 用的 YAML 片段，点位存 `localStorage`；`web/src/field.js` 提供世界坐标↔像素换算（`format.test.mjs` 覆盖），`viz_smoke` 校验新静态资源
 - 新增 `docs/BELIEF.md`（信念层字段字典）：逐字段记录 `WorldState` / `RefereeState` / `SelfState` / `NavState` / `EnemyState` 的含义、单位、来源裁判消息字段、解码位置与有效性判定；并明确 `EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行）

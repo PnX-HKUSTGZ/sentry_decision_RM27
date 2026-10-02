@@ -1,11 +1,15 @@
+#include <yaml-cpp/yaml.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <geometry_msgs/msg/pose.hpp>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -35,6 +39,10 @@
 #include "sentry_interfaces/msg/sentry_info_online.hpp"
 #include "sentry_interfaces/msg/team_info.hpp"
 
+#ifndef DEFAULT_SIM_CONFIG_PATH
+#define DEFAULT_SIM_CONFIG_PATH "config/sim.yaml"
+#endif
+
 namespace {
 
 using sentry_decision::Duration;
@@ -51,6 +59,8 @@ struct Options {
   std::string scenario;
   // 场景时间轴跑完后不退出，保持最后一个世界状态，适合网页面板演示。
   bool hold = false;
+  // 仿真参数 yaml；数值默认全部来自该文件（-p 仍可逐项覆盖）。
+  std::string sim_config = DEFAULT_SIM_CONFIG_PATH;
 };
 
 Options parse_options(int argc, char** argv) {
@@ -70,6 +80,8 @@ Options parse_options(int argc, char** argv) {
       options.scenario = next("--scenario");
     } else if (arg == "--hold") {
       options.hold = true;
+    } else if (arg == "--sim-config") {
+      options.sim_config = next("--sim-config");
     } else if (arg == "--ros-args") {
       // ROS 参数 / 重映射交给 rclcpp，由 declare_parameter 读取；其后参数不再解析。
       break;
@@ -83,6 +95,104 @@ Options parse_options(int argc, char** argv) {
     std::exit(2);
   }
   return options;
+}
+
+// 裁判仿真参数：默认值全部来自 config/sim.yaml（点位来自该文件引用的 map），
+// 源码不再硬编码；命令行 -p 仍可逐项覆盖。
+struct SimConfig {
+  int max_hp = 0;
+  double nav_speed = 0.0;
+  double nav_tolerance = 0.0;
+  double supply_x = 0.0;
+  double supply_y = 0.0;
+  double supply_radius = 0.0;
+  double supply_heal_ratio = 0.0;
+  double supply_heal_ratio_late = 0.0;
+  double supply_heal_late_after_s = 0.0;
+  double base_x = 0.0, base_y = 0.0, base_radius = 0.0;
+  double our_x = 0.0, our_y = 0.0, our_radius = 0.0;
+  double fort_x = 0.0, fort_y = 0.0, fort_radius = 0.0;
+};
+
+double yaml_number(const YAML::Node& node, const char* key, double fallback) {
+  return node[key] ? node[key].as<double>() : fallback;
+}
+
+// 读取一个「point + radius」形式的增益点；point 必须在命名点表中。
+bool load_zone(const YAML::Node& node,
+               const std::map<std::string, sentry_decision::Point2D>& points, const char* label,
+               double* x, double* y, double* radius, std::string* error) {
+  if (!node) {
+    return true;
+  }
+  const std::string point = node["point"] ? node["point"].as<std::string>() : "";
+  const auto it = points.find(point);
+  if (it == points.end()) {
+    *error = std::string(label) + ": 未知命名点 '" + point + "'";
+    return false;
+  }
+  *x = it->second.x;
+  *y = it->second.y;
+  if (node["radius"]) {
+    *radius = node["radius"].as<double>();
+  }
+  return true;
+}
+
+bool load_sim_config(const std::string& path, SimConfig* out, std::string* error) {
+  try {
+    const YAML::Node root = YAML::LoadFile(path);
+    const std::filesystem::path dir = std::filesystem::path(path).parent_path();
+    std::map<std::string, sentry_decision::Point2D> points;
+    const std::string map_rel = root["map"] ? root["map"].as<std::string>() : "";
+    if (!map_rel.empty()) {
+      const YAML::Node map = YAML::LoadFile((dir / map_rel).string());
+      for (const auto& item : map["points"]) {
+        const YAML::Node value = item.second;
+        if (!value.IsSequence() || value.size() < 2) {
+          *error = "地图点位 " + item.first.as<std::string>() + " 需要 [x, y]";
+          return false;
+        }
+        sentry_decision::Point2D p;
+        p.x = value[0].as<double>();
+        p.y = value[1].as<double>();
+        p.yaw = value.size() > 2 ? value[2].as<double>() : 0.0;
+        points[item.first.as<std::string>()] = p;
+      }
+    }
+    out->max_hp = static_cast<int>(yaml_number(root, "max_hp", out->max_hp));
+    if (root["nav"]) {
+      out->nav_speed = yaml_number(root["nav"], "speed_mps", out->nav_speed);
+      out->nav_tolerance = yaml_number(root["nav"], "tolerance_m", out->nav_tolerance);
+    }
+    if (root["supply"]) {
+      const YAML::Node supply = root["supply"];
+      if (!load_zone(supply, points, "supply", &out->supply_x, &out->supply_y, &out->supply_radius,
+                     error)) {
+        return false;
+      }
+      out->supply_heal_ratio = yaml_number(supply, "heal_ratio", out->supply_heal_ratio);
+      out->supply_heal_ratio_late =
+          yaml_number(supply, "heal_ratio_late", out->supply_heal_ratio_late);
+      out->supply_heal_late_after_s =
+          yaml_number(supply, "heal_late_after_s", out->supply_heal_late_after_s);
+    }
+    if (root["gain_zones"]) {
+      const YAML::Node zones = root["gain_zones"];
+      if (!load_zone(zones["base_buff"], points, "base_buff", &out->base_x, &out->base_y,
+                     &out->base_radius, error) ||
+          !load_zone(zones["our_outpost"], points, "our_outpost", &out->our_x, &out->our_y,
+                     &out->our_radius, error) ||
+          !load_zone(zones["fort_buff"], points, "fort_buff", &out->fort_x, &out->fort_y,
+                     &out->fort_radius, error)) {
+        return false;
+      }
+    }
+    return true;
+  } catch (const std::exception& ex) {
+    *error = ex.what();
+    return false;
+  }
 }
 
 sentry_decision::DecisionActionKind kind_from_msg(std::uint8_t kind) {
@@ -126,18 +236,19 @@ class RefereeSimNode : public rclcpp::Node {
   using NavigateToPose = nav2_msgs::action::NavigateToPose;
   using GoalHandle = rclcpp_action::ServerGoalHandle<NavigateToPose>;
 
-  RefereeSimNode(const Options& options, Scenario scenario, bool has_scenario)
+  RefereeSimNode(const Options& options, Scenario scenario, bool has_scenario, SimConfig sim)
       // 自动声明 -p 覆盖：数值参数可能是整数或浮点写法（如 max_hp:=400），
       // 先按覆盖的原生类型声明，再由 declare_number_param 统一读成 double，
       // 避免 declare_parameter<double> 因类型不匹配在启动时抛异常。
       : Node("sentry_referee_sim", rclcpp::NodeOptions()
                                        .allow_undeclared_parameters(true)
                                        .automatically_declare_parameters_from_overrides(true)),
-        nav_(2.0, 0.2),
         scenario_(std::move(scenario)),
         has_scenario_(has_scenario),
         hold_(options.hold),
         scenario_start_(SteadyClock::now()) {
+    sim_ = std::move(sim);
+    nav_ = sentry_decision_sim::NavSimulator(sim_.nav_speed, sim_.nav_tolerance);
     declare_and_create_interfaces();
     if (has_scenario_) {
       for (const auto& item : scenario_.initial_world) {
@@ -185,25 +296,27 @@ class RefereeSimNode : public rclcpp::Node {
 
   void declare_and_create_interfaces() {
     // 补给区回血 / 血量上限：仿真近似规则 5.2.1（占领补给区每秒回上限血量的
-    // 10%，比赛 4 分钟后为 25%）。以下增益点默认坐标与 config/maps/RMUC26.yaml 一致
-    // （supply=healing / base_buff=home / our_outpost_buff=our_outpost / fort_buff=fort）。
-    max_hp_ = static_cast<int>(declare_number_param("max_hp", 400.0));
-    supply_center_x_ = declare_number_param("supply_center_x", -12.36);
-    supply_center_y_ = declare_number_param("supply_center_y", -3.47);
-    supply_radius_ = declare_number_param("supply_radius", 1.5);
-    supply_heal_ratio_ = declare_number_param("supply_heal_ratio", 0.10);
-    supply_heal_ratio_late_ = declare_number_param("supply_heal_ratio_late", 0.25);
-    supply_heal_late_after_s_ = declare_number_param("supply_heal_late_after_s", 240.0);
+    // 10%，比赛 4 分钟后为 25%）。默认值来自 config/sim.yaml（点位取自其引用的 map）；
+    // 命令行 -p 覆盖优先级最高。
+    max_hp_ = static_cast<int>(declare_number_param("max_hp", sim_.max_hp));
+    supply_center_x_ = declare_number_param("supply_center_x", sim_.supply_x);
+    supply_center_y_ = declare_number_param("supply_center_y", sim_.supply_y);
+    supply_radius_ = declare_number_param("supply_radius", sim_.supply_radius);
+    supply_heal_ratio_ = declare_number_param("supply_heal_ratio", sim_.supply_heal_ratio);
+    supply_heal_ratio_late_ =
+        declare_number_param("supply_heal_ratio_late", sim_.supply_heal_ratio_late);
+    supply_heal_late_after_s_ =
+        declare_number_param("supply_heal_late_after_s", sim_.supply_heal_late_after_s);
     // 其余己方增益点区域（半径 <= 0 表示不启用）；用于「本地兑换发弹量」的前置判定。
-    base_buff_center_x_ = declare_number_param("base_buff_center_x", -11.47);
-    base_buff_center_y_ = declare_number_param("base_buff_center_y", -4.40);
-    base_buff_radius_ = declare_number_param("base_buff_radius", 1.0);
-    our_outpost_center_x_ = declare_number_param("our_outpost_center_x", -2.55);
-    our_outpost_center_y_ = declare_number_param("our_outpost_center_y", -2.21);
-    our_outpost_radius_ = declare_number_param("our_outpost_radius", 1.0);
-    fort_buff_center_x_ = declare_number_param("fort_buff_center_x", -7.37);
-    fort_buff_center_y_ = declare_number_param("fort_buff_center_y", 1.60);
-    fort_buff_radius_ = declare_number_param("fort_buff_radius", 1.0);
+    base_buff_center_x_ = declare_number_param("base_buff_center_x", sim_.base_x);
+    base_buff_center_y_ = declare_number_param("base_buff_center_y", sim_.base_y);
+    base_buff_radius_ = declare_number_param("base_buff_radius", sim_.base_radius);
+    our_outpost_center_x_ = declare_number_param("our_outpost_center_x", sim_.our_x);
+    our_outpost_center_y_ = declare_number_param("our_outpost_center_y", sim_.our_y);
+    our_outpost_radius_ = declare_number_param("our_outpost_radius", sim_.our_radius);
+    fort_buff_center_x_ = declare_number_param("fort_buff_center_x", sim_.fort_x);
+    fort_buff_center_y_ = declare_number_param("fort_buff_center_y", sim_.fort_y);
+    fort_buff_radius_ = declare_number_param("fort_buff_radius", sim_.fort_radius);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -772,6 +885,7 @@ class RefereeSimNode : public rclcpp::Node {
     rclcpp::shutdown();
   }
 
+  SimConfig sim_;
   sentry_decision_sim::NavSimulator nav_;
   sentry_decision_sim::DecisionActuatorSim actuator_{2};
   SimWorld world_;
@@ -844,6 +958,25 @@ int main(int argc, char** argv) {
   logger.add_short_sink(console);
   logger.set_short_min_level(sentry_decision::LogLevel::kAct);
 
+  // 仿真参数（含增益点 / 补给区 / 速度）全部来自 config/sim.yaml；-p 覆盖在节点内处理。
+  SimConfig sim_config;
+  std::string sim_path = options.sim_config;
+  if (!std::filesystem::exists(sim_path)) {
+    const std::string relative = "config/sim.yaml";
+    if (std::filesystem::exists(relative)) {
+      sim_path = relative;
+    }
+  }
+  {
+    std::string sim_error;
+    if (!load_sim_config(sim_path, &sim_config, &sim_error)) {
+      std::cerr << "仿真参数加载失败: " << sim_path << "\n  " << sim_error << "\n";
+      rclcpp::shutdown();
+      return 1;
+    }
+  }
+  SD_LOG_ACT("sim", "仿真参数来自 %s", sim_path.c_str());
+
   Scenario scenario;
   bool has_scenario = false;
   if (!options.scenario.empty()) {
@@ -863,7 +996,8 @@ int main(int argc, char** argv) {
   }
 
   try {
-    auto node = std::make_shared<RefereeSimNode>(options, std::move(scenario), has_scenario);
+    auto node =
+        std::make_shared<RefereeSimNode>(options, std::move(scenario), has_scenario, sim_config);
     rclcpp::spin(node);
     rclcpp::shutdown();
     return node->exit_code();

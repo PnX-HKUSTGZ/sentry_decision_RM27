@@ -43,6 +43,9 @@ target_link_libraries(referee_sim_node ${PROJECT_NAME})
 ament_target_dependencies(referee_sim_node
   rclcpp rclcpp_action nav2_msgs nav_msgs geometry_msgs std_msgs
   sentry_interfaces sentry_decision_msgs sentry_decision_core)
+# 仿真参数 yaml 的编译期默认路径（开发/仿真用；可用 --sim-config 覆盖）。
+target_compile_definitions(referee_sim_node PRIVATE
+  DEFAULT_SIM_CONFIG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../config/sim.yaml")
 
 install(TARGETS ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}

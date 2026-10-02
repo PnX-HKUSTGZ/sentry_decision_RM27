@@ -464,13 +464,15 @@ ros2 run sentry_decision_io io_node --ros-args \
 
 ### 5.4 referee_sim_node 参数
 
-上行 / 下行话题与 `io_node` 同名同默认，另加：
+上行 / 下行话题与 `io_node` 同名同默认。数值默认值（`max_hp` / 补给区 / 增益点 / 导航速度）全部来自
+`config/sim.yaml`（增益点圆心取自其 `map:` 引用的命名点），`-p` 可逐项覆盖；另加：
 
 | 参数 / 命令行 | 默认 | 说明 |
 | --- | --- | --- |
 | `--rate` | `20.0` | 发布与 tick 频率（Hz），取值 `(0, 1000]` |
 | `--scenario` | 空 | 场景 YAML 路径；为空则持续发布全零世界 |
 | `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
+| `--sim-config` | 编译期绝对路径 | 仿真参数 YAML；该路径不存在时回退到相对路径 `config/sim.yaml` |
 | `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
 | `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
 | `--ros-args -p set_world_service` | `/sentry_sim/set_world` | 直接修改仿真世界的服务名 |

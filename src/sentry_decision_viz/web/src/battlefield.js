@@ -92,6 +92,17 @@ function drawSelf(ctx, self, extent, width, height) {
   ctx.restore();
 }
 
+function drawNamedPoints(ctx, points, extent, width, height) {
+  points.forEach(function (point) {
+    const p = worldToCanvas(point, extent, width, height);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(224, 164, 74, 0.95)';
+    ctx.fill();
+    label(ctx, point.name, p.x + 6, p.y + 4, 'left');
+  });
+}
+
 export function drawBattlefield(canvas, model) {
   lastCanvas = canvas;
   lastModel = model;
@@ -101,6 +112,9 @@ export function drawBattlefield(canvas, model) {
   const extent = model.extent;
   ctx.clearRect(0, 0, width, height);
   drawField(ctx, extent, width, height);
+  if (model.points && model.points.length) {
+    drawNamedPoints(ctx, model.points, extent, width, height);
+  }
   if (model.goal) {
     drawGoal(ctx, model.goal, extent, width, height);
   }

@@ -1,7 +1,7 @@
 // 人工干预控件：比赛阶段 / 暂停 -> 裁判仿真 service；其余走 /decision/debug (service)。
 // 不使用 ManualOverride action：vendored roslib 1.4.1 的 ActionClient 是 ROS 1 actionlib
 // 命名（/<action>/goal 等），无法对接 ROS 2 action 的 /_action/* 服务，故面板统一走 service。
-export function createControlsPanel(el, bridge, onLog) {
+export function createControlsPanel(el, bridge, onLog, onRefresh) {
   const modeOptions = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
   const worldFields = [
     ['self_hp', '自身血量'],
@@ -133,6 +133,10 @@ export function createControlsPanel(el, bridge, onLog) {
       })
       .then(function () {
         onLog('决策节点干预状态已清空');
+        // 重新读取 list_state，使面板叠加的命名点等随重置刷新。
+        if (onRefresh) {
+          onRefresh();
+        }
       })
       .catch(function (error) {
         onLog('重置失败: ' + error);

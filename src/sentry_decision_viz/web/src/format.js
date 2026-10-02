@@ -109,13 +109,15 @@ export function decisionToView(msg) {
 }
 
 // 战场模型：范围取自 RMUC 场地底图（origin/resolution/尺寸见 field.js）。
-export function battlefieldModel(world, decision) {
+// listState（list_state JSON）携带命名点；重置 / 轮询后会重新读取，覆盖层随之更新。
+export function battlefieldModel(world, decision, listState) {
   return {
     extent: fieldExtent(),
     self: world && world.selfValid ? { x: world.posX, y: world.posY, yaw: world.yaw } : null,
     goal: decision && decision.hasNavGoal ? { x: decision.navGoalX, y: decision.navGoalY } : null,
     enemy: world && world.enemyValid && world.hasEnemy ? { x: world.enemyX, y: world.enemyY } : null,
     mode: decision ? decision.modeName : 'unknown',
+    points: listState && Array.isArray(listState.points) ? listState.points : [],
   };
 }
 

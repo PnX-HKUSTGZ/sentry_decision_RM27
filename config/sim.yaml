@@ -1,0 +1,19 @@
+# 裁判仿真参数（referee_sim_node）。默认值集中在此，源码不再硬编码；
+# 命令行 `--ros-args -p <name>:=<value>` 仍可逐项覆盖。
+# map 相对本文件目录；其命名点用于供给补给区 / 增益点圆心。
+map: maps/RMUC26.yaml
+
+max_hp: 400
+nav:
+  speed_mps: 2.0
+  tolerance_m: 0.2
+supply:
+  point: healing
+  radius: 1.5
+  heal_ratio: 0.10
+  heal_ratio_late: 0.25
+  heal_late_after_s: 240
+gain_zones:
+  base_buff:   { point: home,        radius: 1.0 }
+  our_outpost: { point: our_outpost, radius: 1.0 }
+  fort_buff:   { point: fort,        radius: 1.0 }
