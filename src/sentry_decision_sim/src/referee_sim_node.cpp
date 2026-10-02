@@ -19,6 +19,7 @@
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
+#include "sentry_decision_msgs/srv/apply_effect.hpp"
 #include "sentry_decision_msgs/srv/debug_command.hpp"
 #include "sentry_decision_msgs/srv/set_game_pause.hpp"
 #include "sentry_decision_msgs/srv/set_game_stage.hpp"
@@ -204,6 +205,7 @@ class RefereeSimNode : public rclcpp::Node {
     supply_center_x_ = declare_number_param("supply_center_x", sim_.supply_x);
     supply_center_y_ = declare_number_param("supply_center_y", sim_.supply_y);
     supply_radius_ = declare_number_param("supply_radius", sim_.supply_radius);
+    supply_enter_delay_s_ = declare_number_param("supply_enter_delay_s", sim_.supply_enter_delay_s);
     supply_heal_ratio_ = declare_number_param("supply_heal_ratio", sim_.supply_heal_ratio);
     supply_heal_ratio_late_ =
         declare_number_param("supply_heal_ratio_late", sim_.supply_heal_ratio_late);
@@ -291,6 +293,16 @@ class RefereeSimNode : public rclcpp::Node {
           handle_set_world(*request, *response);
         });
 
+    // 具名仿真效果（面板按钮）：步长来自 sim.yaml 的 effects，只改真实世界。
+    const auto apply_effect_service =
+        declare_parameter<std::string>("apply_effect_service", "/sentry_sim/apply_effect");
+    apply_effect_server_ = create_service<sentry_decision_msgs::srv::ApplyEffect>(
+        apply_effect_service,
+        [this](const std::shared_ptr<sentry_decision_msgs::srv::ApplyEffect::Request> request,
+               std::shared_ptr<sentry_decision_msgs::srv::ApplyEffect::Response> response) {
+          handle_apply_effect(*request, *response);
+        });
+
     using namespace std::placeholders;
     action_server_ = rclcpp_action::create_server<NavigateToPose>(
         this, navigate_action,
@@ -371,6 +383,7 @@ class RefereeSimNode : public rclcpp::Node {
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
       in_supply_ = false;
+      supply_seconds_in_zone_ = 0;
     }
     last_stage_tick_ = SteadyClock::now();
     sync_world_stage();
@@ -414,6 +427,22 @@ class RefereeSimNode : public rclcpp::Node {
     response.value = request.value;
     response.message = "ok";
     SD_LOG_ACT("sim", "仿真世界 %s = %.2f", request.field.c_str(), request.value);
+  }
+
+  // 具名仿真效果：按 sim.yaml 的步长扣减真实世界，供面板模拟赛场事件。
+  void handle_apply_effect(const sentry_decision_msgs::srv::ApplyEffect::Request& request,
+                           sentry_decision_msgs::srv::ApplyEffect::Response& response) {
+    const sentry_decision_sim::EffectResult result =
+        sentry_decision_sim::apply_effect(&world_, request.effect, sim_.effects);
+    response.success = result.applied;
+    response.new_value = result.new_value;
+    response.message = result.detail;
+    if (result.applied) {
+      SD_LOG_ACT("sim", "效果 %s: %s -> %.0f", request.effect.c_str(), result.detail.c_str(),
+                 result.new_value);
+    } else {
+      SD_LOG_WARN("sim", "效果被拒: %s", result.detail.c_str());
+    }
   }
 
   // 把阶段控制器的状态写回 SimWorld；未激活时保留场景设定的 game_status / 时间。
@@ -467,16 +496,21 @@ class RefereeSimNode : public rclcpp::Node {
     const bool inside = in_supply_zone();
     if (inside != in_supply_) {
       in_supply_ = inside;
+      supply_seconds_in_zone_ = 0;
       SD_LOG_ACT("sim", "%s补给区", inside ? "进入" : "离开");
     }
     if (!inside) {
       return;
     }
-    const int healed =
-        sentry_decision_sim::supply_heal(&world_, max_hp_, supply_heal_ratio_for_now());
-    if (healed > 0) {
-      SD_LOG_ACT("sim", "补给区回血 +%d -> %d/%d", healed, world_.self_hp, max_hp_);
+    // 进入后先等检测建立（enter_delay_s，默认 1s），延时满足前的整秒不回血。
+    if (sentry_decision_sim::supply_heal_ready(supply_seconds_in_zone_, supply_enter_delay_s_)) {
+      const int healed =
+          sentry_decision_sim::supply_heal(&world_, max_hp_, supply_heal_ratio_for_now());
+      if (healed > 0) {
+        SD_LOG_ACT("sim", "补给区回血 +%d -> %d/%d", healed, world_.self_hp, max_hp_);
+      }
     }
+    ++supply_seconds_in_zone_;
     // 规则 5.3.2：占领补给区时领取累积的免费发弹量（每满 1 分钟 100 发）。
     const int gained =
         sentry_decision_sim::claim_supply_ammo(&world_, match_elapsed_seconds(), true);
@@ -797,12 +831,15 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_supply_tick_{};
   TimePoint last_remote_tick_{};
   bool in_supply_ = false;
+  // 连续在补给区内的整秒数（进入当拍为 0），用于回血进入延时。
+  int supply_seconds_in_zone_ = 0;
   // 有效值由 declare_and_create_interfaces() 从 config/sim.yaml 写入；
   // 这里的零值只是构造期占位，不是可调参数。
   int max_hp_ = 0;
   double supply_center_x_ = 0.0;
   double supply_center_y_ = 0.0;
   double supply_radius_ = 0.0;
+  double supply_enter_delay_s_ = 0.0;
   double supply_heal_ratio_ = 0.0;
   double supply_heal_ratio_late_ = 0.0;
   double supply_heal_late_after_s_ = 0.0;
@@ -844,6 +881,7 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGamePause>::SharedPtr set_game_pause_server_;
   rclcpp::Service<sentry_decision_msgs::srv::SetWorld>::SharedPtr set_world_server_;
+  rclcpp::Service<sentry_decision_msgs::srv::ApplyEffect>::SharedPtr apply_effect_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;

@@ -2,6 +2,7 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -19,10 +20,11 @@ int yaml_int(const YAML::Node& node, const char* key, int fallback) {
   return node[key] ? node[key].as<int>() : fallback;
 }
 
-// 读取一个「point + radius」形式的增益点；point 必须在命名点表中。
+// 读取一个增益点：point 必须在命名点表中，半径取自地图点第 4 位（必须为正）。
 bool load_zone(const YAML::Node& node,
-               const std::map<std::string, sentry_decision::Point2D>& points, const char* label,
-               double* x, double* y, double* radius, std::string* error) {
+               const std::map<std::string, sentry_decision::Point2D>& points,
+               const std::map<std::string, double>& radii, const char* label, double* x, double* y,
+               double* radius, std::string* error) {
   if (!node) {
     return true;
   }
@@ -32,11 +34,14 @@ bool load_zone(const YAML::Node& node,
     *error = std::string(label) + ": 未知命名点 '" + point + "'";
     return false;
   }
+  const auto radius_it = radii.find(point);
+  if (radius_it == radii.end() || !(radius_it->second > 0.0)) {
+    *error = std::string(label) + ": 地图点 '" + point + "' 缺少正半径（点第 4 位）";
+    return false;
+  }
   *x = it->second.x;
   *y = it->second.y;
-  if (node["radius"]) {
-    *radius = node["radius"].as<double>();
-  }
+  *radius = radius_it->second;
   return true;
 }
 
@@ -47,20 +52,28 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
     const YAML::Node root = YAML::LoadFile(path);
     const std::filesystem::path dir = std::filesystem::path(path).parent_path();
     std::map<std::string, sentry_decision::Point2D> points;
+    std::map<std::string, double> radii;
     const std::string map_rel = root["map"] ? root["map"].as<std::string>() : "";
     if (!map_rel.empty()) {
       const YAML::Node map = YAML::LoadFile((dir / map_rel).string());
       for (const auto& item : map["points"]) {
         const YAML::Node value = item.second;
-        if (!value.IsSequence() || value.size() < 2) {
-          *error = "地图点位 " + item.first.as<std::string>() + " 需要 [x, y]";
+        const std::string name = item.first.as<std::string>();
+        if (!value.IsSequence() || value.size() < 2 || value.size() > 4) {
+          *error = "地图点位 " + name + " 需要 [x, y] / [x, y, yaw] / [x, y, yaw, radius]";
           return false;
         }
         sentry_decision::Point2D p;
         p.x = value[0].as<double>();
         p.y = value[1].as<double>();
         p.yaw = value.size() > 2 ? value[2].as<double>() : 0.0;
-        points[item.first.as<std::string>()] = p;
+        const double radius = value.size() == 4 ? value[3].as<double>() : 0.0;
+        if (!std::isfinite(radius) || radius < 0.0) {
+          *error = "地图点位 " + name + " 的半径必须是非负有限值";
+          return false;
+        }
+        points[name] = p;
+        radii[name] = radius;
       }
     }
     out->max_hp = yaml_int(root, "max_hp", out->max_hp);
@@ -78,10 +91,11 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
     }
     if (root["supply"]) {
       const YAML::Node supply = root["supply"];
-      if (!load_zone(supply, points, "supply", &out->supply_x, &out->supply_y, &out->supply_radius,
-                     error)) {
+      if (!load_zone(supply, points, radii, "supply", &out->supply_x, &out->supply_y,
+                     &out->supply_radius, error)) {
         return false;
       }
+      out->supply_enter_delay_s = yaml_number(supply, "enter_delay_s", out->supply_enter_delay_s);
       out->supply_heal_ratio = yaml_number(supply, "heal_ratio", out->supply_heal_ratio);
       out->supply_heal_ratio_late =
           yaml_number(supply, "heal_ratio_late", out->supply_heal_ratio_late);
@@ -90,14 +104,28 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
     }
     if (root["gain_zones"]) {
       const YAML::Node zones = root["gain_zones"];
-      if (!load_zone(zones["base_buff"], points, "base_buff", &out->base_x, &out->base_y,
+      if (!load_zone(zones["base_buff"], points, radii, "base_buff", &out->base_x, &out->base_y,
                      &out->base_radius, error) ||
-          !load_zone(zones["our_outpost"], points, "our_outpost", &out->our_x, &out->our_y,
+          !load_zone(zones["our_outpost"], points, radii, "our_outpost", &out->our_x, &out->our_y,
                      &out->our_radius, error) ||
-          !load_zone(zones["fort_buff"], points, "fort_buff", &out->fort_x, &out->fort_y,
+          !load_zone(zones["fort_buff"], points, radii, "fort_buff", &out->fort_x, &out->fort_y,
                      &out->fort_radius, error)) {
         return false;
       }
+    }
+    if (root["effects"]) {
+      const YAML::Node effects = root["effects"];
+      out->effects.self_damage = yaml_number(effects, "self_damage", out->effects.self_damage);
+      out->effects.self_ammo_consume =
+          yaml_number(effects, "self_ammo_consume", out->effects.self_ammo_consume);
+      out->effects.our_outpost_damage =
+          yaml_number(effects, "our_outpost_damage", out->effects.our_outpost_damage);
+      out->effects.our_base_damage =
+          yaml_number(effects, "our_base_damage", out->effects.our_base_damage);
+      out->effects.enemy_outpost_damage =
+          yaml_number(effects, "enemy_outpost_damage", out->effects.enemy_outpost_damage);
+      out->effects.enemy_base_damage =
+          yaml_number(effects, "enemy_base_damage", out->effects.enemy_base_damage);
     }
     return true;
   } catch (const std::exception& ex) {

@@ -20,6 +20,8 @@ struct PolicyConfig {
   std::string strategy_profile;
   std::string map_frame = "map";
   std::map<std::string, Point2D> points;
+  // 命名点可选半径（米）：0 表示普通点；> 0 表示增益区圆（地图点第 4 位）。
+  std::map<std::string, double> point_radius;
   std::map<std::string, double> numbers;
   std::map<std::string, bool> flags;
 

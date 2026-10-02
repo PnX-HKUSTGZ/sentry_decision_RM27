@@ -14,12 +14,25 @@ match:
   running_s: 420
   settling_s: 10
 supply:
-  point: healing
-  radius: 1.5
+  point: sim_home
+  # 半径取自地图点的第 4 位（maps/RMUC26.yaml 的 sim_home）。
+  # 规则 5.2.1：占领补给区每秒回上限血量 10%，比赛 4 分钟后 25%。
+  # 仿真额外加 1s 进入延时，模拟场地交互模块的检测建立时间。
+  enter_delay_s: 1.0
   heal_ratio: 0.10
   heal_ratio_late: 0.25
   heal_late_after_s: 240
 gain_zones:
-  base_buff:   { point: home,        radius: 1.0 }
-  our_outpost: { point: our_outpost, radius: 1.0 }
-  fort_buff:   { point: fort,        radius: 1.0 }
+  # 补给区（sim_home）会回血；以下三者只用于本地兑换，不回血。
+  # 半径同样取自各地图点的第 4 位。
+  base_buff:   { point: sim_base }
+  our_outpost: { point: sim_our_outpost }
+  fort_buff:   { point: sim_fort }
+# 面板「仿真效果」按钮的步长：对仿真世界真实值做减法（摧毁类直接置 0，无需步长）。
+effects:
+  self_damage: 100
+  self_ammo_consume: 50
+  our_outpost_damage: 300
+  our_base_damage: 500
+  enemy_outpost_damage: 300
+  enemy_base_damage: 500

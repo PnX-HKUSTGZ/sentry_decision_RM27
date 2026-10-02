@@ -312,6 +312,68 @@ int supply_heal(SimWorld* world, int max_hp, double ratio) {
   return world->self_hp - before;
 }
 
+bool supply_heal_ready(int seconds_in_zone, double enter_delay_s) {
+  if (enter_delay_s <= 0.0) {
+    return true;
+  }
+  return static_cast<double>(seconds_in_zone) >= enter_delay_s;
+}
+
+EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimEffects& effects) {
+  EffectResult result;
+  if (world == nullptr) {
+    result.detail = "世界为空";
+    return result;
+  }
+  auto damage = [](int current, double amount) {
+    return std::max(0, current - static_cast<int>(amount));
+  };
+  if (effect == "self_damage") {
+    world->self_hp = damage(world->self_hp, effects.self_damage);
+    result.new_value = world->self_hp;
+    result.detail = "自身血量 -" + std::to_string(static_cast<int>(effects.self_damage));
+  } else if (effect == "self_ammo_consume") {
+    world->self_ammo = damage(world->self_ammo, effects.self_ammo_consume);
+    result.new_value = world->self_ammo;
+    result.detail = "自身发弹量 -" + std::to_string(static_cast<int>(effects.self_ammo_consume));
+  } else if (effect == "self_death") {
+    world->self_hp = 0;
+    result.new_value = 0.0;
+    result.detail = "自身战亡（血量归零）";
+  } else if (effect == "our_outpost_damage") {
+    world->our_outpost_hp = damage(world->our_outpost_hp, effects.our_outpost_damage);
+    result.new_value = world->our_outpost_hp;
+    result.detail =
+        "己方前哨站血量 -" + std::to_string(static_cast<int>(effects.our_outpost_damage));
+  } else if (effect == "our_outpost_destroy") {
+    world->our_outpost_hp = 0;
+    result.new_value = 0.0;
+    result.detail = "己方前哨站被摧毁";
+  } else if (effect == "our_base_damage") {
+    world->base_hp = damage(world->base_hp, effects.our_base_damage);
+    result.new_value = world->base_hp;
+    result.detail = "己方基地血量 -" + std::to_string(static_cast<int>(effects.our_base_damage));
+  } else if (effect == "enemy_outpost_damage") {
+    world->enemy_outpost_hp = damage(world->enemy_outpost_hp, effects.enemy_outpost_damage);
+    result.new_value = world->enemy_outpost_hp;
+    result.detail =
+        "敌方前哨站血量 -" + std::to_string(static_cast<int>(effects.enemy_outpost_damage));
+  } else if (effect == "enemy_outpost_destroy") {
+    world->enemy_outpost_hp = 0;
+    result.new_value = 0.0;
+    result.detail = "敌方前哨站被摧毁";
+  } else if (effect == "enemy_base_damage") {
+    world->enemy_base_hp = damage(world->enemy_base_hp, effects.enemy_base_damage);
+    result.new_value = world->enemy_base_hp;
+    result.detail = "敌方基地血量 -" + std::to_string(static_cast<int>(effects.enemy_base_damage));
+  } else {
+    result.detail = "未知仿真效果: " + effect;
+    return result;
+  }
+  result.applied = true;
+  return result;
+}
+
 int claim_supply_ammo(SimWorld* world, int match_elapsed_seconds, bool in_supply) {
   if (world == nullptr || !in_supply || match_elapsed_seconds < 0) {
     return 0;

@@ -19,6 +19,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TreeStatus.msg"
   "msg/WorldState.msg"
   "action/ManualOverride.action"
+  "srv/ApplyEffect.srv"
   "srv/DebugCommand.srv"
   "srv/SetGameStage.srv"
   "srv/SetGamePause.srv"

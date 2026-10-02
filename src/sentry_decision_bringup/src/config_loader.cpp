@@ -112,16 +112,20 @@ void flatten_scalars(const YAML::Node& node, const std::string& prefix,
 }
 
 bool load_point(const YAML::Node& node, const std::string& name, sentry_decision::Point2D* out,
-                std::vector<std::string>* errors) {
+                double* radius, std::vector<std::string>* errors) {
+  *radius = 0.0;
   try {
     if (node.IsSequence()) {
-      if (node.size() < 2 || node.size() > 3) {
-        errors->push_back("点位 " + name + " 需要 [x, y] 或 [x, y, yaw]");
+      if (node.size() < 2 || node.size() > 4) {
+        errors->push_back("点位 " + name + " 需要 [x, y] / [x, y, yaw] / [x, y, yaw, radius]");
         return false;
       }
       out->x = node[0].as<double>();
       out->y = node[1].as<double>();
-      out->yaw = node.size() == 3 ? node[2].as<double>() : 0.0;
+      out->yaw = node.size() >= 3 ? node[2].as<double>() : 0.0;
+      if (node.size() == 4) {
+        *radius = node[3].as<double>();
+      }
     } else if (node.IsMap()) {
       // 点位是外部输入：map 形式必须显式给出 x 与 y，缺失即报错，不静默落到原点。
       if (!node["x"] || !node["y"]) {
@@ -131,6 +135,9 @@ bool load_point(const YAML::Node& node, const std::string& name, sentry_decision
       out->x = node["x"].as<double>();
       out->y = node["y"].as<double>();
       out->yaw = node["yaw"] ? node["yaw"].as<double>() : 0.0;
+      if (node["radius"]) {
+        *radius = node["radius"].as<double>();
+      }
     } else {
       errors->push_back("点位 " + name + " 格式不支持");
       return false;
@@ -141,6 +148,10 @@ bool load_point(const YAML::Node& node, const std::string& name, sentry_decision
   }
   if (!std::isfinite(out->x) || !std::isfinite(out->y) || !std::isfinite(out->yaw)) {
     errors->push_back("点位 " + name + " 含非有限值");
+    return false;
+  }
+  if (!std::isfinite(*radius) || *radius < 0.0) {
+    errors->push_back("点位 " + name + " 的半径必须是非负有限值");
     return false;
   }
   return true;
@@ -192,8 +203,10 @@ ConfigLoadResult load_policy_config(const std::string& profiles_path) {
       for (auto it = map["points"].begin(); it != map["points"].end(); ++it) {
         const std::string name = it->first.as<std::string>();
         sentry_decision::Point2D point;
-        if (load_point(it->second, name, &point, &result.errors)) {
+        double radius = 0.0;
+        if (load_point(it->second, name, &point, &radius, &result.errors)) {
           result.config.points[name] = point;
+          result.config.point_radius[name] = radius;
         }
       }
     } else {

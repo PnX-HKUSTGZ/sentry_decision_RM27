@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "sentry_decision_sim/scenario.hpp"
+#include "sentry_decision_sim/sim_config.hpp"
 
 namespace sentry_decision_sim {
 
@@ -102,6 +103,22 @@ ExchangeResult exchange_hp(SimWorld* world, int value, int max_hp);
 
 // 补给区回血：按上限血量的 ratio 恢复，返回实际恢复量（已满血返回 0）。
 int supply_heal(SimWorld* world, int max_hp, double ratio);
+
+// 进入补给区后是否已满足回血延时：seconds_in_zone 为连续在区内的整秒数（进入当拍为 0）。
+bool supply_heal_ready(int seconds_in_zone, double enter_delay_s);
+
+// 一次仿真效果（面板「仿真效果」按钮）的结算结果。
+struct EffectResult {
+  bool applied = false;
+  double new_value = 0.0;  // 结算后该字段的值
+  std::string detail;      // 成功说明或未知效果原因
+};
+
+// 对仿真世界施加一个具名效果：self_damage / self_ammo_consume / self_death /
+// our_outpost_damage / our_outpost_destroy / our_base_damage /
+// enemy_outpost_damage / enemy_outpost_destroy / enemy_base_damage。
+// 扣血 / 扣弹按 effects 步长做减法并夹到 0；摧毁类直接置 0。未知效果返回 applied=false。
+EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimEffects& effects);
 
 // 领取补给区免费发弹量：比赛每满 1 分钟累积 100 发，占领补给区时一次性领取未领取部分。
 // match_elapsed_seconds 为比赛已进行秒数；返回本次实际增加的发弹量（0 表示无可领取）。

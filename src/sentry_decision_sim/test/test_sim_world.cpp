@@ -79,6 +79,48 @@ void test_supply_heal() {
   CHECK(supply_heal(&world, 250, 0.10) == 25);
 }
 
+// 进入补给区延时：进入当拍（0 秒）不回血，满足延时后的整秒才开始。
+void test_supply_heal_ready() {
+  CHECK(!supply_heal_ready(0, 1.0));
+  CHECK(supply_heal_ready(1, 1.0));
+  CHECK(supply_heal_ready(0, 0.0));
+  CHECK(!supply_heal_ready(0, 0.5));
+  CHECK(supply_heal_ready(1, 0.5));
+}
+
+// 仿真效果：扣血 / 扣弹按步长夹到 0，摧毁类置 0，未知效果不生效。
+void test_apply_effects() {
+  SimEffects effects;
+  effects.self_damage = 100;
+  effects.self_ammo_consume = 50;
+  effects.our_outpost_damage = 300;
+  effects.our_base_damage = 500;
+  effects.enemy_outpost_damage = 300;
+  effects.enemy_base_damage = 500;
+
+  SimWorld world;
+  world.self_hp = 400;
+  world.self_ammo = 100;
+  world.our_outpost_hp = 1500;
+  world.base_hp = 5000;
+  world.enemy_outpost_hp = 1500;
+  world.enemy_base_hp = 5000;
+
+  CHECK(apply_effect(&world, "self_damage", effects).new_value == 300);
+  CHECK(world.self_hp == 300);
+  CHECK(apply_effect(&world, "self_ammo_consume", effects).new_value == 50);
+  world.self_ammo = 20;
+  CHECK(apply_effect(&world, "self_ammo_consume", effects).new_value == 0);
+  CHECK(apply_effect(&world, "self_death", effects).applied);
+  CHECK(world.self_hp == 0);
+  CHECK(apply_effect(&world, "our_outpost_damage", effects).new_value == 1200);
+  CHECK(apply_effect(&world, "enemy_outpost_destroy", effects).new_value == 0);
+  CHECK(world.enemy_outpost_hp == 0);
+  CHECK(apply_effect(&world, "our_base_damage", effects).new_value == 4500);
+  CHECK(apply_effect(&world, "enemy_base_damage", effects).new_value == 4500);
+  CHECK(!apply_effect(&world, "bogus", effects).applied);
+}
+
 // 增益点占领：按位姿判定并写回 event_code 位段。
 void test_occupancy() {
   GainZones zones;
@@ -237,6 +279,11 @@ void test_supply_ammo() {
   // 跨过 420s 边界再累积 1 分钟。
   CHECK(claim_supply_ammo(&world, 420, true) == 100);
   CHECK(world.self_ammo == 700);
+
+  // 规则 5.3.2 示例：从未占领，剩余 30s（已进行 390s）时才进补给区 -> 一次 +600。
+  SimWorld fresh;
+  CHECK(claim_supply_ammo(&fresh, 390, true) == 600);
+  CHECK(fresh.self_ammo == 600);
 }
 
 // 远程兑换血量延迟：6s 后 +60% 上限；期间战亡则作废且金币不返还。
@@ -279,6 +326,8 @@ int main() {
   test_exchange_ammo();
   test_exchange_hp();
   test_supply_heal();
+  test_supply_heal_ready();
+  test_apply_effects();
   test_occupancy();
   test_supply_ammo();
   test_remote_hp_delay();

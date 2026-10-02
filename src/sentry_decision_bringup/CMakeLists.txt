@@ -127,6 +127,13 @@ if(BUILD_TESTING)
             --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_point/profiles.yaml)
   set_tests_properties(config_bad_point PROPERTIES WILL_FAIL TRUE)
 
+  # 点位半径为负必须启动失败。
+  add_test(NAME config_bad_radius
+    COMMAND decision_main --ticks 1
+            --tree ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml
+            --config ${CMAKE_CURRENT_SOURCE_DIR}/test/fixtures/bad_config_radius/profiles.yaml)
+  set_tests_properties(config_bad_radius PROPERTIES WILL_FAIL TRUE)
+
   # 已知数值键为负必须启动失败。
   add_test(NAME config_bad_negative
     COMMAND decision_main --ticks 1
@@ -173,6 +180,12 @@ if(BUILD_TESTING)
     behaviortree_cpp::behaviortree_cpp)
   add_test(NAME preemption
     COMMAND test_preemption ${CMAKE_CURRENT_SOURCE_DIR}/../../tree/root.xml)
+
+  # 地图点半径解析（第 4 位）：带半径的点进 point_radius，普通点为 0。
+  add_executable(test_config_loader test/test_config_loader.cpp)
+  target_link_libraries(test_config_loader bringup_loader)
+  add_test(NAME config_loader
+    COMMAND test_config_loader ${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles.yaml)
 
   add_executable(test_replay_determinism test/test_replay_determinism.cpp)
   target_link_libraries(test_replay_determinism

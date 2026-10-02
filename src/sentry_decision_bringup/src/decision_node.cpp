@@ -421,8 +421,14 @@ class DecisionNode : public rclcpp::Node {
           out << ",";
         }
         first = false;
+        // 可选半径：仅供面板把增益点画成虚线环（0 = 普通点）。
+        double radius = 0.0;
+        const auto radius_it = context_.config->point_radius.find(entry.first);
+        if (radius_it != context_.config->point_radius.end()) {
+          radius = radius_it->second;
+        }
         out << "{\"name\":\"" << json_escape(entry.first) << "\",\"x\":" << entry.second.x
-            << ",\"y\":" << entry.second.y << "}";
+            << ",\"y\":" << entry.second.y << ",\"r\":" << radius << "}";
       }
     }
     out << "],\"resource\":{\"ammo\":" << result.output.resource.ammo

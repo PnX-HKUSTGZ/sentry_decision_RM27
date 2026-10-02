@@ -167,6 +167,18 @@ if ! grep -q "补给区回血" /tmp/effects_sim.log; then
   fail=1
 fi
 
+# 仿真效果：self_damage 按 sim.yaml 步长（100）扣血，日志应记录从 400 结算到 300。
+set_world self_hp 400.0
+sleep 1
+timeout 5 ros2 service call /sentry_sim/apply_effect sentry_decision_msgs/srv/ApplyEffect \
+  "{effect: 'self_damage'}" >/tmp/effects_effect.log 2>&1 || true
+sleep 0.5
+if ! grep -q "自身血量 -100 -> 300" /tmp/effects_sim.log; then
+  echo "FAIL: self_damage 未按步长把血量结算到 300" >&2
+  cat /tmp/effects_effect.log >&2
+  fail=1
+fi
+
 if [[ "${fail}" -eq 0 ]]; then
   echo "sim effects smoke test passed"
 fi

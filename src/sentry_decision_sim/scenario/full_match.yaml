@@ -35,7 +35,7 @@ timeline:
       nav_goal_x: 1.39
       nav_goal_y: 6.08
 
-  # 血量低于撤退阈值 -> 撤退（4），目标 home (-11.47, -4.40)。
+  # 血量低于撤退阈值 -> 撤退（4），目标 home (-11.83, -3.66)。
   - at: 6.0
     set_world:
       self_hp: 40
@@ -43,8 +43,8 @@ timeline:
     expect:
       tactical_mode: retreat
       stance: move
-      nav_goal_x: -11.47
-      nav_goal_y: -4.40
+      nav_goal_x: -11.83
+      nav_goal_y: -3.66
 
   # 阵亡 -> 复活（6），不发导航目标。
   - at: 9.0
