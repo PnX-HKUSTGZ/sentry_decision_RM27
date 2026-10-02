@@ -20,7 +20,7 @@
 - **依赖单向**：`core` 不依赖 ROS；行为树节点不直接调用 ROS，只读写数据契约或调用抽象接口。
 - **模块化 / 插件式**：功能模块编译为独立共享库，通过清单加载，可单独开关。
 - **可测试**：核心逻辑与 BT 节点是纯逻辑，可用构造好的数据直接单测。
-- **回放优先**：所有决策输入与人为干预都可录制、可确定性重放。
+- **回放优先**：所有决策输入与输出都可录制、可确定性重放。
 - **单一事实来源**：优先级、字段所有权、配置集中定义，避免两套规则。
 - **配置即数据**：地图、点位、区域、阈值、模块开关全部外置并做启动校验。
 - **观测优先**：模式切换、意图胜负、分支抢占等决策过程必须可观测。
@@ -36,7 +36,7 @@ flowchart TD
   SKILL -->|Intent| ARB[指令层: IntentArbiter 字段级仲裁]
   BELIEF --> SUP[SafetySupervisor 安全监督]
   SUP -->|最高优先级 Intent / veto| ARB
-  MAN[人工干预模块 intervention] -->|Intent / 世界状态覆盖 / 模块开关| ARB
+  TAC[战术层覆盖 TacticalOverride] -->|改写 strategy.mode| STRAT
   ARB --> OUT[DecisionOutput]
   OUT --> IOOUT[IO 层: 下发 Nav2 / cmd_vel / 服务]
   IOOUT --> BELIEF
@@ -77,7 +77,7 @@ flowchart TD
 
 ### 3.3 指令层
 
-指令层把「树内策略意图 + 树外来源（安全、人工）」在字段级仲裁成唯一、可执行的 `DecisionOutput`。
+指令层把「树内策略意图 + 树外来源（安全）」在字段级仲裁成唯一、可执行的 `DecisionOutput`。
 它不产生新的策略，只做裁决、限幅与安全兜底。详见第 9 节。
 
 ## 4. 数据契约
@@ -132,7 +132,7 @@ enum class IntentField { NavGoal, ChassisVel, ResourceRequest, TacticalMode, Sta
 
 struct Intent {
   IntentField field;
-  SourceId    source;    // strategic / mission / skill / intervention / supervisor
+  SourceId    source;    // strategic / mission / skill / recovery / supervisor
   Priority    priority;  // 引用集中定义的优先级表
   TimePoint   stamp;
   Duration    lease{};   // 有效期，过期即失效
@@ -163,12 +163,12 @@ struct DecisionOutput {
 | `sentry_decision_msgs` | 对外消息：`DecisionState` / `WorldState` / `DecisionOutput` | std_msgs、geometry_msgs |
 | `sentry_interfaces` | 与 auto-aim 的裁判上行 / 决策下行接口消息 | std_msgs、geometry_msgs |
 | `sentry_decision_sim` | 本地仿真：dummy 裁判系统、伪导航（ROS 无关）+ ROS 仿真节点 `referee_sim_node` | core、（节点）rclcpp |
-| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay）；干预服务端 `InterventionServer` | core、msgs |
-| `sentry_decision_nodes` | 行为树插件模块（含 `intervention`），编译为共享库 | core、io 抽象接口 |
+| `sentry_decision_io` | 全部 ROS 交互：订阅、发布、action / service 客户端；实现 core 中定义的 IO 接口（real / sim / replay）；面板调试服务端 | core、msgs |
+| `sentry_decision_nodes` | 行为树插件模块，编译为共享库 | core、io 抽象接口 |
 | `sentry_decision_bringup` | `main`、launch、参数 YAML、tree XML、插件清单 | nodes、io、core、viz |
 | `sentry_decision_viz` | 可视化：`TreeStatePublisher`、Groot2 桥、网页面板静态资产与 launch | core、msgs、behaviortree_cpp |
 
-`sentry_decision_test`（测试与回放工具）按需再拆。`sentry_decision_msgs` 后续补充干预 / 调试的 action 与 service（见 §14.3）。
+`sentry_decision_test`（测试与回放工具）按需再拆。`sentry_decision_msgs` 后续补充调试 / 面板的 service（见 §14.3）。
 
 ### 5.1 包与层的关系
 
@@ -178,7 +178,7 @@ struct DecisionOutput {
 | --- | --- |
 | `sentry_decision_core` | 信念层（融合）+ 指令层（仲裁 / 安全 / 限幅）+ 跨层基础（类型 / 几何 / 日志 / 配置） |
 | `sentry_decision_io` | 执行层（传输 / 下发）+ 信念层（原始解码） |
-| `sentry_decision_nodes` | 意图层（战略 / 任务 / 技能）+ `intervention` |
+| `sentry_decision_nodes` | 意图层（战略 / 任务 / 技能） |
 | `sentry_decision_bringup` | 无（组合根） |
 | `sentry_decision_viz` | 可观测性（跨层只读：树状态、世界快照、意图） |
 
@@ -217,7 +217,7 @@ flowchart TD
 - 新增 / 删除 / 开关模块 = 增删一个库 + 改一行配置，不碰核心代码。
 
 这样才真正实现「独立开关模块而不影响其他模块」。已拆分的模块：`common`（条件）、`nav`（导航技能）、
-`resource`（资源 / 复活）、`strategic`（C++ 策略，非 BT 插件）；`intervention` 的 ROS 动作留 P3。
+`resource`（资源 / 复活）、`strategic`（C++ 策略，非 BT 插件）。
 模块库由 `tree_manifest.yaml` 的 `library` 指定、经 `registerFromPlugin` 加载，
 `module.yaml` 的 provides / consumes 在启动时校验。
 
@@ -344,21 +344,18 @@ ReactiveFallback  全局优先级
 优先级集中定义，单一事实来源：
 
 ```text
-safety(急停 / 看门狗) > intervention(人工干预 / 调试注入) > recovery > tactical > default
+safety(急停 / 看门狗) > recovery > tactical > default
 ```
-
-人工干预走 `intervention` 带，因此硬安全永远压得住人。仿真中可另开仅 `competition_mode=false` 时允许的
-`debug_override` 带，用于强制测试。
 
 ### 9.3 字段所有权与 lease
 
 | 输出字段 | owner | 允许覆盖者 |
 | --- | --- | --- |
-| `nav_goal` | 导航决策模块 | safety、intervention |
+| `nav_goal` | 导航决策模块 | safety |
 | `safe_cmd_vel` | recovery（仅接管时） | safety（急停） |
-| `resource` | 资源模块 | intervention |
-| `tactical_mode` | 战略层 | intervention |
-| `stance` | 战略层 | safety、intervention |
+| `resource` | 资源模块 | - |
+| `tactical_mode` | 战略层 | - |
+| `stance` | 战略层 | safety |
 
 - 非 owner 提交该字段记 `WARN`；
 - 同优先级多来源冲突按显式 tie-break 解决并告警；
@@ -389,95 +386,19 @@ BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
 被 halt 的分支本 tick 不再提交 Intent，其请求自然消失；随后仲裁器把树内意图与树外来源合并成唯一指令。
 `SafetySupervisor` 使用保留的最高优先级带，并在仲裁后做最终 clamp / 急停，保证安全无法被绕过。
 
-## 10. 人工干预模块（intervention）
+## 10. 战术层覆盖
 
-人工干预封装为一个**独立模块**，与策略、安全并列，走同一条流水线，可单独开关；
-初期作为 `nodes` 下的独立插件库，接口稳定后如需可提升为独立包。
+调试与测试只保留两类干预，均不进入决策内部：
 
-### 10.1 三个注入点
+- **仿真世界干预**：`/sentry_sim/set_world`、`/sentry_sim/apply_effect`，由仿真节点直接改真实世界（§14.4）。
+- **战术层覆盖**：`TacticalOverride` 覆盖本拍战术模式，由两个决策入口在 `apply_strategy` 之后应用，
+  任务树照常读取 `context.strategy`，安全层优先级不受影响。
 
-| 注入点 | 改什么 | 走哪条路 | 用途 |
-| --- | --- | --- | --- |
-| 世界状态注入 | `WorldState` 字段（血量、弹量、阶段、敌方位置） | IO 的 Sim / Override 源 | 触发策略分支 |
-| 意图注入 | 直接加一条 `Intent` | `IntentArbiter` 的 intervention 来源 | 手动接管 / 加动作 |
-| 模块开关 | 加载期禁用插件；运行期按字段过滤意图 | `tree_manifest.yaml` 的 `enabled`；`InterventionController::allows`（`kNavGoal→nav` 等） | 隔离测试 |
+`TacticalOverride` 是 core 中的纯逻辑组件，接口 `set(mode, lease, now)` / `clear()` / `mode(now)`：
+lease 过期自动失效，`clear()` 立即撤销。
 
-### 10.2 接口
-
-用结构化 action / service，而不是裸 topic：
-
-```text
-# decision_msgs/action/ManualOverride.action
-IntentField field      # nav.goal / resource.request / chassis.vel ...
-string      value      # 类型化取值
-float64     lease_sec  # 生效时长，到点自动撤销
-string      reason     # 记录到日志与回放
----
-bool   accepted
-string message
----
-bool   effective       # 当前是否在仲裁中胜出
-string overridden_by   # 若被更高优先级覆盖，是谁
-```
-
-```text
-# decision_msgs/srv/DebugCommand.srv
-string command   # set_intent / clear_intent / set_world / disable_module / list_state
-string json_args # 按 JSON Schema 校验
----
-bool   success
-string message
-string state_json
-```
-
-强类型 action 面向实车与正式接管；通用 service 面向调试与网页面板。二者都转成 `Intent` 或世界状态覆盖，进入同一条流水线。
-
-### 10.3 相对手动发 topic 的优势
-
-| 维度 | 手动发 topic | 干预模块 |
-| --- | --- | --- |
-| 需要知道 | topic 名、QoS、消息字段、frame | 语义化字段名，可自动补全 / 生成表单 |
-| 时间语义 | 一次性，无过期、无取消 | lease 自动失效 + action 可取消 |
-| 冲突可见 | 不知道被谁覆盖 | 仲裁器逐字段给出胜负与原因 |
-| 改世界 | 要自己造整套消息 | 只覆盖一个字段 |
-| 回放 | 不在决策输入记录里，无法复现 | 作为输入通道一起录制 / 重放 |
-| 自动化 | 难 | 场景脚本时间轴 |
-| 安全 | 可能绕过安全 | 走同一仲裁，安全仍最高 |
-
-### 10.4 网页面板
-
-在 rosbridge 战场页中提供决策调试面板：左侧树状态、中间战场俯视图、右侧 `WorldState` 与活跃 Intent 列表
-（来源 / 优先级 / 剩余 lease / 是否胜出）以及按钮组（切换模式 / 去点位 / 切换姿态 / 买弹 / 禁用模块 / 清空手动意图）；
-仿真世界干预（`set_world` / `apply_effect`）与决策侧干预分开。
-面板根据 `list_state` 返回的 schema 自动生成表单，新增字段无需改前端。
-
-### 10.5 回放与场景脚本
-
-人工干预必须作为一路带时间戳的输入被记录，回放时按原时间点重放，否则「只靠回放复现」在有人干预时立刻失效。
-同一机制也支持场景脚本，把干预变成可提交的测试用例：
-
-```yaml
-# scenario/retreat.yaml
-- at: 5.0
-  set_world:  { self.hp: 20 }
-- at: 6.0
-  add_intent: { field: chassis.vel, value: [0, 0, 0], lease: 2.0, source: intervention }
-- at: 8.0
-  disable:    [tactical]
-- at: 12.0
-  expect:     { nav_goal: point_home, tactical_mode: retreat }
-```
-
-### 10.6 安全边界
-
-干预模块是受控入口，不是绕过安全的后门：它进入仲裁器，而不是直接写 `DecisionOutput`；
-所有干预记 `ACT` 日志并进回放；比赛模式下可关闭调试专用能力。
-
-P2 范围：先落地 core 侧的三类注入（意图注入、世界状态覆盖、模块开关）；结构化 action / service
-与网页面板由 P3 落地，设计见 §14.3 与 §14.6。
-
-世界状态覆盖**只改数值、不提升 `referee.valid`**，因此不会绕过失效急停；模块开关分两级：加载期由
-`tree_manifest.yaml` 的 `enabled` 决定 .so 是否加载，运行期由 `InterventionController::allows` 按字段过滤意图。
+决策内部（意图、世界视图、运行期模块开关）不提供任何人工写入口；加载期模块开关仍由
+`tree_manifest.yaml` 的 `enabled` 决定（§6）。
 
 ## 11. 导航模块
 
@@ -513,7 +434,7 @@ P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/
 
 ## 13. 回放与测试
 
-**回放契约**：凡决策读到的输入、发出的输出、以及人工干预，都必须能记录并用同一份 core 确定性重放
+**回放契约**：凡决策读到的输入与发出的输出，都必须能记录并用同一份 core 确定性重放
 （`use_sim_time`、固定 tick 顺序、固定随机种子）。
 
 核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
@@ -534,7 +455,7 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 ## 14. 可视化与仿真
 
 目标：让决策过程可观测、可手动干预、可赛后回放（对应 `docs/ROADMAP.md` P3）。
-可视化只**读取**决策数据，干预只经受控通道写入，二者都不参与决策、不绕过安全。
+可视化只**读取**决策数据；战术层覆盖与仿真世界干预都走受控入口，不绕过安全。
 
 ### 14.1 包与边界
 
@@ -542,9 +463,9 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 | --- | --- | --- |
 | `TreeStatePublisher` | `sentry_decision_viz` | 采集 BT 节点状态并发布 `/decision/tree_status` |
 | Groot2 桥 | `sentry_decision_viz` | 可选地把行为树挂到 `BT::Groot2Publisher`，供 Groot2 实时连接 |
-| 网页面板 | `sentry_decision_viz/web` | 纯静态页：树状态、战场俯视图、WorldState / Intent、干预按钮 |
+| 网页面板 | `sentry_decision_viz/web` | 纯静态页：树状态、战场俯视图、WorldState、仿真与战术覆盖按钮 |
 | `referee_sim_node` | `sentry_decision_sim` | ROS 侧裁判仿真：发 `/sentry/*` 与 odom，跑导航 action server 与动作回执 |
-| `InterventionServer` | `sentry_decision_io` | 干预 action / service 服务端，转成线程安全命令队列 |
+| `DebugCommand` 服务端 | `sentry_decision_io` | 面板状态与战术层覆盖 service，转成线程安全命令队列 |
 
 `sentry_decision_viz` 依赖 `core`、`sentry_decision_msgs` 与 `behaviortree_cpp`，
 只读决策数据，不被决策主循环依赖。core 的仿真组件保持 ROS 无关，`referee_sim_node` 只是薄驱动。
@@ -575,45 +496,18 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显式开启时附加
 `BT::Groot2Publisher`（BT.CPP 4.10 已带 zmq 支持），不作为 CI 验收项。
 
-### 14.3 干预接口（ROS）
+### 14.3 面板服务（ROS）
 
-结构化 action / service 语义见 §10.2，消息落在 `sentry_decision_msgs`。这部分的关键是线程模型：
-BT tick 跑在定时器回调，而 action / service 回调在 `MultiThreadedExecutor` 的其他线程，
-不能直接共享 `InterventionController`：
-
-```text
-Action / Service 回调线程 --> 加锁命令队列 --> tick 边界 drain --> InterventionController
-```
-
-- 回调只做**校验 + 入队**，不触碰 `WorldState` 与行为树；
-- tick 开始时按固定顺序应用本拍命令，保证确定性；
-- 应用成功的干预记 `ACT`（来源、字段、lease、原因），并发布到 `/decision/intervention` 以便录制与回放；
-- `IntentArbiter::resolve` 的结果新增逐字段胜者 `winners`，供 action 反馈与 `list_state` 使用；
-- 人工接管 `kTacticalMode` 时，tick 在跑任务树前先用接管值覆盖 `context.strategy.mode`，
-  因此「切换模式」会真正改变任务树分支，而不只是改变仲裁输出。
-
-**action `ManualOverride`**（goal / result / feedback）：
-
-| goal 字段 | 说明 |
-| --- | --- |
-| `field` | `FIELD_NAV_GOAL` / `FIELD_CHASSIS_VEL` / `FIELD_RESOURCE_REQUEST` / `FIELD_TACTICAL_MODE` / `FIELD_STANCE`，与 `core::IntentField` 一致 |
-| `value` | 类型化文本（YAML/JSON）：`[x, y, yaw]` / `[vx, vy, wz]` / `{ammo, hp, revive}` / 模式名或 0-7 |
-| `lease_sec` | 生效时长，`0` 表示不过期；goal 保持执行态直到失效或被取消 |
-| `reason` | 记入日志与 `/decision/intervention` |
-
-result 返回是否接受；feedback 每 tick 给出该字段的 `effective` 与 `overridden_by`。
-
-**service `DebugCommand`**（`command` + `args`，args 为 YAML/JSON 文本）：
+网页面板通过 `DebugCommand.srv`（`/decision/debug`）读取状态、设置战术层覆盖：
 
 | command | args | 作用 |
 | --- | --- | --- |
-| `set_intent` | `{field, value, lease_sec, reason}` | 同 ManualOverride，但同步返回 |
-| `clear_intent` | `{field}` | 撤销某字段注入 |
-| `set_world` | `{field, value}` | 覆盖世界数值 |
-| `clear_world` | `{field}` 或省略 | 清除覆盖 |
-| `set_module` | `{module, enabled}` | 运行期模块开关 |
-| `clear_all` | — | 清空全部干预 |
-| `list_state` | — | 返回 `world / intents / winners / modules / world_overrides / safety_emergency` 的 JSON 快照，供网页面板自动生成表单（§10.4） |
+| `list_state` | — | 返回 `points`（含半径）/ `resource` / `last_action` / `last_ack` / `safety_emergency` / `tactical_override` 的 JSON 快照，供面板渲染 |
+| `set_tactical_mode` | `{mode, lease_sec}` | 设置战术层覆盖，`lease_sec` 为 `0` 表示不过期 |
+| `clear_tactical_mode` | — | 清除战术层覆盖 |
+
+服务回调只做**校验 + 入队**，tick 开始时在固定边界应用，保证确定性；应用成功记 `ACT`（模式、lease）。
+写入发生在任务树读取 `context.strategy` 之前，因此「切换模式」会真正改变任务树分支，而不只是改变仲裁输出。
 
 ### 14.4 裁判仿真与场景脚本
 
@@ -657,8 +551,7 @@ timeline:
     expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
 ```
 
-场景支持 `set_world` / `expect` / `add_intent` / `disable`：后两者经 `/decision/debug`
-在事件时刻注入干预，因此场景脚本可直接把「人工干预」写成可提交的测试用例。
+场景支持 `set_world` / `expect`：在事件时刻改世界或断言决策输出，因此场景脚本可直接把测试用例写成时间轴。
 场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
 
 比赛阶段由 ROS 无关的 `MatchStageController` 管理，并通过 `/sentry_sim/set_game_stage`
@@ -667,40 +560,24 @@ timeline:
 因此既有场景测试不受影响。场景可声明 `start_pose: [x, y, yaw]` 作为机器人初始位姿，进程启动与
 「重置」都会应用（重置同时清空导航目标）。另提供 `SetGamePause`（`/sentry_sim/set_game_pause`）：
 暂停时冻结计时与 `NavSimulator` 运动，odom 仍刷新时间戳以免被判失效，恢复后从当前时刻继续。
-`/sentry_sim/set_world` 与 `/sentry_sim/apply_effect` 作用于仿真世界真实值，不进入决策节点；
-决策侧的人工干预（`/decision/debug`）与此相互独立。
+`/sentry_sim/set_world` 与 `/sentry_sim/apply_effect` 作用于仿真世界真实值，不进入决策节点。
 
 战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
 任务树的 `MissionPatrol` 也以 `IfTacticalMode(patrol)` 门控，因此待机时不下发任务导航目标。
 
-### 14.5 干预回放
-
-干预是一路带时间戳的输入（§10.5），必须与信念输入一起录制、按原时刻重放：
-
-- `core::ReplayData` 增 `interventions` 通道，`ReplaySource` 暴露当前时刻生效的干预事件；
-- io 的 `load_replay_data` 从 `/decision/intervention` 读取，并支持新格式 `/sentry/*` 上行
-  （走 `sentry_bridge` 合并）与旧标量话题；
-- 回放时干预事件在对应 tick 注入 `InterventionController`，因此含干预的回放仍逐 tick 确定；
-- `bringup/replay_main` 读 bag 后离线重放：逐 tick 应用干预、跑行为树 / 仲裁 / 安全，
-  输出模式与目标变化，用于赛后复盘。
-
-### 14.6 网页面板
+### 14.5 网页面板
 
 rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅用于纯逻辑单测）：
 
 - 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（场地底图 + 己方 /
-  导航目标 / 敌方 / 增益区，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与模块 / Intent 面板；
+  导航目标 / 敌方 / 增益区，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与资源 / 动作面板；
   增益区来自 `list_state.points` 中带半径的点，画成青色虚线环、标签置于环下方居中；
 - 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
-  只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
+  只可前进；重置同时调用 `/decision/debug clear_tactical_mode` 清除战术层覆盖；
 - 仿真控制：「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与三行「仿真效果」按钮
   （`/sentry_sim/apply_effect`，步长来自 `config/sim.yaml` 的 `effects`），以及暂停按钮；
-- 决策侧人工干预按钮：切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
-  统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发
-  （「强制撤退」已移除：与模式选择 `retreat` 等价；「决策覆盖」已移除：只保留仿真世界干预）；
-  未进入「比赛中」时人工意图按钮自动禁用；
-  `ManualOverride` action 仍保留给 `ros2 action send_goal` 等客户端；面板不用 action 是因为
-  vendored roslib 1.4.1 的 `ActionClient` 为 ROS 1 actionlib 命名，无法对接 ROS 2 action；
+- 战术层覆盖：模式下拉 + 设置 / 清除按钮，通过 `/decision/debug` 的
+  `set_tactical_mode` / `clear_tactical_mode` service 下发；未进入「比赛中」时自动禁用；
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/
   `panels/*`（每个面板一个模块）/ `battlefield`（canvas）分层，使用浏览器原生 ES modules；
 - `web/vendor/roslib.min.js` 锁版本 vendor（BSD-2，1.4.1）；`web/package.json` 仅声明
@@ -712,7 +589,7 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
 - 不引入打包器：当前规模的收益大于成本，且分层已为将来平滑迁移到 Vite + TS 留好接缝；
 - 说明：`WorldState` 目前只带单个敌方位置与队友数量，战场页暂不画队友；「急停」无独立接口，留待 P4。
 
-### 14.7 依赖
+### 14.6 依赖
 
 - 镜像新增 `ros-jazzy-rosbridge-suite`；
 - Groot2 依赖已随 `ros-jazzy-behaviortree-cpp`（4.10.0）提供，无需额外系统包；

@@ -50,7 +50,6 @@ flowchart LR
 - `RosIoNode` 额外要求 **`GameInfo` 与 `SentryInfoOnline` 都出现过**才返回就绪
   （`referee_sources_ready`）：只到其中一条时缺失字段会以默认 0 参与决策，可能被误判为「0 血 / 阵亡」。
 - `referee.valid=false` 时 `SafetySupervisor` 触发急停（撤销导航目标 + 速度清零）。
-- 世界覆盖（干预 `set_world`）只改数值，**不提升** `referee.valid`，不会绕过急停。
 - 状态变化只打印一次（`referee data stale / recovered` 等）。
 
 ## 4. RefereeState 字段字典
