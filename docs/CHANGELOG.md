@@ -11,6 +11,13 @@
 
 ### Added
 
+- 地图点支持可选第 4 位区域半径：补给区 / 基地 / 前哨 / 堡垒增益点的半径从 `sim.yaml` 移入 `config/maps/*.yaml`，`sim.yaml` 只保留「角色 → 点名」引用；半径缺失或非正启动即失败
+- `list_state.points` 增加 `r`（半径）；网页面板把 `r > 0` 的点画成青色虚线环，标签置于环下方居中
+- 场地标定工具初始点位改为空序列（不再展示默认点位）；列表可直接编辑 `r`（区域半径）并按半径画出青色虚线环，导出写出第 4 位；新增「刷新预览」按钮
+- 地图与仿真心智模型：补给区圆心改用 `sim_home`（删除 `healing`），新增 `sim_base` 表示基地增益点；基地 / 前哨站增益点仅用于本地兑换、不触发回血
+- 补给区回血新增进入延时 `supply.enter_delay_s`（默认 1s）：进入补给区后先等检测建立再开始回血
+- `referee_sim_node` 新增 `srv/ApplyEffect`（`/sentry_sim/apply_effect`）：按 `config/sim.yaml` 的 `effects` 对仿真世界施加具名效果（自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁）
+- 网页面板新增三行「仿真效果」按钮（自身 / 我方 / 敌方），替代键盘快捷键方案
 - 参数全部外置到 YAML：`config/sim.yaml`（`max_hp` / 导航速度 / 比赛阶段时长 `match` / 补给区 / 增益点）、`config/policies/<POLICY>.yaml`（新增 `safety` 速度限幅与急停开关、`timeouts` 输入有效期、`action` one-shot 超时）；`referee_sim_node` / `MatchStageController` / `WorldModel` / `SafetySupervisor` / `ActionDispatcher` / 离线 `decision_main` 的 `NavSimulator` 源码不再硬编码可调默认值；`referee_sim_node` 新增 `--sim-config`（缺省回退相对路径），`-p` 仍逐项覆盖；增益点圆心按其引用的 `map:` 命名点解析
 - 面板布局调整：左列（60%）战场俯视图在上 + 行为树，右列（40%）世界状态 / 模块 / 人工干预；「场地标定」链接改为新标签页打开；俯视图用 RMUC 底图并叠加命名点（来自 `list_state`，重置后重新读取）
 - 地图切换为 RMUC：`map_profile` 更名 `RMUL26`→`RMUC26`，`config/maps/RMUC26.yaml` 使用网页面板「场地标定」标定出的点位；主面板战场俯视图改用导航仓库 `RMUC2026.pgm` 底图（583×300、0.05 m/px、origin [-14.6, -5.86]），战场 extent 由 `web/src/field.js` 统一；仿真增益点默认坐标、`demo.yaml` `start_pose`、`full_match.yaml` / `intervention.yaml` 断言与 `match_smoke` / `sim_effects_smoke` 同步到新坐标
@@ -63,6 +70,7 @@
 
 ### Fixed
 
+- 移除网页面板「决策覆盖」控件与世界状态面板的「原始 血/弹/金」对照（只保留仿真世界干预）；移除与模式下拉等价的「强制撤退」按钮
 - `RosIoNode` 此前只要收到 5 条裁判消息中任意一条就把 `RefereeState` 判为有效，只到单条时缺失字段会以默认 0 参与决策（可能被误判为「0 血 / 阵亡」）；现要求 `GameInfo` + `SentryInfoOnline` 都出现过才判有效（`referee_sources_ready` + 单测）
 - `EventCode::local_ammo_exchange_point()` 漏判 RMUL 的补给区占用位（bit 2）：RMUL 场次下补给区占领只置 bit 2，此前会被误判为「不在增益点」而拒绝本地兑换，现已同时判 bit 0 / bit 2
 - `referee_sim_node` 的 `NavigateToPose` action server 收到新目标时未中止旧 goal，旧 handle 会悬挂、永远收不到结果；现在接受新目标前先 `abort` 旧目标

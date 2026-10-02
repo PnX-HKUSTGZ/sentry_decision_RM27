@@ -179,14 +179,14 @@ ros2 bag record /decision/state /decision/world_state /decision/tree_status /dec
 ```text
 config/
 ├── profiles.yaml           # 入口：map_profile / strategy_profile / pre_match
-├── maps/<MAP>.yaml         # 命名点、frame
+├── maps/<MAP>.yaml         # 命名点（可选第 4 位区域半径）、frame
 ├── policies/<POLICY>.yaml  # 阈值、时间窗、兑换步长、安全限幅、超时
-└── sim.yaml                # 仿真参数：max_hp / 导航速度 / 比赛阶段时长 / 补给区 / 增益点
+└── sim.yaml                # 仿真参数：max_hp / 导航速度 / 比赛阶段时长 / 补给区与增益点引用 / 回血 / 效果
 ```
 
 `policies/<POLICY>.yaml` 还含 `safety`（速度限幅 / 急停开关）、`timeouts`（输入有效期）、
-`action`（one-shot 超时）；`sim.yaml` 的增益点圆心用 `point: <命名点>` 引用 maps 里的点，
-改点名点即同步仿真，无需改代码。
+`action`（one-shot 超时）；`sim.yaml` 的增益点用 `point: <命名点>` 引用 maps 里的点，
+**圆心与半径都来自该地图点（半径 = 点第 4 位）**，改点名点即同步仿真与面板，无需改代码。
 
 XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
 启动时校验配置与行为树的引用一致性、数值完整解析、已知键的整数 / 非负约束；缺失或越界即启动报错并列出缺项，
@@ -298,13 +298,14 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
 - 中间战场俯视图（RMUC2026 场地底图，来源导航仓库 `RMUC2026.pgm`，0.05 m/px、origin `[-14.6, -5.86]`；
   叠加己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
-- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执 /
-  原始世界（每秒轮询 `list_state`）；
+- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执
+  （每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
-  「重置」回未开始，并清空决策节点的干预 / 世界覆盖 / 模块开关；
-- 人工干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预；
-- 世界数值分两处：「仿真世界」直接改裁判仿真的真实世界（兑换 / 回血据此演变），
-  「决策覆盖」只钉住决策视图（不改仿真世界，供离线 / 回放测试）。
+  「重置」回未开始，并清空决策节点的干预 / 模块开关；
+- 仿真控制：「仿真世界」直接改裁判仿真的真实世界；「仿真效果」三行按钮
+  （自身：扣血 / 扣弹 / 死亡；我方 / 敌方：前哨站扣血 / 摧毁、基地扣血）模拟赛场事件，
+  步长来自 `config/sim.yaml` 的 `effects`；
+- 人工干预按钮（决策侧）：切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
 
 > 决策只有收到 `game_status=4`（比赛中）才执行任务；未开始 / 准备 / 自检 / 倒计时 / 结算阶段输出
 > `idle`，不下发任务导航目标，因此「准备阶段不动、开始比赛后才进攻/巡逻」。
@@ -327,8 +328,7 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 | 比赛阶段 / 重置 | 推进阶段；重置回未开始并恢复机器人初始位姿 | `/sentry_sim/set_game_stage` |
 | 暂停 / 继续 | 冻结比赛计时与机器人运动（odom 保持最后位置） | `/sentry_sim/set_game_pause` |
 | 仿真世界 设置 | 直接改裁判仿真的真实世界：自身 / 基地 / 前哨血量、金币、发弹量、剩余时间 | `/sentry_sim/set_world` |
-| 决策覆盖 设置 / 清除 | 只覆盖决策视图（不改仿真世界），用于离线 / 回放测试 | `/decision/debug set_world` / `clear_world` |
-| 强制撤退 | 人工接管战术模式为 `retreat`，任务树当拍切到撤退 | `set_intent {field: tactical_mode, value: retreat}` |
+| 仿真效果 三行按钮 | 对真实世界施加具名效果：自身扣血 / 扣弹 / 死亡；我方 / 敌方前哨扣血 / 摧毁、基地扣血 | `/sentry_sim/apply_effect`（步长见 `config/sim.yaml` 的 `effects`） |
 | 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `set_intent {field: tactical_mode}` |
 | 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `set_intent {field: nav_goal}` |
 | 模块 启用 / 禁用 | 运行期关闭某模块后，该字段的意图（含人工干预）被丢弃 | `/decision/debug set_module` |
@@ -349,10 +349,8 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > 「资源请求 / 最近动作 / 动作回执」，或决策节点日志的 `[action] 下发 ...` 与
 > `[action] 动作 N 已确认`。
 
-未进入「比赛中」（`game_status != 4`）时，人工意图按钮自动禁用，避免准备阶段误发干预；
-仿真世界 / 决策覆盖与「清空干预」仍可用。决策覆盖只改数值、不提升 `referee.valid`，
-不会绕过安全急停。**注意到「决策覆盖」会钉住该字段的决策视图**：即使仿真世界在补血 / 兑换，
-面板血量也不会变；右侧「原始 血/弹/金」一行显示的才是覆盖前的真实世界。
+未进入「比赛中」时，决策侧人工意图按钮自动禁用，避免准备阶段误发干预；
+仿真世界 / 仿真效果与「清空干预」仍可用。
 
 > 兑换会真正结算进仿真世界，且**裁判侧会校验前置条件**：非法动作不改变世界、回执 `rejected`，
 > 并在仿真日志打印「裁判拒绝动作 ...」。规则依据：
@@ -369,8 +367,9 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > - **立即复活**需 `can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则确认免费复活。
 >
 > 金币不足 / 未脱战 / 不在增益点都会被裁判拒绝（`动作回执` 行显示 `rejected` 与原因）。
-> 补给区自动回血：机器人处于补给区（默认 `healing` 点附近）且比赛中时，按上限血量的
-> 10% / 秒回血，比赛 4 分钟后为 25%（仿真近似规则 5.2.1）。
+> 补给区自动回血：机器人处于补给区（默认 `sim_home` 点附近）且比赛中时，按上限血量的
+> 10% / 秒回血，比赛 4 分钟后为 25%（仿真近似规则 5.2.1）；进入补给区后先等 1s
+> （`supply_enter_delay_s`）再开始回血。基地 / 前哨站增益点只用于兑换，不触发回血。
 > 补给区还会按规则 5.3.2 发放免费发弹量：**比赛每满 1 分钟累积 100 发，进入补给区时一次性
 > 领取全部累积值**（与金币无关，金币不足时也能补弹）。
 > 远程兑换按规则延迟生效：确认时扣金币，**6 秒后**才加发弹量 / 血量；远程兑换血量
@@ -391,12 +390,13 @@ node src/sentry_decision_viz/web/test/format.test.mjs
 用于在地图上标定 `config/maps/*.yaml` 的命名点坐标：左侧 RMUC 底图，右侧点位列表。
 
 - 打开 `http://<宿主>:8080/calibrate.html`（与面板同一个静态服务，**不需要 rosbridge / 决策节点**）。
+- 初始为**空序列**（工具不读取真实地图文件），避免把示例点误当成实际配置；点「添加点」或
+  「从文本导入」开始标定。点位本地存 `localStorage`（键 `sentry.fieldPoints.v1`），「重置」清空。
 - 底图来自导航仓库 `RMUC2026.pgm`（583×300，0.05 m/px，origin `[-14.6, -5.86]`），
   世界坐标->像素映射集中在 `web/src/field.js`。
 - 交互：点地图移动当前选中点 / 拖动标记 / 右侧改数值 / 添加或删除点；鼠标位置实时显示世界坐标。
-  点位本地存 `localStorage`（键 `sentry.fieldPoints.v1`）。
-- 「导出 YAML」生成可直接覆盖 `config/maps/RMUC26.yaml` 的 `points:` 片段；
-  「从文本导入」可粘贴现有 yaml 片段继续编辑。
+- 列表可直接编辑 x/y/yaw 与 `r`（区域半径，米，0 = 普通点）；`r > 0` 的点按半径画出青色虚线环
+  （与主面板一致），导出时写出第 4 位。编辑即时重绘，也可点「刷新预览」强制重绘。
 - 纯逻辑（`fieldExtent` / `worldToImage` / `imageToWorld`）由 `web/test/format.test.mjs` 覆盖。
 
 
@@ -469,8 +469,9 @@ ros2 run sentry_decision_io io_node --ros-args \
 
 ### 5.4 referee_sim_node 参数
 
-上行 / 下行话题与 `io_node` 同名同默认。数值默认值（`max_hp` / 补给区 / 增益点 / 导航速度）全部来自
-`config/sim.yaml`（增益点圆心取自其 `map:` 引用的命名点），`-p` 可逐项覆盖；另加：
+上行 / 下行话题与 `io_node` 同名同默认。数值默认值（`max_hp` / 回血比例 / 增益点引用 / 导航速度）来自
+`config/sim.yaml`；补给区 / 增益点的**圆心与半径**取自其 `map:` 引用的命名点（半径 = 点第 4 位），
+`-p` 可逐项覆盖；另加：
 
 | 参数 / 命令行 | 默认 | 说明 |
 | --- | --- | --- |
@@ -481,15 +482,17 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
 | `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
 | `--ros-args -p set_world_service` | `/sentry_sim/set_world` | 直接修改仿真世界的服务名 |
+| `--ros-args -p apply_effect_service` | `/sentry_sim/apply_effect` | 施加具名仿真效果的服务名 |
 | `--ros-args -p max_hp` | `400` | 哨兵上限血量（用于兑换 / 回血上限） |
-| `--ros-args -p supply_center_x` / `_y` | `-12.36` / `-3.47` | 补给区圆心（默认取地图 `healing` 点） |
-| `--ros-args -p supply_radius` | `1.5` | 补给区半径（米） |
+| `--ros-args -p supply_center_x` / `_y` | `-11.79` / `-3.66` | 补给区圆心（默认取地图 `sim_home` 点） |
+| `--ros-args -p supply_radius` | 取地图 `sim_home` 第 4 位（`1.5`） | 补给区半径（米） |
+| `--ros-args -p supply_enter_delay_s` | `1.0` | 进入补给区后延迟多少秒才开始回血 |
 | `--ros-args -p supply_heal_ratio` | `0.10` | 补给区回血比例（上限血量 / 秒） |
 | `--ros-args -p supply_heal_ratio_late` | `0.25` | 比赛 4 分钟后的回血比例 |
 | `--ros-args -p supply_heal_late_after_s` | `240` | 提高回血比例的已进行秒数 |
-| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | `-11.47` / `-4.40` / `1.0` | 己方基地增益点区域（默认 `home` 点；半径 0 = 不启用） |
-| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | `-2.55` / `-2.21` / `1.0` | 己方前哨站增益点区域（默认取地图 `our_outpost` 点） |
-| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | `-7.37` / `1.60` / `1.0` | 己方堡垒增益点区域（默认 `fort` 点） |
+| `--ros-args -p base_buff_center_x` / `_y` / `_radius` | 取地图 `sim_base` 点及其第 4 位 | 己方基地增益点区域（仅兑换、不回血；半径 0 = 不启用） |
+| `--ros-args -p our_outpost_center_x` / `_y` / `_radius` | 取地图 `sim_our_outpost` 点及其第 4 位 | 己方前哨站增益点区域（仅兑换、不回血） |
+| `--ros-args -p fort_buff_center_x` / `_y` / `_radius` | 取地图 `sim_fort` 点及其第 4 位 | 己方堡垒增益点区域 |
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |

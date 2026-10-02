@@ -447,7 +447,8 @@ string state_json
 ### 10.4 网页面板
 
 在 rosbridge 战场页中提供决策调试面板：左侧树状态、中间战场俯视图、右侧 `WorldState` 与活跃 Intent 列表
-（来源 / 优先级 / 剩余 lease / 是否胜出）以及按钮组（强制撤退、去点位、切换姿态、买弹、禁用模块、清空手动意图、急停）。
+（来源 / 优先级 / 剩余 lease / 是否胜出）以及按钮组（切换模式 / 去点位 / 切换姿态 / 买弹 / 禁用模块 / 清空手动意图）；
+仿真世界干预（`set_world` / `apply_effect`）与决策侧干预分开。
 面板根据 `list_state` 返回的 schema 自动生成表单，新增字段无需改前端。
 
 ### 10.5 回放与场景脚本
@@ -627,15 +628,19 @@ result 返回是否接受；feedback 每 tick 给出该字段的 `effective` 与
   要求脱战（5.2.1 / 表 5-6）；复活要求对应 `info1` 标志与金币。合法时按 10 金币/10 发等结算；
 - 节点每拍按机器人位姿对可配置的增益点区域（补给区 / 基地 / 前哨站 / 堡垒）判定占领状态，
   写回 `event_code` 位段（`supply_zone_occupied` / `supply_zone_occupied_rmul` 等），供决策端
-  `IfOccupyingGainPoint` 门控；四个区域默认都启用（半径 1.0~1.5，可 `-p *_radius:=0` 关闭）；
+  `IfOccupyingGainPoint` 门控；区域圆心与半径来自地图点（半径 = 点第 4 位），四个区域默认启用
+  （可 `-p *_radius:=0` 关闭）；
   `sentry_info_2.disengaged` 默认脱战（可用 `set_world {disengaged: 0}` 覆盖）；
 - 节点按真实秒在补给区回血（近似规则 5.2.1：每秒回上限血量的 10%，比赛 4 分钟后 25%，
-  上限受 `max_hp` 约束；补给区为可配置的「圆心 + 半径」）；
+  上限受 `max_hp` 约束；补给区为可配置的「圆心 + 半径」，进入后延迟 `supply_enter_delay_s`
+  才开始回血）；基地 / 前哨站 / 堡垒增益点只用于本地兑换，不回血；
 - **补给区免费发弹量**（规则 5.3.2）：比赛每满 1 分钟累积 100 发，未被占领领取的部分一直累积，
   机器人进入补给区的整秒一次性领取全部累积值（示例：剩余 30s 时才进补给区，一次 +600）；
 - **远程兑换延迟**（规则 5.3.2 / 5.2.1）：确认时立即扣金币并进入延迟队列，6 秒后发弹量 / 血量
   才生效；远程兑换血量在 6 秒内战亡则作废且金币不返还（`step_pending_remote` 纯逻辑结算）；
-- `srv/SetWorld`（`/sentry_sim/set_world`）可绕过决策覆盖直接改仿真世界，供面板做闭环测试；
+- `srv/SetWorld`（`/sentry_sim/set_world`）直接改仿真世界真实值；`srv/ApplyEffect`
+  （`/sentry_sim/apply_effect`）按 `config/sim.yaml` 的 `effects` 施加具名效果
+  （自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁），供面板做闭环测试；
 - 场景脚本 YAML 描述带时间轴的事件与断言：
 
 ```yaml
@@ -662,9 +667,8 @@ timeline:
 因此既有场景测试不受影响。场景可声明 `start_pose: [x, y, yaw]` 作为机器人初始位姿，进程启动与
 「重置」都会应用（重置同时清空导航目标）。另提供 `SetGamePause`（`/sentry_sim/set_game_pause`）：
 暂停时冻结计时与 `NavSimulator` 运动，odom 仍刷新时间戳以免被判失效，恢复后从当前时刻继续。
-`/sentry_sim/set_world` 与决策覆盖（§14.3 的 `/decision/debug set_world`）是两件事：前者改
-仿真世界的真实值，后者只钉住决策节点读到的视图；`list_state` 额外给出 `raw_world`，
-面板据此显示「覆盖生效时被钉住」的真实数值。
+`/sentry_sim/set_world` 与 `/sentry_sim/apply_effect` 作用于仿真世界真实值，不进入决策节点；
+决策侧的人工干预（`/decision/debug`）与此相互独立。
 
 战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
 任务树的 `MissionPatrol` 也以 `IfTacticalMode(patrol)` 门控，因此待机时不下发任务导航目标。
@@ -685,14 +689,15 @@ timeline:
 rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅用于纯逻辑单测）：
 
 - 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（场地底图 + 己方 /
-  导航目标 / 敌方，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与模块 / Intent 面板；
+  导航目标 / 敌方 / 增益区，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与模块 / Intent 面板；
+  增益区来自 `list_state.points` 中带半径的点，画成青色虚线环、标签置于环下方居中；
 - 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
   只可前进；重置同时调用 `/decision/debug clear_all` 清空决策节点干预 / 世界覆盖 / 模块开关；
-- 干预按钮：强制撤退、切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
-  统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发；
-  另外提供「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与「决策覆盖」
-  （`set_world` / `clear_world`，只改决策视图）两组数值控件，以及暂停按钮；
-  世界状态面板在覆盖生效时额外显示「原始 血/弹/金」（来自 `list_state.raw_world'）作对照；
+- 仿真控制：「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与三行「仿真效果」按钮
+  （`/sentry_sim/apply_effect`，步长来自 `config/sim.yaml` 的 `effects`），以及暂停按钮；
+- 决策侧人工干预按钮：切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预，
+  统一通过 `/decision/debug` 的 `set_intent` / `set_module` / `clear_all` service 下发
+  （「强制撤退」已移除：与模式选择 `retreat` 等价；「决策覆盖」已移除：只保留仿真世界干预）；
   未进入「比赛中」时人工意图按钮自动禁用；
   `ManualOverride` action 仍保留给 `ros2 action send_goal` 等客户端；面板不用 action 是因为
   vendored roslib 1.4.1 的 `ActionClient` 为 ROS 1 actionlib 命名，无法对接 ROS 2 action；
@@ -721,7 +726,7 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
 ```text
 config/
 ├── profiles.yaml           # 唯一入口：map_profile / strategy_profile / pre_match
-├── maps/<MAP>.yaml         # 命名点、区域、frame
+├── maps/<MAP>.yaml         # 命名点、区域半径（点第 4 位）、frame
 └── policies/<POLICY>.yaml  # 阈值、时间窗、冷却、兑换步长
 ```
 
