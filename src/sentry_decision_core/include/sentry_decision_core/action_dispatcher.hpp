@@ -8,9 +8,10 @@
 
 namespace sentry_decision {
 
+// one-shot 发出后超过 one_shot_timeout 仍未收到 ack，记一次 WARN（重发策略待协议确定）。
+// 该时长由 config/policies/<POLICY>.yaml 的 action 段提供，源码不设默认值。
 struct ActionDispatcherConfig {
-  // one-shot 发出后超过该时长仍未收到 ack，记一次 WARN（重发策略待协议确定）。
-  Duration one_shot_timeout{500};
+  Duration one_shot_timeout;
 };
 
 // 决策动作派发器：把决策层每 tick 的期望动作转成「本 tick 实际要发送的命令」，
@@ -30,7 +31,7 @@ struct ActionDispatcherConfig {
 //     停止提交即停止重发。
 class ActionDispatcher {
  public:
-  explicit ActionDispatcher(ActionDispatcherConfig config = {});
+  explicit ActionDispatcher(ActionDispatcherConfig config);
 
   void submit(const DecisionAction& action);
   void on_ack(const ActionAck& ack);

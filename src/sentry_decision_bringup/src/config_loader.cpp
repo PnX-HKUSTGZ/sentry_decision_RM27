@@ -38,6 +38,13 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"resource.remote_ammo_min_coins", {true, true}},
       {"strategic.attack_window_min_remaining", {true, true}},
       {"strategic.attack_window_max_remaining", {true, true}},
+      {"safety.max_vx", {false, true}},
+      {"safety.max_vy", {false, true}},
+      {"safety.max_wz", {false, true}},
+      {"timeouts.referee_ms", {true, true}},
+      {"timeouts.odometry_ms", {true, true}},
+      {"timeouts.navigation_ms", {true, true}},
+      {"action.one_shot_timeout_ms", {true, true}},
   };
   return rules;
 }

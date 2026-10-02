@@ -1,19 +1,24 @@
 #include "sentry_decision_sim/match_stage.hpp"
 
+#include <utility>
+
 namespace sentry_decision_sim {
 
-int stage_duration_seconds(MatchStage stage) {
+MatchStageController::MatchStageController(MatchDurations durations)
+    : durations_(std::move(durations)) {}
+
+int MatchStageController::duration_seconds(MatchStage stage) const {
   switch (stage) {
     case MatchStage::kPreparation:
-      return 180;  // 3 分钟准备阶段
+      return durations_.preparation_s;
     case MatchStage::kSelfCheck:
-      return 15;
+      return durations_.self_check_s;
     case MatchStage::kCountdown:
-      return 5;
+      return durations_.countdown_s;
     case MatchStage::kRunning:
-      return 420;
+      return durations_.running_s;
     case MatchStage::kSettling:
-      return 10;  // 结算展示时长（近似）
+      return durations_.settling_s;
     case MatchStage::kNotStarted:
     default:
       return 0;
@@ -22,7 +27,7 @@ int stage_duration_seconds(MatchStage stage) {
 
 void MatchStageController::enter(MatchStage stage) {
   stage_ = stage;
-  remaining_ = stage_duration_seconds(stage);
+  remaining_ = duration_seconds(stage);
   counting_ = stage == MatchStage::kPreparation || stage == MatchStage::kSelfCheck ||
               stage == MatchStage::kCountdown || stage == MatchStage::kRunning ||
               stage == MatchStage::kSettling;

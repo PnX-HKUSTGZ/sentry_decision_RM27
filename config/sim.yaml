@@ -7,6 +7,12 @@ max_hp: 400
 nav:
   speed_mps: 2.0
   tolerance_m: 0.2
+match:
+  preparation_s: 180
+  self_check_s: 15
+  countdown_s: 5
+  running_s: 420
+  settling_s: 10
 supply:
   point: healing
   radius: 1.5

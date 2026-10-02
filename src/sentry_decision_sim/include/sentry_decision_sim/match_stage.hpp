@@ -15,8 +15,15 @@ enum class MatchStage : std::uint8_t {
   kSettling = 5,  // 比赛结算中：比赛时间耗尽后自动进入
 };
 
-// 阶段的默认展示时长（秒）；0 表示不计时。
-int stage_duration_seconds(MatchStage stage);
+// 各阶段展示时长（秒）；0 表示不计时。数值由 config/sim.yaml 的 match 段提供，
+// 源码不再硬编码。
+struct MatchDurations {
+  int preparation_s = 0;
+  int self_check_s = 0;
+  int countdown_s = 0;
+  int running_s = 0;
+  int settling_s = 0;
+};
 
 // 比赛阶段状态机：只允许前进，stage 0 作为「重置到未开始」。
 //
@@ -24,6 +31,8 @@ int stage_duration_seconds(MatchStage stage);
 // 设置 game_status / game_time_remaining）；一旦激活，就由本类统一驱动阶段与剩余时间。
 class MatchStageController {
  public:
+  explicit MatchStageController(MatchDurations durations);
+
   // 设置阶段；stage=0 表示重置。非法取值或回退返回 false 并写 error，状态不变。
   bool set(std::uint8_t stage, std::string* error);
   // 重置到未开始并激活。
@@ -51,10 +60,15 @@ class MatchStageController {
   bool counting() const {
     return counting_;
   }
+  int duration_seconds(MatchStage stage) const;
+  const MatchDurations& durations() const {
+    return durations_;
+  }
 
  private:
   void enter(MatchStage stage);
 
+  MatchDurations durations_;
   bool active_ = false;
   bool paused_ = false;
   MatchStage stage_ = MatchStage::kNotStarted;

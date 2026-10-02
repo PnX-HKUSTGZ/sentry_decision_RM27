@@ -45,6 +45,7 @@ target_link_libraries(decision_main
 target_compile_definitions(decision_main PRIVATE
   DEFAULT_TREE_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/tree/root.xml"
   DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/profiles.yaml"
+  DEFAULT_SIM_CONFIG_PATH="${CMAKE_INSTALL_PREFIX}/share/sentry_decision_bringup/config/sim.yaml"
   DEFAULT_MODULE_LIB_DIR="${SENTRY_NODES_LIB_DIR}")
 
 # 真实 IO 决策主程序：RosIoNode + 行为树 + 仲裁 + 决策状态发布。

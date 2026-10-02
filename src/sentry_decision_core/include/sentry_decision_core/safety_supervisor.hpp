@@ -8,12 +8,13 @@
 
 namespace sentry_decision {
 
+// 安全限幅；由 config/policies/<POLICY>.yaml 的 safety 段提供，源码不设默认值。
 struct SafetyLimits {
-  double max_vx = 3.0;  // 速度限幅（m/s）
-  double max_vy = 3.0;
-  double max_wz = 6.0;           // 角速度限幅（rad/s）
-  bool require_referee = true;   // 裁判数据无效时急停
-  bool require_odometry = true;  // 里程计数据无效时急停
+  double max_vx;  // 速度限幅（m/s）
+  double max_vy;
+  double max_wz;          // 角速度限幅（rad/s）
+  bool require_referee;   // 裁判数据无效时急停
+  bool require_odometry;  // 里程计数据无效时急停
 };
 
 struct SafetyResult {
@@ -26,7 +27,7 @@ struct SafetyResult {
 // 纯逻辑、无 ROS，可脱离行为树单测。
 class SafetySupervisor {
  public:
-  explicit SafetySupervisor(SafetyLimits limits = {});
+  explicit SafetySupervisor(SafetyLimits limits);
 
   SafetyResult apply(const WorldState& world, const DecisionOutput& input) const;
 

@@ -15,6 +15,7 @@
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/runtime_config.hpp"
 #include "sentry_decision_bringup/tree_loader.hpp"
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
@@ -160,7 +161,9 @@ class DecisionNode : public rclcpp::Node {
                const sentry_decision::PolicyConfig* config)
       : Node("sentry_decision"),
         io_(std::move(io)),
-        world_model_(*io_, *io_, *io_),
+        world_model_(*io_, *io_, *io_, sentry_decision_bringup::timeouts_from_config(config)),
+        dispatcher_(sentry_decision_bringup::action_config_from_config(config)),
+        safety_(sentry_decision_bringup::safety_limits_from_config(config)),
         state_publisher_(*this),
         max_ticks_(options.ticks) {
     context_.config = config;

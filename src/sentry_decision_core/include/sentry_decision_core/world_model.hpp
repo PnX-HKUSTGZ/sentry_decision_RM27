@@ -5,11 +5,11 @@
 
 namespace sentry_decision {
 
-// 输入超时阈值。
+// 输入超时阈值；由 config/policies/<POLICY>.yaml 的 timeouts 段提供，源码不设默认值。
 struct WorldTimeouts {
-  Duration referee{500};
-  Duration odometry{200};
-  Duration navigation{500};
+  Duration referee;
+  Duration odometry;
+  Duration navigation;
 };
 
 // 信念层：从输入源取原始值，判定新鲜度，组装 WorldState。
@@ -17,7 +17,7 @@ struct WorldTimeouts {
 class WorldModel {
  public:
   WorldModel(RefereeSource& referee, OdometrySource& odometry, NavigationSink& navigation,
-             WorldTimeouts timeouts = {});
+             WorldTimeouts timeouts);
 
   WorldState snapshot(TimePoint now);
 

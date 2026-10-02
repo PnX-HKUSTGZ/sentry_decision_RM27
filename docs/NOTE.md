@@ -21,7 +21,9 @@
 
 - 已完成（本地）：P3.8 面板布局 + 参数外置——左列 60% 放战场俯视图（上）/ 行为树，右列 40% 控制；
   「场地标定」新标签页打开；俯视图叠加命名点（`list_state` 提供，重置后重读）；
-  新增 `config/sim.yaml`，`referee_sim_node` 的 `max_hp` / 补给区 / 增益点 / 导航速度改从 yaml 读，`--sim-config` 可覆盖路径。
+  新增 `config/sim.yaml`（`max_hp` / 导航速度 / 比赛阶段时长 / 补给区 / 增益点），`referee_sim_node` 全部改从 yaml 读，`--sim-config` 可覆盖路径；
+  决策侧 `safety` / `timeouts` / `action` 旋钮进 `config/policies/<POLICY>.yaml`；离线 `decision_main` 的 `NavSimulator` 速度也来自 sim.yaml；
+  所有可调常量从源码移出（`MatchStageController` 阶段时长、`WorldTimeouts`、`SafetyLimits`、`ActionDispatcher` 超时）。
 - 已完成（本地）：P3.7 资源动作接入 + 场地标定——`ResourceRequest` 增 `remote_ammo` / `remote_hp` / `instant_revive`，
   资源树按「立即复活 > 免费复活 > 远程血 > 本地弹 > 远程弹」重写，血量只走脱战远程兑换；
   场地口径确认为 RMUC（战场 28×15m），地图 profile 更名 `RMUC26`，网页面板「场地标定」工具完成标定，

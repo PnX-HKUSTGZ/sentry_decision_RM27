@@ -180,8 +180,13 @@ ros2 bag record /decision/state /decision/world_state /decision/tree_status /dec
 config/
 ├── profiles.yaml           # 入口：map_profile / strategy_profile / pre_match
 ├── maps/<MAP>.yaml         # 命名点、frame
-└── policies/<POLICY>.yaml  # 阈值、时间窗、兑换步长
+├── policies/<POLICY>.yaml  # 阈值、时间窗、兑换步长、安全限幅、超时
+└── sim.yaml                # 仿真参数：max_hp / 导航速度 / 比赛阶段时长 / 补给区 / 增益点
 ```
+
+`policies/<POLICY>.yaml` 还含 `safety`（速度限幅 / 急停开关）、`timeouts`（输入有效期）、
+`action`（one-shot 超时）；`sim.yaml` 的增益点圆心用 `point: <命名点>` 引用 maps 里的点，
+改点名点即同步仿真，无需改代码。
 
 XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
 启动时校验配置与行为树的引用一致性、数值完整解析、已知键的整数 / 非负约束；缺失或越界即启动报错并列出缺项，

@@ -1,5 +1,3 @@
-#include <yaml-cpp/yaml.h>
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -9,7 +7,6 @@
 #include <filesystem>
 #include <geometry_msgs/msg/pose.hpp>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -30,6 +27,7 @@
 #include "sentry_decision_sim/match_stage.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/scenario.hpp"
+#include "sentry_decision_sim/sim_config.hpp"
 #include "sentry_decision_sim/sim_world.hpp"
 #include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
@@ -52,6 +50,7 @@ using sentry_decision_sim::DecisionView;
 using sentry_decision_sim::Scenario;
 using sentry_decision_sim::ScenarioEvent;
 using sentry_decision_sim::ScenarioValue;
+using sentry_decision_sim::SimConfig;
 using sentry_decision_sim::SimWorld;
 
 struct Options {
@@ -95,104 +94,6 @@ Options parse_options(int argc, char** argv) {
     std::exit(2);
   }
   return options;
-}
-
-// 裁判仿真参数：默认值全部来自 config/sim.yaml（点位来自该文件引用的 map），
-// 源码不再硬编码；命令行 -p 仍可逐项覆盖。
-struct SimConfig {
-  int max_hp = 0;
-  double nav_speed = 0.0;
-  double nav_tolerance = 0.0;
-  double supply_x = 0.0;
-  double supply_y = 0.0;
-  double supply_radius = 0.0;
-  double supply_heal_ratio = 0.0;
-  double supply_heal_ratio_late = 0.0;
-  double supply_heal_late_after_s = 0.0;
-  double base_x = 0.0, base_y = 0.0, base_radius = 0.0;
-  double our_x = 0.0, our_y = 0.0, our_radius = 0.0;
-  double fort_x = 0.0, fort_y = 0.0, fort_radius = 0.0;
-};
-
-double yaml_number(const YAML::Node& node, const char* key, double fallback) {
-  return node[key] ? node[key].as<double>() : fallback;
-}
-
-// 读取一个「point + radius」形式的增益点；point 必须在命名点表中。
-bool load_zone(const YAML::Node& node,
-               const std::map<std::string, sentry_decision::Point2D>& points, const char* label,
-               double* x, double* y, double* radius, std::string* error) {
-  if (!node) {
-    return true;
-  }
-  const std::string point = node["point"] ? node["point"].as<std::string>() : "";
-  const auto it = points.find(point);
-  if (it == points.end()) {
-    *error = std::string(label) + ": 未知命名点 '" + point + "'";
-    return false;
-  }
-  *x = it->second.x;
-  *y = it->second.y;
-  if (node["radius"]) {
-    *radius = node["radius"].as<double>();
-  }
-  return true;
-}
-
-bool load_sim_config(const std::string& path, SimConfig* out, std::string* error) {
-  try {
-    const YAML::Node root = YAML::LoadFile(path);
-    const std::filesystem::path dir = std::filesystem::path(path).parent_path();
-    std::map<std::string, sentry_decision::Point2D> points;
-    const std::string map_rel = root["map"] ? root["map"].as<std::string>() : "";
-    if (!map_rel.empty()) {
-      const YAML::Node map = YAML::LoadFile((dir / map_rel).string());
-      for (const auto& item : map["points"]) {
-        const YAML::Node value = item.second;
-        if (!value.IsSequence() || value.size() < 2) {
-          *error = "地图点位 " + item.first.as<std::string>() + " 需要 [x, y]";
-          return false;
-        }
-        sentry_decision::Point2D p;
-        p.x = value[0].as<double>();
-        p.y = value[1].as<double>();
-        p.yaw = value.size() > 2 ? value[2].as<double>() : 0.0;
-        points[item.first.as<std::string>()] = p;
-      }
-    }
-    out->max_hp = static_cast<int>(yaml_number(root, "max_hp", out->max_hp));
-    if (root["nav"]) {
-      out->nav_speed = yaml_number(root["nav"], "speed_mps", out->nav_speed);
-      out->nav_tolerance = yaml_number(root["nav"], "tolerance_m", out->nav_tolerance);
-    }
-    if (root["supply"]) {
-      const YAML::Node supply = root["supply"];
-      if (!load_zone(supply, points, "supply", &out->supply_x, &out->supply_y, &out->supply_radius,
-                     error)) {
-        return false;
-      }
-      out->supply_heal_ratio = yaml_number(supply, "heal_ratio", out->supply_heal_ratio);
-      out->supply_heal_ratio_late =
-          yaml_number(supply, "heal_ratio_late", out->supply_heal_ratio_late);
-      out->supply_heal_late_after_s =
-          yaml_number(supply, "heal_late_after_s", out->supply_heal_late_after_s);
-    }
-    if (root["gain_zones"]) {
-      const YAML::Node zones = root["gain_zones"];
-      if (!load_zone(zones["base_buff"], points, "base_buff", &out->base_x, &out->base_y,
-                     &out->base_radius, error) ||
-          !load_zone(zones["our_outpost"], points, "our_outpost", &out->our_x, &out->our_y,
-                     &out->our_radius, error) ||
-          !load_zone(zones["fort_buff"], points, "fort_buff", &out->fort_x, &out->fort_y,
-                     &out->fort_radius, error)) {
-        return false;
-      }
-    }
-    return true;
-  } catch (const std::exception& ex) {
-    *error = ex.what();
-    return false;
-  }
 }
 
 sentry_decision::DecisionActionKind kind_from_msg(std::uint8_t kind) {
@@ -243,11 +144,12 @@ class RefereeSimNode : public rclcpp::Node {
       : Node("sentry_referee_sim", rclcpp::NodeOptions()
                                        .allow_undeclared_parameters(true)
                                        .automatically_declare_parameters_from_overrides(true)),
+        sim_(std::move(sim)),
+        match_(sim_.match),
         scenario_(std::move(scenario)),
         has_scenario_(has_scenario),
         hold_(options.hold),
         scenario_start_(SteadyClock::now()) {
-    sim_ = std::move(sim);
     nav_ = sentry_decision_sim::NavSimulator(sim_.nav_speed, sim_.nav_tolerance);
     declare_and_create_interfaces();
     if (has_scenario_) {
@@ -544,8 +446,7 @@ class RefereeSimNode : public rclcpp::Node {
 
   // 比赛已进行秒数：由「比赛时长 - 当前剩余」得到，时长与 MatchStageController 保持一致。
   int match_elapsed_seconds() const {
-    const int total =
-        sentry_decision_sim::stage_duration_seconds(sentry_decision_sim::MatchStage::kRunning);
+    const int total = match_.duration_seconds(sentry_decision_sim::MatchStage::kRunning);
     return std::max(0, total - world_.game_time_remaining);
   }
 
@@ -896,22 +797,24 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_supply_tick_{};
   TimePoint last_remote_tick_{};
   bool in_supply_ = false;
-  int max_hp_ = 400;
-  double supply_center_x_ = -12.36;
-  double supply_center_y_ = -3.47;
-  double supply_radius_ = 1.5;
-  double supply_heal_ratio_ = 0.10;
-  double supply_heal_ratio_late_ = 0.25;
-  double supply_heal_late_after_s_ = 240.0;
-  double base_buff_center_x_ = -11.47;
-  double base_buff_center_y_ = -4.40;
-  double base_buff_radius_ = 1.0;
-  double our_outpost_center_x_ = -2.55;
-  double our_outpost_center_y_ = -2.21;
-  double our_outpost_radius_ = 1.0;
-  double fort_buff_center_x_ = -7.37;
-  double fort_buff_center_y_ = 1.60;
-  double fort_buff_radius_ = 1.0;
+  // 有效值由 declare_and_create_interfaces() 从 config/sim.yaml 写入；
+  // 这里的零值只是构造期占位，不是可调参数。
+  int max_hp_ = 0;
+  double supply_center_x_ = 0.0;
+  double supply_center_y_ = 0.0;
+  double supply_radius_ = 0.0;
+  double supply_heal_ratio_ = 0.0;
+  double supply_heal_ratio_late_ = 0.0;
+  double supply_heal_late_after_s_ = 0.0;
+  double base_buff_center_x_ = 0.0;
+  double base_buff_center_y_ = 0.0;
+  double base_buff_radius_ = 0.0;
+  double our_outpost_center_x_ = 0.0;
+  double our_outpost_center_y_ = 0.0;
+  double our_outpost_radius_ = 0.0;
+  double fort_buff_center_x_ = 0.0;
+  double fort_buff_center_y_ = 0.0;
+  double fort_buff_radius_ = 0.0;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
@@ -969,7 +872,7 @@ int main(int argc, char** argv) {
   }
   {
     std::string sim_error;
-    if (!load_sim_config(sim_path, &sim_config, &sim_error)) {
+    if (!sentry_decision_sim::load_sim_config(sim_path, &sim_config, &sim_error)) {
       std::cerr << "仿真参数加载失败: " << sim_path << "\n  " << sim_error << "\n";
       rclcpp::shutdown();
       return 1;

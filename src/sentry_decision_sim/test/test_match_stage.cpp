@@ -3,10 +3,16 @@
 
 #include "sentry_decision_sim/match_stage.hpp"
 
+using sentry_decision_sim::MatchDurations;
 using sentry_decision_sim::MatchStage;
 using sentry_decision_sim::MatchStageController;
 
 namespace {
+
+// 测试用的阶段时长（与 config/sim.yaml 的 match 段一致）。
+MatchDurations test_durations() {
+  return MatchDurations{180, 15, 5, 420, 10};
+}
 
 int g_failures = 0;
 
@@ -20,7 +26,7 @@ void check(bool ok, const char* expr, const char* file, int line) {
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
 void test_forward_only() {
-  MatchStageController controller;
+  MatchStageController controller(test_durations());
   std::string error;
   CHECK(!controller.active());
   CHECK(controller.stage() == MatchStage::kNotStarted);
@@ -52,7 +58,7 @@ void test_forward_only() {
 }
 
 void test_auto_advance() {
-  MatchStageController controller;
+  MatchStageController controller(test_durations());
   std::string error;
   CHECK(controller.set(2, &error));  // 15s 自检
   CHECK(controller.remaining_seconds() == 15);
@@ -82,7 +88,7 @@ void test_auto_advance() {
 }
 
 void test_pause_freezes_countdown() {
-  MatchStageController controller;
+  MatchStageController controller(test_durations());
   std::string error;
   CHECK(controller.set(3, &error));  // 5s 倒计时
   CHECK(controller.remaining_seconds() == 5);
@@ -100,7 +106,7 @@ void test_pause_freezes_countdown() {
 }
 
 void test_reset() {
-  MatchStageController controller;
+  MatchStageController controller(test_durations());
   std::string error;
   CHECK(controller.set(4, &error));
   CHECK(controller.set(0, &error));  // 重置始终允许

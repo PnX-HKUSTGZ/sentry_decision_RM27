@@ -92,7 +92,8 @@ ReplayData make_data() {
 
 std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path, TimePoint epoch) {
   ReplaySource replay(data, epoch);
-  WorldModel model(replay, replay, replay);
+  WorldModel model(replay, replay, replay,
+                   WorldTimeouts{Duration{500}, Duration{200}, Duration{500}});
 
   BT::BehaviorTreeFactory factory;
   register_sentry_nodes(factory);

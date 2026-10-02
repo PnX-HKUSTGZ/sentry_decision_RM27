@@ -75,7 +75,7 @@ button:hover {
 /* 左列（60%）：战场俯视图在上 + 行为树；右列（40%）：世界状态 / 干预。 */
 .dashboard {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+  grid-template-columns: minmax(360px, 2fr) minmax(360px, 2fr);
   gap: 10px;
   padding: 10px;
   align-items: start;

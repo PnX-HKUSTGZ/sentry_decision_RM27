@@ -22,7 +22,7 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 // 离线 ack 闭环：派发器 -> 模拟执行端 -> 回执 -> 派发器。
 void test_action_roundtrip() {
-  ActionDispatcher dispatcher;
+  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}});
   DecisionActuatorSim actuator(2);
   const TimePoint t0{};
 

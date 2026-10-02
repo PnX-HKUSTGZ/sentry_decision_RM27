@@ -29,7 +29,8 @@ add_library(${PROJECT_NAME}
   src/decision_actuator_sim.cpp
   src/scenario.cpp
   src/sim_world.cpp
-  src/match_stage.cpp)
+  src/match_stage.cpp
+  src/sim_config.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")

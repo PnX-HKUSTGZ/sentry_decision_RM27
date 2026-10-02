@@ -15,3 +15,15 @@ resource:
 strategic:
   attack_window_min_remaining: 0
   attack_window_max_remaining: 420
+safety:
+  max_vx: 3.0                   # 速度限幅（m/s）
+  max_vy: 3.0
+  max_wz: 6.0                   # 角速度限幅（rad/s）
+  require_referee: true         # 裁判数据无效时急停
+  require_odometry: true        # 里程计数据无效时急停
+timeouts:
+  referee_ms: 500               # 裁判上行有效期
+  odometry_ms: 200              # 里程计有效期
+  navigation_ms: 500            # 导航状态有效期
+action:
+  one_shot_timeout_ms: 500      # one-shot 动作超时未 ack 记 WARN
