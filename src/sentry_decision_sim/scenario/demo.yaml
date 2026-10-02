@@ -1,0 +1,26 @@
+# 网页面板演示世界：稳定的非零世界状态，比赛阶段由面板 / set_game_stage 服务驱动。
+# 用法：referee_sim_node --scenario <该文件> --hold
+#   --hold 让场景时间轴跑完后不退出，持续发布最后一个世界状态。
+name: demo
+
+# 机器人初始位姿（map，[x, y, yaw]）：己方半场靠近基地，避免停在场地中央。
+start_pose: [-11.47, -4.40, 0.0]
+
+# 初始世界（时间轴之前应用）。比赛从未开始开始，面板按钮可逐级快进。
+world:
+  game_status: 0
+  game_time_remaining: 0
+  coins: 220
+  self_hp: 400
+  self_ammo: 100
+  base_hp: 5000
+  our_outpost_hp: 1500
+  enemy_outpost_hp: 1200
+  enemy_base_hp: 5000
+  can_rebuild_outpost: true
+
+# 至少需要一个事件（解析器要求）；该事件只做无副作用的世界回填。
+timeline:
+  - at: 0.0
+    set_world:
+      game_status: 0

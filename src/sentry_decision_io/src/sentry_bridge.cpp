@@ -28,6 +28,7 @@ void merge(const SentryInfoOnlineMsg& msg, sentry_decision::RefereeState* out) {
   out->gimbal_yaw_deg = msg.speed_monitor_angle;
   out->info1 = sentry_decision::decode_sentry_info1(msg.sentry_info_1);
   out->info2 = sentry_decision::decode_sentry_info2(msg.sentry_info_2);
+  out->info3 = sentry_decision::decode_sentry_info3(msg.sentry_info_3);
 }
 
 void merge(const SentryInfoOfflineMsg& msg, sentry_decision::RefereeState* out) {
@@ -80,6 +81,10 @@ std::uint8_t to_msg_mode(sentry_decision::ActionMode mode) {
 }
 
 }  // namespace
+
+bool referee_sources_ready(bool has_game_info, bool has_online_info) {
+  return has_game_info && has_online_info;
+}
 
 sentry_interfaces::msg::DecisionCommand to_msg(const sentry_decision::DecisionAction& action) {
   sentry_interfaces::msg::DecisionCommand msg;

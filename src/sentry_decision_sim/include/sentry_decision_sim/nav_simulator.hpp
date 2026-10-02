@@ -19,6 +19,10 @@ class NavSimulator : public sentry_decision::OdometrySource,
   void set_pose(const sentry_decision::Point2D& pose);
   // 让当前目标立即失败，用于测试降级 / 失败分支。
   void fail_current_goal();
+  // 暂停 / 恢复运动：暂停时 odom 仍刷新时间戳（保持有效）但位置不变。
+  void set_paused(bool paused) {
+    paused_ = paused;
+  }
 
   // OdometrySource
   bool odometry(sentry_decision::SelfState* out) const override;
@@ -43,6 +47,7 @@ class NavSimulator : public sentry_decision::OdometrySource,
   bool has_last_now_ = false;
   bool reached_ = false;
   bool failed_ = false;
+  bool paused_ = false;
   double speed_;
   double tolerance_;
 };

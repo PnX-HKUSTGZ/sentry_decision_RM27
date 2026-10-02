@@ -74,7 +74,8 @@ void test_fresh_inputs() {
   navigation.state.stamp = t0;
   navigation.state.valid = true;
 
-  WorldModel model(referee, odometry, navigation);
+  WorldModel model(referee, odometry, navigation,
+                   WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const WorldState state = model.snapshot(t0);
   CHECK(state.referee.valid);
   CHECK(state.referee.self_hp == 400);
@@ -119,7 +120,8 @@ void test_unavailable_source() {
   odometry.available = false;
   FakeNavigation navigation;
 
-  WorldModel model(referee, odometry, navigation);
+  WorldModel model(referee, odometry, navigation,
+                   WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const WorldState state = model.snapshot(t0);
   CHECK(!state.referee.valid);
   CHECK(!state.self.valid);
@@ -132,7 +134,8 @@ void test_navigation_sink() {
   FakeOdometry odometry;
   FakeNavigation navigation;
 
-  WorldModel model(referee, odometry, navigation);
+  WorldModel model(referee, odometry, navigation,
+                   WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const Point2D goal{1.5, 2.5, 0.0};
   navigation.send_goal(goal);
   CHECK(navigation.goal_sent);

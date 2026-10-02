@@ -14,8 +14,17 @@ find_package(geometry_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DecisionOutput.msg"
   "msg/DecisionState.msg"
+  "msg/InterventionEvent.msg"
+  "msg/TreeNodeStatus.msg"
+  "msg/TreeStatus.msg"
   "msg/WorldState.msg"
-  DEPENDENCIES std_msgs geometry_msgs)
+  "action/ManualOverride.action"
+  "srv/ApplyEffect.srv"
+  "srv/DebugCommand.srv"
+  "srv/SetGameStage.srv"
+  "srv/SetGamePause.srv"
+  "srv/SetWorld.srv"
+  DEPENDENCIES std_msgs geometry_msgs action_msgs unique_identifier_msgs)
 
 ament_export_dependencies(rosidl_default_runtime)
 ament_package()

@@ -25,6 +25,7 @@ WorldState make_world() {
   world.referee.our_outpost_hp = 1500;
   world.referee.enemy_outpost_hp = 1500;
   world.referee.game_time_remaining = 420;
+  world.referee.game_status = GameStatus::kRunning;
   return world;
 }
 
@@ -33,12 +34,15 @@ void test_priority() {
 
   WorldState world = make_world();
   CHECK(policy.decide(world).mode == TacticalMode::kAttack);
+  CHECK(policy.decide(world).stance == SentryStance::kAttack);
 
   world.referee.self_hp = 50;
   CHECK(policy.decide(world).mode == TacticalMode::kRetreat);
+  CHECK(policy.decide(world).stance == SentryStance::kMove);
 
   world.referee.self_hp = 0;
   CHECK(policy.decide(world).mode == TacticalMode::kRespawn);
+  CHECK(policy.decide(world).stance == SentryStance::kMove);
 
   world = make_world();
   world.referee.self_ammo = 10;
@@ -47,6 +51,7 @@ void test_priority() {
   world = make_world();
   world.referee.our_outpost_hp = 0;
   CHECK(policy.decide(world).mode == TacticalMode::kDefend);
+  CHECK(policy.decide(world).stance == SentryStance::kDefense);
 
   world = make_world();
   world.referee.enemy_outpost_hp = 0;
@@ -57,8 +62,14 @@ void test_priority() {
   CHECK(policy.decide(world).mode == TacticalMode::kPatrol);
 
   world = make_world();
+  world.referee.game_status = GameStatus::kPreparation;  // 未进入比赛中 -> 待机
+  CHECK(policy.decide(world).mode == TacticalMode::kIdle);
+  world.referee.game_status = GameStatus::kRunning;
+
+  world = make_world();
   world.referee.valid = false;
   CHECK(policy.decide(world).mode == TacticalMode::kUnknown);
+  CHECK(policy.decide(world).stance == SentryStance::kUnknown);
 }
 
 void test_from_config() {

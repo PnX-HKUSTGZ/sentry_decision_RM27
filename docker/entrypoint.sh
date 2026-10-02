@@ -50,6 +50,7 @@ run_tests() {
 case "${1:-shell}" in
   build) build ;;
   test) build; run_tests ;;
+  demo) shift; exec "${WS_DIR}/tools/demo.sh" "$@" ;;
   shell) exec bash ;;
   *) exec "$@" ;;
 esac

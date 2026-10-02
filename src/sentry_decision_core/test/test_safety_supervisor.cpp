@@ -24,6 +24,10 @@ WorldState make_world() {
   return world;
 }
 
+SafetyLimits default_limits() {
+  return SafetyLimits{3.0, 3.0, 6.0, true, true};
+}
+
 DecisionOutput make_output() {
   DecisionOutput output;
   output.nav_goal = Point2D{1.0, 2.0, 0.0};
@@ -45,7 +49,7 @@ void test_clamp_when_valid() {
 void test_emergency_on_stale_referee() {
   WorldState world = make_world();
   world.referee.valid = false;
-  const SafetySupervisor supervisor;
+  const SafetySupervisor supervisor(default_limits());
   const SafetyResult result = supervisor.apply(world, make_output());
   CHECK(result.emergency);
   CHECK(!result.output.nav_goal.has_value());
@@ -57,7 +61,7 @@ void test_emergency_on_stale_referee() {
 void test_emergency_on_stale_odometry() {
   WorldState world = make_world();
   world.self.valid = false;
-  const SafetySupervisor supervisor;
+  const SafetySupervisor supervisor(default_limits());
   const SafetyResult result = supervisor.apply(world, make_output());
   CHECK(result.emergency);
   CHECK(!result.output.nav_goal.has_value());
@@ -66,7 +70,7 @@ void test_emergency_on_stale_odometry() {
 void test_valid_without_cmd_vel() {
   DecisionOutput output;
   output.nav_goal = Point2D{1.0, 2.0, 0.0};
-  const SafetySupervisor supervisor;
+  const SafetySupervisor supervisor(default_limits());
   const SafetyResult result = supervisor.apply(make_world(), output);
   CHECK(!result.emergency);
   CHECK(result.output.nav_goal.has_value());

@@ -18,6 +18,7 @@ enum class IntentField {
   kChassisVel,
   kResourceRequest,
   kTacticalMode,
+  kStance,
 };
 
 // 意图来源。枚举顺序也用于同优先级、同时间戳时的确定性 tie-break。
@@ -39,7 +40,26 @@ enum class Priority : int {
   kSafety = 4,
 };
 
-enum class TacticalMode { kUnknown, kPatrol, kAttack, kDefend, kRetreat, kHeal, kRespawn };
+enum class TacticalMode {
+  kUnknown = 0,
+  kPatrol = 1,
+  kAttack = 2,
+  kDefend = 3,
+  kRetreat = 4,
+  kHeal = 5,
+  kRespawn = 6,
+  // 比赛未进入「比赛中」（准备 / 自检 / 倒计时 / 结算）时的待机模式：不执行任务。
+  kIdle = 7,
+};
+
+// 哨兵物理姿态（2026 规则 5.6.4）。取值与裁判 SentryInfo2.stance 位段一致：
+// 1 进攻 / 2 防御 / 3 移动；0 表示未知（消息未给或不在比赛中）。
+enum class SentryStance : std::uint8_t {
+  kUnknown = 0,
+  kAttack = 1,
+  kDefense = 2,
+  kMove = 3,
+};
 
 struct Point2D {
   double x = 0.0;
@@ -62,13 +82,21 @@ struct Quaternion {
 };
 
 struct ResourceRequest {
+  // 本地兑换允许发弹量（需占领补给区 / 基地 / 前哨站增益点），单位：发。
   int ammo = 0;
+  // 本地兑换血量：规则只允许远程兑换，此字段仅保留给人工注入 / 调试，决策树不再主动产出。
   int hp = 0;
-  bool revive = false;
+  // 远程兑换允许发弹量次数（需脱战），单位：次。
+  int remote_ammo = 0;
+  // 远程兑换血量次数（需脱战），单位：次。
+  int remote_hp = 0;
+  bool revive = false;          // 确认免费复活
+  bool instant_revive = false;  // 兑换立即复活（需 can_instant_resurrect 且金币足够）
 };
 
 // 意图载荷；具体用哪一项由 Intent::field 决定。
-using IntentValue = std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest>;
+using IntentValue =
+    std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest, SentryStance>;
 
 // 意图：一次请求，不保证最终生效。
 struct Intent {
@@ -87,18 +115,19 @@ struct DecisionOutput {
   std::optional<Twist> cmd_vel;
   ResourceRequest resource{};
   TacticalMode tactical_mode = TacticalMode::kUnknown;
+  SentryStance stance = SentryStance::kUnknown;
   TimePoint stamp{};
 };
 
 // 决策动作类型（下行给下位机）。
 enum class DecisionActionKind {
   kNone,
-  kAmmoExchange,        // 本地兑换允许发弹量，value = 数量
-  kHpExchange,          // 本地兑换血量，value = 数量
-  kFreeResurrect,       // 确认免费复活
-  kInstantResurrect,    // 兑换立即复活
-  kRemoteAmmoExchange,  // 远程兑换发弹量，value = 次数
-  kRemoteHpExchange,    // 远程兑换血量，value = 次数
+  kAmmoExchange,  // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站），value = 数量
+  kHpExchange,        // 兑换血量：需脱战（规则仅允许远程兑换），value = 数量
+  kFreeResurrect,     // 确认免费复活：需 can_free_resurrect
+  kInstantResurrect,  // 兑换立即复活：需 can_instant_resurrect 且金币足够
+  kRemoteAmmoExchange,  // 远程兑换发弹量：需脱战，value = 次数
+  kRemoteHpExchange,    // 远程兑换血量：需脱战，value = 次数
 };
 
 // 动作发送模式：配置动作时必须显式选择。

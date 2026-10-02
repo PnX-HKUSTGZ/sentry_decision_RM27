@@ -1,0 +1,8 @@
+# 直接修改裁判仿真的模拟世界（仅模拟 / 演示用），字段与取值同场景 set_world。
+string field
+float64 value
+---
+bool success
+string field
+float64 value
+string message

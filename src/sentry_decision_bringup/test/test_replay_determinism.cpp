@@ -6,6 +6,7 @@
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/config.hpp"
 #include "sentry_decision_core/context.hpp"
+#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/replay.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
@@ -63,6 +64,7 @@ ReplayData make_data() {
   referee.our_outpost_hp = 1500;
   referee.enemy_outpost_hp = 1500;
   referee.game_time_remaining = 420;
+  referee.game_status = GameStatus::kRunning;
   data.referee.push_back({Duration{0}, referee});
 
   RefereeState hurt = referee;
@@ -76,12 +78,22 @@ ReplayData make_data() {
   NavState nav;
   nav.valid = true;
   data.navigation.push_back({Duration{0}, nav});
+
+  // 2500ms 起人工接管导航目标，用于验证「含干预的回放」可复现且在原时刻生效。
+  InterventionCommand override_goal;
+  override_goal.kind = InterventionCommand::Kind::kIntent;
+  override_goal.intent.field = IntentField::kNavGoal;
+  override_goal.intent.value = Point2D{9.0, 9.0, 0.0};
+  override_goal.value_text = "[9.0, 9.0]";
+  override_goal.reason = "replay_test";
+  data.interventions.push_back({Duration{2500}, override_goal});
   return data;
 }
 
 std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path, TimePoint epoch) {
   ReplaySource replay(data, epoch);
-  WorldModel model(replay, replay, replay);
+  WorldModel model(replay, replay, replay,
+                   WorldTimeouts{Duration{500}, Duration{200}, Duration{500}});
 
   BT::BehaviorTreeFactory factory;
   register_sentry_nodes(factory);
@@ -94,18 +106,27 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
   BT::Tree tree = factory.createTreeFromFile(tree_path, blackboard);
 
   IntentArbiter arbiter;
+  InterventionController intervention;
   std::vector<StepResult> steps;
   const Duration period{50};
   for (int tick = 0; tick < 60; ++tick) {
     replay.step(period);
-    context.world = model.snapshot(replay.stamp());
+    for (const auto& command : replay.interventions()) {
+      apply_intervention(&intervention, command, replay.stamp());
+    }
+    context.world = intervention.apply_world(model.snapshot(replay.stamp()));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
+    apply_intervention_intents(intervention, replay.stamp(), &context);
     tree.tickOnce();
 
     arbiter.clear_source(SourceId::kStrategic);
     arbiter.clear_source(SourceId::kSkill);
+    arbiter.clear_source(SourceId::kIntervention);
     for (const auto& intent : context.intents) {
+      if (!intervention.allows(intent.field)) {
+        continue;
+      }
       arbiter.submit(intent);
     }
     const ArbiterResult result = arbiter.resolve(replay.stamp());
@@ -133,21 +154,34 @@ void test_replay_is_deterministic(const std::string& tree_path) {
   CHECK(first.size() == 60);
   CHECK(first == second);
 
-  // 表驱动：0~950ms 满血、去 patrol_a；1000ms 起低血撤退、去 home。
-  // 前若干 tick 裁判数据尚未在有效期内（stale），战略层输出 kUnknown；
-  // 数据有效后满血双方前哨在场 -> 进攻。
-  for (std::size_t i = 0; i < 19; ++i) {
+  // at=0 的裁判在 500ms 内有效 -> 进攻（该测试里 enemy_outpost 与 patrol_a 同为 1.1,1.1）。
+  for (std::size_t i = 0; i < 10; ++i) {
     CHECK(first[i].hp == 400);
+    CHECK(first[i].mode == TacticalMode::kAttack);
     CHECK(first[i].has_goal);
     CHECK(first[i].goal_x == 1.1);
     CHECK(first[i].goal_y == 1.1);
   }
-  CHECK(first[0].mode == TacticalMode::kAttack);
+  // 500~1000ms 无新裁判数据 -> stale -> kUnknown -> 不下发任务目标。
+  for (std::size_t i = 10; i < 19; ++i) {
+    CHECK(first[i].hp == 400);
+    CHECK(first[i].mode == TacticalMode::kUnknown);
+    CHECK(!first[i].has_goal);
+  }
+  // at=1000ms 起低血 -> 撤退 home(-5,3)，在有效期内。
   CHECK(first[19].hp == 50);
   CHECK(first[19].mode == TacticalMode::kRetreat);
   CHECK(first[19].has_goal);
   CHECK(first[19].goal_x == -5.0);
   CHECK(first[19].goal_y == 3.0);
+  // 1500ms 后裁判再次 stale -> 无任务目标。
+  CHECK(first[48].hp == 50);
+  CHECK(first[48].mode == TacticalMode::kUnknown);
+  CHECK(!first[48].has_goal);
+  // 2500ms 的人工接管：导航目标被干预覆盖为 (9,9)（即使战略层 stale 也生效）。
+  CHECK(first[49].mode == TacticalMode::kUnknown);
+  CHECK(first[49].goal_x == 9.0);
+  CHECK(first[49].goal_y == 9.0);
 }
 
 }  // namespace

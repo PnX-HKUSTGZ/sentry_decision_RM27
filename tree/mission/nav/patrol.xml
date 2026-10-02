@@ -1,12 +1,15 @@
 <?xml version="1.0"?>
 <!--
   任务：巡逻（默认任务）。
-  进入条件：无（ReactiveFallback 兜底）。
+  进入条件：战略模式 = kPatrol(1)。未进入比赛中（kIdle）时不匹配，因此不下发任务。
   退出条件：被更高优先级任务抢占。
   抢占关系：优先级最低。
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionPatrol">
   <BehaviorTree ID="MissionPatrol">
-    <SubTree ID="GotoNamedPoint" target_point="patrol_a"/>
+    <Sequence name="PatrolSequence">
+      <IfTacticalMode mode="1"/>
+      <SubTree ID="GotoNamedPoint" target_point="patrol_a"/>
+    </Sequence>
   </BehaviorTree>
 </root>

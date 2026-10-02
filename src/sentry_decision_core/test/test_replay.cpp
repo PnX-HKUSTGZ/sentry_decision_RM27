@@ -76,7 +76,8 @@ void test_epoch_stamp_and_freshness() {
   data.navigation.push_back(ReplayRecord<NavState>{Duration{0}, nav});
 
   ReplaySource replay(data, epoch);
-  WorldModel model(replay, replay, replay);
+  WorldModel model(replay, replay, replay,
+                   WorldTimeouts{Duration{500}, Duration{200}, Duration{500}});
   CHECK(replay.stamp() == epoch);
 
   const WorldState fresh = model.snapshot(replay.stamp());
@@ -84,7 +85,7 @@ void test_epoch_stamp_and_freshness() {
   CHECK(fresh.self.valid);
   CHECK(fresh.nav.valid);
 
-  replay.step(Duration{600});  // 超过默认 500ms 有效期
+  replay.step(Duration{600});  // 超过 500ms 有效期
   const WorldState stale = model.snapshot(replay.stamp());
   CHECK(!stale.referee.valid);
   CHECK(!stale.nav.valid);
@@ -106,7 +107,8 @@ void test_finished_and_empty() {
 
 std::vector<int> run_sequence(const ReplayData& data) {
   ReplaySource replay(data);
-  WorldModel model(replay, replay, replay);
+  WorldModel model(replay, replay, replay,
+                   WorldTimeouts{Duration{500}, Duration{200}, Duration{500}});
   std::vector<int> result;
   for (int i = 0; i < 5; ++i) {
     replay.step(Duration{100});
@@ -121,6 +123,30 @@ void test_determinism() {
   const std::vector<int> second = run_sequence(data);
   CHECK(first == second);
   CHECK((first == std::vector<int>{400, 50, 50, 50, 50}));
+}
+
+void test_intervention_channel() {
+  ReplayData data = make_referee_series();
+  InterventionCommand first;
+  first.kind = InterventionCommand::Kind::kModuleSwitch;
+  first.module = "nav";
+  first.enabled = false;
+  data.interventions.push_back({Duration{0}, first});
+
+  InterventionCommand second;
+  second.kind = InterventionCommand::Kind::kClearWorld;
+  data.interventions.push_back({Duration{200}, second});
+
+  ReplaySource replay(data);
+  // at = 0 的事件在首次调用即返回，且不重复。
+  CHECK(replay.interventions().size() == 1);
+  CHECK(replay.interventions().empty());
+  replay.step(Duration{100});
+  CHECK(replay.interventions().empty());
+  replay.step(Duration{100});  // now = 200
+  const std::vector<InterventionCommand> due = replay.interventions();
+  CHECK(due.size() == 1);
+  CHECK(due[0].kind == InterventionCommand::Kind::kClearWorld);
 }
 
 void test_navigation_sink_counters() {
@@ -141,6 +167,7 @@ int main() {
   test_epoch_stamp_and_freshness();
   test_finished_and_empty();
   test_determinism();
+  test_intervention_channel();
   test_navigation_sink_counters();
   if (g_failures == 0) {
     std::printf("all core replay tests passed\n");

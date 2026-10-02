@@ -8,9 +8,10 @@
 
 namespace sentry_decision {
 
+// one-shot 发出后超过 one_shot_timeout 仍未收到 ack，记一次 WARN（重发策略待协议确定）。
+// 该时长由 config/policies/<POLICY>.yaml 的 action 段提供，源码不设默认值。
 struct ActionDispatcherConfig {
-  // one-shot 发出后超过该时长仍未收到 ack，记一次 WARN（重发策略待协议确定）。
-  Duration one_shot_timeout{500};
+  Duration one_shot_timeout;
 };
 
 // 决策动作派发器：把决策层每 tick 的期望动作转成「本 tick 实际要发送的命令」，
@@ -30,11 +31,14 @@ struct ActionDispatcherConfig {
 //     停止提交即停止重发。
 class ActionDispatcher {
  public:
-  explicit ActionDispatcher(ActionDispatcherConfig config = {});
+  explicit ActionDispatcher(ActionDispatcherConfig config);
 
   void submit(const DecisionAction& action);
   void on_ack(const ActionAck& ack);
   std::vector<DecisionAction> poll(TimePoint now);
+  // 清除某个动作的 one-shot「已发送」记忆，使下一次同值提交视为新请求。
+  // 人工干预（如面板重复点「兑换发弹」）需要它：意图持续存在时同值请求本会被去重。
+  void rearm(DecisionActionKind kind);
   void reset();
 
  private:

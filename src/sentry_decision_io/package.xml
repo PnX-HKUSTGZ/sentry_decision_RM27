@@ -20,6 +20,7 @@
   <depend>sentry_decision_core</depend>
   <depend>sentry_decision_msgs</depend>
   <depend>sentry_interfaces</depend>
+  <depend>yaml-cpp</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

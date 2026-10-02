@@ -9,6 +9,49 @@
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-10-02
+
+> P3：可视化与本地仿真——让决策可观测、可干预、可回放，并完成规则对齐与参数外置。
+
+### Added
+
+- **观测与面板**：新增 `sentry_decision_viz`（`TreeStatus` / `TreeNodeStatus`、`/decision/tree_status`、
+  可选 Groot2）与 rosbridge 网页面板（行为树 / 战场俯视图 / 世界状态 / 模块与 Intent / 干预）；
+  新增场地标定工具 `calibrate.html`。
+- **本地仿真**：`referee_sim_node` 发布 `/sentry/*` 五条上行与 odom，提供 `NavigateToPose` action server
+  与 `DecisionCommand`→`DecisionAck` 闭环；ROS 无关的 `SimWorld` 与场景脚本（`set_world` / `expect` /
+  `add_intent` / `disable`）；`tools/demo.sh` 一键起「面板 + 仿真 + 决策」。
+- **比赛与场地**：`MatchStageController`（准备 / 自检 / 倒计时 / 比赛中 / 结算，只可前进、可重置、可暂停）；
+  按位姿判定增益点占领；补给区回血（10%/s，4 分钟后 25%，进入延时 1s）、免费发弹量（每分钟 100 发、可累积）、
+  远程兑换 6 秒延迟与战亡作废；裁判侧动作前置校验。
+- **规则对齐**：`referee_protocol` 按 2026 规则 / 通信协议补齐（`EventCode` 全字段、`SentryInfo3`）；
+  恢复姿态 `SentryStance` 并贯通战略层 / 仲裁 / 消息 / 面板；资源请求打通远程发弹 / 远程血量 / 立即复活。
+- **干预与回放**：`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；`InterventionServer`
+  在 tick 边界应用干预；`IntentArbiter` 逐字段 `winners`；`/decision/intervention` 录制；`replay_main` 离线回放。
+- **仿真效果**：新增 `srv/ApplyEffect`（`/sentry_sim/apply_effect`），按 `config/sim.yaml` 的 `effects`
+  对真实世界施加具名效果（自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁），面板三行按钮。
+- **增益区**：地图点支持可选第 4 位区域半径（补给 / 基地 / 前哨 / 堡垒），`list_state.points` 带 `r`；
+  面板把 `r > 0` 的点画成青色虚线环；标定工具可直接编辑 x/y/yaw/r 并预览。
+- **工具与测试**：`scenario_smoke` / `intervention_smoke` / `replay_smoke` / `match_smoke` /
+  `sim_effects_smoke` / `referee_guard_smoke` / `viz_smoke` 端到端测试，`web/test/format.test.mjs` 纯逻辑单测。
+
+### Changed
+
+- 可调参数全部外置到 YAML：`config/sim.yaml` 与 `config/policies/<POLICY>.yaml`（安全限幅 / 输入超时 /
+  动作超时 / 回血 / 效果），源码不再硬编码默认值，缺失即启动失败。
+- 地图切换为 RMUC：`map_profile` `RMUL26`→`RMUC26`，主面板改用 `RMUC2026.pgm` 底图；补给区 / 增益点
+  圆心与半径来自地图命名点（`sim_home` / `sim_base` / `sim_our_outpost` / `sim_fort`）。
+- 面板收敛仿真干预：保留「仿真世界」并新增「仿真效果」；移除「决策覆盖」与与模式下拉等价的「强制撤退」。
+- 场地标定工具初始为空序列，避免把示例点位误当成实际配置。
+
+### Fixed
+
+- 裁判来源就绪判定：`GameInfo` + `SentryInfoOnline` 同时到达才判 `RefereeState` 有效。
+- `EventCode::local_ammo_exchange_point()` 补判 RMUL 补给位（bit 2）。
+- `NavigateToPose` 收到新目标先 `abort` 旧 goal，避免悬挂。
+- 本地兑换发弹量门控「占领增益点」、兑换血量要求脱战，裁判侧同步校验并打印拒绝原因。
+- 树状态缓存避免整树 IDLE / 残留上一拍 SUCCESS。
+- `-p` 数值参数兼容整数 / 浮点写法；面板「重置」恢复初始位姿并清空导航目标。
 ## [v0.2.0]
 
 ### Added
@@ -51,10 +94,6 @@
 ### Changed
 
 - 行为树源文件迁移到仓库根目录 `tree/`；bringup 构建、安装与测试路径同步，运行路径不变
-
-### Removed
-
-- 移除已废弃的 stance（姿态）类型与逻辑：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`SentryInfo2.stance` / `stance_enhanced`、`decode_stance` 及消息字段
 
 ### Fixed
 

@@ -58,7 +58,7 @@ void NavSimulator::update(sentry_decision::TimePoint now) {
   last_now_ = now;
   has_last_now_ = true;
 
-  if (!failed_ && goal_.has_value() && !reached_) {
+  if (!paused_ && !failed_ && goal_.has_value() && !reached_) {
     const double dx = goal_->x - self_.pose.x;
     const double dy = goal_->y - self_.pose.y;
     const double dist = std::hypot(dx, dy);

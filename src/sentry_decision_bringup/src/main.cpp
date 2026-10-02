@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -10,6 +11,7 @@
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/runtime_config.hpp"
 #include "sentry_decision_bringup/tree_loader.hpp"
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
@@ -24,6 +26,7 @@
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
 #include "sentry_decision_sim/nav_simulator.hpp"
 #include "sentry_decision_sim/referee_simulator.hpp"
+#include "sentry_decision_sim/sim_config.hpp"
 
 #ifndef DEFAULT_TREE_PATH
 #define DEFAULT_TREE_PATH "tree/root.xml"
@@ -33,6 +36,9 @@
 #endif
 #ifndef DEFAULT_MODULE_LIB_DIR
 #define DEFAULT_MODULE_LIB_DIR ""
+#endif
+#ifndef DEFAULT_SIM_CONFIG_PATH
+#define DEFAULT_SIM_CONFIG_PATH "config/sim.yaml"
 #endif
 
 namespace {
@@ -109,16 +115,43 @@ int main(int argc, char** argv) {
   }
   SD_LOG_ACT("config", "%s", sentry_decision_bringup::format_config(loaded.config).c_str());
 
+  // 运行期参数（安全限幅 / 输入超时 / 动作超时）来自 config/policies yaml，缺项即启动失败。
+  sentry_decision::WorldTimeouts runtime_timeouts;
+  sentry_decision::SafetyLimits safety_limits;
+  sentry_decision::ActionDispatcherConfig action_config;
+  try {
+    runtime_timeouts = sentry_decision_bringup::timeouts_from_config(&loaded.config);
+    safety_limits = sentry_decision_bringup::safety_limits_from_config(&loaded.config);
+    action_config = sentry_decision_bringup::action_config_from_config(&loaded.config);
+  } catch (const std::exception& ex) {
+    std::cerr << "运行参数加载失败: " << ex.what() << "\n";
+    return 1;
+  }
+
   sentry_decision::DecisionContext context;
   context.config = &loaded.config;
   const sentry_decision::RuleBasedStrategicPolicy policy =
       sentry_decision::RuleBasedStrategicPolicy::from_config(loaded.config);
 
+  // 仿真参数（含导航速度 / 容差）来自 config/sim.yaml，源码不再硬编码。
+  sentry_decision_sim::SimConfig sim_config;
+  {
+    std::string sim_path = DEFAULT_SIM_CONFIG_PATH;
+    if (!std::filesystem::exists(sim_path) && std::filesystem::exists("config/sim.yaml")) {
+      sim_path = "config/sim.yaml";
+    }
+    std::string error;
+    if (!sentry_decision_sim::load_sim_config(sim_path, &sim_config, &error)) {
+      std::cerr << "仿真参数加载失败: " << sim_path << "\n  " << error << "\n";
+      return 1;
+    }
+  }
+
   sentry_decision_sim::RefereeSimulator referee;
-  sentry_decision_sim::NavSimulator navigation(2.0, 0.2);
+  sentry_decision_sim::NavSimulator navigation(sim_config.nav_speed, sim_config.nav_tolerance);
   referee.schedule(Duration{static_cast<std::int64_t>(options.hp_drop_sec * 1000.0)},
                    [](sentry_decision::RefereeState& state) { state.self_hp = 50; });
-  sentry_decision::WorldModel world_model(referee, navigation, navigation);
+  sentry_decision::WorldModel world_model(referee, navigation, navigation, runtime_timeouts);
 
   BT::BehaviorTreeFactory factory;
   std::vector<std::string> errors;
@@ -151,9 +184,9 @@ int main(int argc, char** argv) {
   }();
 
   sentry_decision::IntentArbiter arbiter;
-  sentry_decision::ActionDispatcher dispatcher;
+  sentry_decision::ActionDispatcher dispatcher(action_config);
   sentry_decision::InterventionController intervention;
-  sentry_decision::SafetySupervisor safety;
+  sentry_decision::SafetySupervisor safety(safety_limits);
   sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
   const TimePoint epoch = SteadyClock::now();
@@ -167,9 +200,7 @@ int main(int argc, char** argv) {
     context.world = intervention.apply_world(world_model.snapshot(now));
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    for (const auto& intent : intervention.active_intents(now)) {
-      context.emit(intent);
-    }
+    apply_intervention_intents(intervention, now, &context);
     tree.tickOnce();
 
     // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。

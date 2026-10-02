@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-jazzy-behaviortree-cpp \
     ros-jazzy-nav2-msgs \
+    ros-jazzy-rosbridge-suite \
     libyaml-cpp-dev \
     libboost-dev \
     libfmt-dev \

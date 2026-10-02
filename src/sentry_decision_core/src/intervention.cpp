@@ -1,5 +1,7 @@
 #include "sentry_decision_core/intervention.hpp"
 
+#include <variant>
+
 namespace sentry_decision {
 
 void InterventionController::inject(Intent intent, TimePoint now) {
@@ -7,6 +9,10 @@ void InterventionController::inject(Intent intent, TimePoint now) {
   intent.priority = Priority::kIntervention;
   intent.stamp = now;
   intents_[intent.field] = intent;
+}
+
+void InterventionController::clear_intent(IntentField field) {
+  intents_.erase(field);
 }
 
 void InterventionController::set_world_override(WorldField field, double value) {
@@ -36,6 +42,8 @@ const char* InterventionController::module_for_field(IntentField field) {
       return "resource";
     case IntentField::kTacticalMode:
       return "strategic";
+    case IntentField::kStance:
+      return "strategic";
   }
   return "";
 }
@@ -62,6 +70,33 @@ std::vector<Intent> InterventionController::active_intents(TimePoint now) const 
   return active;
 }
 
+void apply_intervention(InterventionController* controller, const InterventionCommand& command,
+                        TimePoint now) {
+  if (controller == nullptr) {
+    return;
+  }
+  switch (command.kind) {
+    case InterventionCommand::Kind::kIntent:
+      controller->inject(command.intent, now);
+      break;
+    case InterventionCommand::Kind::kClearIntent:
+      controller->clear_intent(command.intent_field);
+      break;
+    case InterventionCommand::Kind::kWorldOverride:
+      controller->set_world_override(command.world_field, command.world_value);
+      break;
+    case InterventionCommand::Kind::kClearWorld:
+      controller->clear_world_override(command.world_field);
+      break;
+    case InterventionCommand::Kind::kModuleSwitch:
+      controller->set_module_enabled(command.module, command.enabled);
+      break;
+    case InterventionCommand::Kind::kClearAll:
+      controller->clear();
+      break;
+  }
+}
+
 WorldState InterventionController::apply_world(const WorldState& world) const {
   WorldState out = world;
   for (const auto& entry : world_overrides_) {
@@ -78,8 +113,14 @@ WorldState InterventionController::apply_world(const WorldState& world) const {
       case WorldField::kOurOutpostHp:
         out.referee.our_outpost_hp = static_cast<int>(value);
         break;
+      case WorldField::kBaseHp:
+        out.referee.base_hp = static_cast<int>(value);
+        break;
       case WorldField::kEnemyOutpostHp:
         out.referee.enemy_outpost_hp = static_cast<int>(value);
+        break;
+      case WorldField::kEnemyBaseHp:
+        out.referee.enemy_base_hp = static_cast<int>(value);
         break;
       case WorldField::kGameTimeRemaining:
         out.referee.game_time_remaining = static_cast<int>(value);
@@ -90,6 +131,21 @@ WorldState InterventionController::apply_world(const WorldState& world) const {
     }
   }
   return out;
+}
+
+void apply_intervention_intents(const InterventionController& controller, TimePoint now,
+                                DecisionContext* context) {
+  if (context == nullptr) {
+    return;
+  }
+  for (const auto& intent : controller.active_intents(now)) {
+    if (intent.field == IntentField::kTacticalMode) {
+      if (const auto* mode = std::get_if<TacticalMode>(&intent.value)) {
+        context->strategy.mode = *mode;
+      }
+    }
+    context->emit(intent);
+  }
 }
 
 }  // namespace sentry_decision

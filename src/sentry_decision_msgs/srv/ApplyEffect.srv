@@ -1,0 +1,7 @@
+# 对裁判仿真的真实世界施加一个具名效果（仅模拟 / 演示用）。
+# 效果名与步长来自 config/sim.yaml 的 effects；语义见 sim_world::apply_effect。
+string effect
+---
+bool success
+float64 new_value
+string message

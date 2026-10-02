@@ -24,17 +24,25 @@ struct DecisionContext {
     intents.clear();
   }
 
-  // 应用战略层结论：写入 strategy，并提交一条 kTacticalMode 意图（owner = kStrategic），
-  // 使仲裁输出与可视化能看到战术模式。
+  // 应用战略层结论：写入 strategy，并提交 kTacticalMode / kStance 意图（owner = kStrategic），
+  // 使仲裁输出与可视化能看到战术模式与期望姿态。
   void apply_strategy(const StrategicDecision& decision) {
     strategy = decision;
-    Intent intent;
-    intent.field = IntentField::kTacticalMode;
-    intent.source = SourceId::kStrategic;
-    intent.priority = Priority::kTactical;
-    intent.stamp = world.stamp;
-    intent.value = decision.mode;
-    emit(std::move(intent));
+    Intent mode_intent;
+    mode_intent.field = IntentField::kTacticalMode;
+    mode_intent.source = SourceId::kStrategic;
+    mode_intent.priority = Priority::kTactical;
+    mode_intent.stamp = world.stamp;
+    mode_intent.value = decision.mode;
+    emit(std::move(mode_intent));
+
+    Intent stance_intent;
+    stance_intent.field = IntentField::kStance;
+    stance_intent.source = SourceId::kStrategic;
+    stance_intent.priority = Priority::kTactical;
+    stance_intent.stamp = world.stamp;
+    stance_intent.value = decision.stance;
+    emit(std::move(stance_intent));
   }
 
   void emit(Intent intent) {

@@ -52,6 +52,62 @@ class IfCoinsAtLeast : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
+// Node:         IfOccupyingGainPoint
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断是否占领可本地兑换发弹量的增益点（补给区 / 基地 / 前哨站）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, event)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> AmmoExchange
+class IfOccupyingGainPoint : public BT::SyncActionNode {
+ public:
+  IfOccupyingGainPoint(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         IfDisengaged
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断是否脱战（远程兑换血量的前置条件）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, info2.disengaged)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> RemoteHpExchange / RemoteAmmoExchange
+class IfDisengaged : public BT::SyncActionNode {
+ public:
+  IfDisengaged(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         IfNotOccupyingGainPoint
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断当前是否不在可本地兑换发弹量的增益点（远程兑换时的分流条件）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, event)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> RemoteAmmoExchange
+class IfNotOccupyingGainPoint : public BT::SyncActionNode {
+ public:
+  IfNotOccupyingGainPoint(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         IfCanInstantResurrect
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断是否可兑换立即复活且金币足够（数额来自裁判 info1）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, info1, coins)  write: (none)
+// Side Effects: none
+// See:          tree/resource/root.xml -> InstantRevive
+class IfCanInstantResurrect : public BT::SyncActionNode {
+ public:
+  IfCanInstantResurrect(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
 // Node:         RequestFreeRevive
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求确认免费复活。
@@ -66,16 +122,44 @@ class RequestFreeRevive : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
-// Node:         RequestHpExchange
+// Node:         RequestRemoteHpExchange
 // Category:     Action (synchronous, writes one Intent)
-// Purpose:      请求兑换血量。
-// Inputs:       amount_key: string (端口, 配置 key, 兑换数量)
+// Purpose:      请求远程兑换血量（需脱战，规则只允许远程兑换）。
+// Inputs:       times_key: string (端口, 配置 key, 兑换次数)
 // Blackboard:   read: context(config)  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（hp = 数量）。
-// See:          tree/resource/root.xml -> HpExchange
-class RequestHpExchange : public BT::SyncActionNode {
+// Side Effects: 写入一条 kResourceRequest 意图（remote_hp = 次数）。
+// See:          tree/resource/root.xml -> RemoteHpExchange
+class RequestRemoteHpExchange : public BT::SyncActionNode {
  public:
-  RequestHpExchange(const std::string& name, const BT::NodeConfig& config);
+  RequestRemoteHpExchange(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         RequestRemoteAmmoExchange
+// Category:     Action (synchronous, writes one Intent)
+// Purpose:      请求远程兑换发弹量（脱战且不在增益点时）。
+// Inputs:       times_key: string (端口, 配置 key, 兑换次数)
+// Blackboard:   read: context(config)  write: context.intents
+// Side Effects: 写入一条 kResourceRequest 意图（remote_ammo = 次数）。
+// See:          tree/resource/root.xml -> RemoteAmmoExchange
+class RequestRemoteAmmoExchange : public BT::SyncActionNode {
+ public:
+  RequestRemoteAmmoExchange(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
+// Node:         RequestInstantRevive
+// Category:     Action (synchronous, writes one Intent)
+// Purpose:      请求兑换立即复活。
+// Inputs:       -
+// Blackboard:   read: context  write: context.intents
+// Side Effects: 写入一条 kResourceRequest 意图（instant_revive = true）。
+// See:          tree/resource/root.xml -> InstantRevive
+class RequestInstantRevive : public BT::SyncActionNode {
+ public:
+  RequestInstantRevive(const std::string& name, const BT::NodeConfig& config);
   static BT::PortsList providedPorts();
   BT::NodeStatus tick() override;
 };

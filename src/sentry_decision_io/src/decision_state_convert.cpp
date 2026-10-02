@@ -18,6 +18,7 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
     msg.cmd_vel.angular.z = output.cmd_vel->wz;
   }
   msg.tactical_mode = static_cast<std::uint8_t>(output.tactical_mode);
+  msg.stance = static_cast<std::uint8_t>(output.stance);
   msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
   msg.resource_hp = static_cast<std::uint16_t>(output.resource.hp);
   msg.resource_revive = output.resource.revive;
@@ -46,6 +47,7 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
   msg.vy = world.self.vy;
   msg.wz = world.self.wz;
   msg.self_valid = world.self.valid;
+  msg.stance = static_cast<std::uint8_t>(referee.info2.stance);
 
   msg.nav_valid = world.nav.valid;
   if (world.nav.current_goal.has_value()) {

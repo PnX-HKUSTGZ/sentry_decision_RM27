@@ -2,15 +2,20 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "behaviortree_cpp/bt_factory.h"
 #include "sentry_decision_bringup/config_loader.hpp"
+#include "sentry_decision_bringup/runtime_config.hpp"
 #include "sentry_decision_bringup/tree_loader.hpp"
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
@@ -21,9 +26,14 @@
 #include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_io/decision_state_publisher.hpp"
+#include "sentry_decision_io/intervention_convert.hpp"
+#include "sentry_decision_io/intervention_server.hpp"
 #include "sentry_decision_io/ros_io_node.hpp"
+#include "sentry_decision_msgs/msg/intervention_event.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
 #include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
+#include "sentry_decision_viz/groot2_bridge.hpp"
+#include "sentry_decision_viz/tree_state_publisher.hpp"
 
 #ifndef DEFAULT_TREE_PATH
 #define DEFAULT_TREE_PATH "tree/root.xml"
@@ -47,6 +57,7 @@ struct Options {
   std::string tree = DEFAULT_TREE_PATH;
   std::string config = DEFAULT_CONFIG_PATH;
   std::string plugin;
+  int groot2_port = 0;  // >0 时开启 Groot2 桥
 };
 
 Options parse_options(int argc, char** argv) {
@@ -70,6 +81,8 @@ Options parse_options(int argc, char** argv) {
       options.config = next("--config");
     } else if (arg == "--plugin") {
       options.plugin = next("--plugin");
+    } else if (arg == "--groot2-port") {
+      options.groot2_port = std::stoi(next("--groot2-port"));
     } else {
       std::cerr << "未知参数: " << arg << "\n";
       std::exit(2);
@@ -77,6 +90,10 @@ Options parse_options(int argc, char** argv) {
   }
   if (!(options.rate_hz > 0.0) || options.rate_hz > 1000.0) {
     std::cerr << "参数 --rate 必须在 (0, 1000] Hz 之间\n";
+    std::exit(2);
+  }
+  if (options.groot2_port < 0 || options.groot2_port > 65535) {
+    std::cerr << "参数 --groot2-port 必须在 [0, 65535] 之间（0 表示关闭）\n";
     std::exit(2);
   }
   return options;
@@ -93,6 +110,49 @@ std::string join_errors(const std::vector<std::string>& errors) {
   return text;
 }
 
+const char* action_kind_name(sentry_decision::DecisionActionKind kind) {
+  using K = sentry_decision::DecisionActionKind;
+  switch (kind) {
+    case K::kAmmoExchange:
+      return "ammo_exchange";
+    case K::kHpExchange:
+      return "hp_exchange";
+    case K::kFreeResurrect:
+      return "free_resurrect";
+    case K::kInstantResurrect:
+      return "instant_resurrect";
+    case K::kRemoteAmmoExchange:
+      return "remote_ammo_exchange";
+    case K::kRemoteHpExchange:
+      return "remote_hp_exchange";
+    case K::kNone:
+    default:
+      return "none";
+  }
+}
+
+// 最小 JSON 字符串转义，用于把回执 detail 放进 list_state。
+std::string json_escape(const std::string& text) {
+  std::string out;
+  out.reserve(text.size());
+  for (char c : text) {
+    switch (c) {
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      default:
+        out += c;
+    }
+  }
+  return out;
+}
+
 // 真实 IO 决策节点：RosIoNode 提供信念输入与执行端，本节点跑行为树与仲裁，
 // 并把仲裁结果下发（导航目标 / 速度 / 决策动作）与发布决策状态。
 class DecisionNode : public rclcpp::Node {
@@ -101,7 +161,9 @@ class DecisionNode : public rclcpp::Node {
                const sentry_decision::PolicyConfig* config)
       : Node("sentry_decision"),
         io_(std::move(io)),
-        world_model_(*io_, *io_, *io_),
+        world_model_(*io_, *io_, *io_, sentry_decision_bringup::timeouts_from_config(config)),
+        dispatcher_(sentry_decision_bringup::action_config_from_config(config)),
+        safety_(sentry_decision_bringup::safety_limits_from_config(config)),
         state_publisher_(*this),
         max_ticks_(options.ticks) {
     context_.config = config;
@@ -109,6 +171,17 @@ class DecisionNode : public rclcpp::Node {
       policy_ = sentry_decision::RuleBasedStrategicPolicy::from_config(*config);
     }
     build_tree(options.tree, options.plugin);
+    tree_publisher_.emplace(*this, *tree_);
+    if (options.groot2_port > 0) {
+      groot2_ = std::make_unique<sentry_decision_viz::Groot2Bridge>(
+          *tree_, static_cast<unsigned>(options.groot2_port));
+      SD_LOG_ACT("viz", "Groot2 已监听端口 %d", options.groot2_port);
+    }
+    intervention_event_pub_ = create_publisher<sentry_decision_msgs::msg::InterventionEvent>(
+        "/decision/intervention", 100);
+    intervention_server_ = std::make_shared<sentry_decision_io::InterventionServer>(
+        *this, "/decision/manual_override", "/decision/debug",
+        [this]() { return state_snapshot_json(); });
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -135,13 +208,20 @@ class DecisionNode : public rclcpp::Node {
 
   void tick() {
     const TimePoint now = SteadyClock::now();
-    context_.world = intervention_.apply_world(world_model_.snapshot(now));
+    // 先应用上一节拍到本拍的干预命令，再取世界快照，使世界覆盖当拍生效。
+    apply_intervention_commands(now);
+    // 覆盖前的原始世界另存一份，供 list_state 对照，避免覆盖值掩盖真实变化。
+    last_raw_world_ = world_model_.snapshot(now);
+    context_.world = intervention_.apply_world(last_raw_world_);
     context_.clear_intents();
     context_.apply_strategy(policy_.decide(context_.world));
-    for (const auto& intent : intervention_.active_intents(now)) {
-      context_.emit(intent);
-    }
+    sentry_decision::apply_intervention_intents(intervention_, now, &context_);
+    // 清空上一拍的树状态缓存，让快照只反映本拍执行的节点。
+    tree_publisher_->begin_tick();
+    const TimePoint tick_begin = SteadyClock::now();
     tree_->tickOnce();
+    const double tick_ms =
+        std::chrono::duration<double, std::milli>(SteadyClock::now() - tick_begin).count();
 
     // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。
     arbiter_.clear_source(sentry_decision::SourceId::kStrategic);
@@ -174,11 +254,216 @@ class DecisionNode : public rclcpp::Node {
     }
     apply_actions(safe_result, now);
 
-    state_publisher_.publish(context_.world, safe_result, tick_count_++);
+    const std::uint32_t tick = tick_count_++;
+    state_publisher_.publish(context_.world, safe_result, tick);
+    tree_publisher_->publish(tick, tick_ms);
+    update_intervention_state(safe_result, now);
 
     if (max_ticks_ > 0 && tick_count_ >= static_cast<std::uint32_t>(max_ticks_)) {
       rclcpp::shutdown();
     }
+  }
+
+  // 干预：tick 边界应用本拍入队的 ROS service / action 命令。
+  void apply_intervention_commands(TimePoint now) {
+    if (!intervention_server_) {
+      return;
+    }
+    for (const auto& command : intervention_server_->take_commands()) {
+      apply_intervention_command(command, now);
+    }
+  }
+
+  void apply_intervention_command(const sentry_decision_io::InterventionCommand& command,
+                                  TimePoint now) {
+    using CommandKind = sentry_decision_io::InterventionCommand::Kind;
+    // 应用逻辑与回放共用 core::apply_intervention，这里只负责事件与日志。
+    sentry_decision::apply_intervention(&intervention_, command, now);
+    sentry_decision_msgs::msg::InterventionEvent event;
+    event.header.stamp = this->now();
+    event.reason = command.reason;
+    switch (command.kind) {
+      case CommandKind::kIntent:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_INTENT;
+        event.field = static_cast<std::uint8_t>(command.intent.field);
+        event.value = command.value_text;
+        event.lease_sec = static_cast<double>(command.intent.lease.count()) / 1000.0;
+        SD_LOG_ACT("intervention", "注入意图 field=%d reason=%s",
+                   static_cast<int>(command.intent.field), command.reason.c_str());
+        break;
+      case CommandKind::kClearIntent:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_INTENT;
+        event.field = static_cast<std::uint8_t>(command.intent_field);
+        SD_LOG_ACT("intervention", "清除意图 field=%d", static_cast<int>(command.intent_field));
+        break;
+      case CommandKind::kWorldOverride:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_WORLD_OVERRIDE;
+        event.field = static_cast<std::uint8_t>(command.world_field);
+        event.value = std::to_string(command.world_value);
+        SD_LOG_ACT("intervention", "世界覆盖 field=%s value=%.2f",
+                   sentry_decision_io::world_field_name(command.world_field), command.world_value);
+        break;
+      case CommandKind::kClearWorld:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_WORLD;
+        event.field = static_cast<std::uint8_t>(command.world_field);
+        break;
+      case CommandKind::kModuleSwitch:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_MODULE_SWITCH;
+        event.module = command.module;
+        event.enabled = command.enabled;
+        SD_LOG_ACT("intervention", "模块 %s %s", command.module.c_str(),
+                   command.enabled ? "启用" : "禁用");
+        break;
+      case CommandKind::kClearAll:
+        event.kind = sentry_decision_msgs::msg::InterventionEvent::KIND_CLEAR_ALL;
+        SD_LOG_ACT("intervention", "清空全部干预");
+        break;
+    }
+    intervention_event_pub_->publish(event);
+  }
+
+  // 反馈 + 状态快照：向活跃 action goal 报告逐字段胜负，并刷新 list_state 的 JSON。
+  void update_intervention_state(const sentry_decision::ArbiterResult& result, TimePoint now) {
+    const std::vector<sentry_decision::Intent> active = intervention_.active_intents(now);
+    std::vector<sentry_decision::IntentField> active_fields;
+    active_fields.reserve(active.size());
+    for (const auto& intent : active) {
+      active_fields.push_back(intent.field);
+    }
+    if (intervention_server_) {
+      intervention_server_->update_status(result.winners, active_fields);
+    }
+
+    std::ostringstream out;
+    out << "{\"world\":{\"self_hp\":" << context_.world.referee.self_hp
+        << ",\"self_ammo\":" << context_.world.referee.self_ammo
+        << ",\"coins\":" << context_.world.referee.coins
+        << ",\"game_status\":" << static_cast<int>(context_.world.referee.game_status)
+        << ",\"game_time_remaining\":" << context_.world.referee.game_time_remaining
+        << ",\"our_outpost_hp\":" << context_.world.referee.our_outpost_hp
+        << ",\"enemy_outpost_hp\":" << context_.world.referee.enemy_outpost_hp
+        << ",\"enemy_base_hp\":" << context_.world.referee.enemy_base_hp
+        << ",\"referee_valid\":" << (context_.world.referee.valid ? "true" : "false") << "}";
+    // 覆盖前的真实世界：面板据此识别「世界覆盖把某字段钉住」。
+    out << ",\"raw_world\":{\"self_hp\":" << last_raw_world_.referee.self_hp
+        << ",\"self_ammo\":" << last_raw_world_.referee.self_ammo
+        << ",\"coins\":" << last_raw_world_.referee.coins
+        << ",\"game_status\":" << static_cast<int>(last_raw_world_.referee.game_status)
+        << ",\"game_time_remaining\":" << last_raw_world_.referee.game_time_remaining
+        << ",\"base_hp\":" << last_raw_world_.referee.base_hp
+        << ",\"our_outpost_hp\":" << last_raw_world_.referee.our_outpost_hp
+        << ",\"enemy_outpost_hp\":" << last_raw_world_.referee.enemy_outpost_hp
+        << ",\"enemy_base_hp\":" << last_raw_world_.referee.enemy_base_hp
+        << ",\"referee_valid\":" << (last_raw_world_.referee.valid ? "true" : "false") << "}";
+    out << ",\"intents\":[";
+    bool first = true;
+    for (const auto& intent : active) {
+      if (!first) {
+        out << ",";
+      }
+      first = false;
+      const auto winner = result.winners.find(intent.field);
+      const bool effective = winner != result.winners.end() && winner->second == intent.source;
+      out << "{\"field\":\"" << sentry_decision_io::intent_field_name(intent.field)
+          << "\",\"source\":\"" << sentry_decision_io::source_name(intent.source)
+          << "\",\"priority\":" << static_cast<int>(intent.priority)
+          << ",\"effective\":" << (effective ? "true" : "false") << "}";
+    }
+    out << "],\"winners\":{";
+    first = true;
+    for (const auto& entry : result.winners) {
+      if (!first) {
+        out << ",";
+      }
+      first = false;
+      out << "\"" << sentry_decision_io::intent_field_name(entry.first) << "\":\""
+          << sentry_decision_io::source_name(entry.second) << "\"";
+    }
+    out << "},\"modules\":{";
+    first = true;
+    // 内置模块未显式设置时默认启用；始终列出，面板才能看出初始状态。
+    static const char* const kBuiltinModules[] = {"nav", "strategic", "resource", "recovery"};
+    for (const char* name : kBuiltinModules) {
+      if (!first) {
+        out << ",";
+      }
+      first = false;
+      out << "\"" << name << "\":" << (intervention_.module_enabled(name) ? "true" : "false");
+    }
+    // 兜底：service 里设置过的自定义模块也一并展示。
+    for (const auto& entry : intervention_.module_switches()) {
+      bool known = false;
+      for (const char* name : kBuiltinModules) {
+        if (entry.first == name) {
+          known = true;
+          break;
+        }
+      }
+      if (known) {
+        continue;
+      }
+      out << ",\"" << entry.first << "\":" << (entry.second ? "true" : "false");
+    }
+    out << "},\"world_overrides\":{";
+    first = true;
+    for (const auto& entry : intervention_.world_overrides()) {
+      if (!first) {
+        out << ",";
+      }
+      first = false;
+      out << "\"" << sentry_decision_io::world_field_name(entry.first) << "\":" << entry.second;
+    }
+    out << "},\"points\":[";
+    first = true;
+    if (context_.config != nullptr) {
+      for (const auto& entry : context_.config->points) {
+        if (!first) {
+          out << ",";
+        }
+        first = false;
+        // 可选半径：仅供面板把增益点画成虚线环（0 = 普通点）。
+        double radius = 0.0;
+        const auto radius_it = context_.config->point_radius.find(entry.first);
+        if (radius_it != context_.config->point_radius.end()) {
+          radius = radius_it->second;
+        }
+        out << "{\"name\":\"" << json_escape(entry.first) << "\",\"x\":" << entry.second.x
+            << ",\"y\":" << entry.second.y << ",\"r\":" << radius << "}";
+      }
+    }
+    out << "],\"resource\":{\"ammo\":" << result.output.resource.ammo
+        << ",\"hp\":" << result.output.resource.hp
+        << ",\"remote_ammo\":" << result.output.resource.remote_ammo
+        << ",\"remote_hp\":" << result.output.resource.remote_hp
+        << ",\"revive\":" << (result.output.resource.revive ? "true" : "false")
+        << ",\"instant_revive\":" << (result.output.resource.instant_revive ? "true" : "false")
+        << "}";
+    out << ",\"last_action\":";
+    if (has_last_action_) {
+      out << "{\"kind\":\"" << action_kind_name(last_action_.kind)
+          << "\",\"value\":" << last_action_.value << ",\"request_id\":" << last_action_.request_id
+          << "}";
+    } else {
+      out << "null";
+    }
+    out << ",\"last_ack\":";
+    if (has_last_ack_) {
+      out << "{\"request_id\":" << last_ack_.request_id
+          << ",\"accepted\":" << (last_ack_.accepted ? "true" : "false")
+          << ",\"code\":" << static_cast<int>(last_ack_.code) << ",\"detail\":\""
+          << json_escape(last_ack_.detail) << "\"}";
+    } else {
+      out << "null";
+    }
+    out << ",\"safety_emergency\":" << (safety_emergency_ ? "true" : "false") << "}";
+
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    state_json_ = out.str();
+  }
+
+  std::string state_snapshot_json() const {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return state_json_;
   }
 
   // 导航目标跟随：用 NavGoalTracker 做边沿 / 取消契约，避免每 tick 重发。
@@ -192,19 +477,47 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
+  // 人工资源请求按「每次注入算一次」：重新注入时清掉派发器的 one-shot 记忆，
+  // 否则同值请求会被去重，面板重复点「兑换发弹 / 血量」不会再次下发。
+  void rearm_intervention_resource() {
+    for (const auto& intent : context_.intents) {
+      if (intent.field != sentry_decision::IntentField::kResourceRequest ||
+          intent.source != sentry_decision::SourceId::kIntervention) {
+        continue;
+      }
+      if (has_resource_intent_stamp_ && intent.stamp == last_resource_intent_stamp_) {
+        return;
+      }
+      last_resource_intent_stamp_ = intent.stamp;
+      has_resource_intent_stamp_ = true;
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kAmmoExchange);
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kHpExchange);
+      dispatcher_.rearm(sentry_decision::DecisionActionKind::kFreeResurrect);
+      return;
+    }
+  }
+
   // 资源请求 -> 决策动作：交给派发器处理 one-shot / polled 与 ack，再下发。
   void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
     for (const auto& ack : io_->take_acks()) {
       dispatcher_.on_ack(ack);
+      last_ack_ = ack;
+      has_last_ack_ = true;
     }
+    rearm_intervention_resource();
     sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
     for (const auto& action : dispatcher_.poll(now)) {
       io_->send_action(action);
+      last_action_ = action;
+      has_last_action_ = true;
+      SD_LOG_ACT("action", "下发 %s value=%d request_id=%u", action_kind_name(action.kind),
+                 action.value, action.request_id);
     }
   }
 
   std::shared_ptr<sentry_decision_io::RosIoNode> io_;
   sentry_decision::DecisionContext context_;
+  sentry_decision::WorldState last_raw_world_;
   sentry_decision::WorldModel world_model_;
   sentry_decision::IntentArbiter arbiter_;
   sentry_decision::ActionDispatcher dispatcher_;
@@ -215,9 +528,22 @@ class DecisionNode : public rclcpp::Node {
   BT::BehaviorTreeFactory factory_;
   std::unique_ptr<BT::Tree> tree_;
   sentry_decision::NavGoalTracker nav_tracker_;
+  bool has_last_action_ = false;
+  sentry_decision::DecisionAction last_action_;
+  sentry_decision::TimePoint last_resource_intent_stamp_{};
+  bool has_resource_intent_stamp_ = false;
+  bool has_last_ack_ = false;
+  sentry_decision::ActionAck last_ack_;
   bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
+  std::optional<sentry_decision_viz::TreeStatePublisher> tree_publisher_;
+  std::unique_ptr<sentry_decision_viz::Groot2Bridge> groot2_;
+  std::shared_ptr<sentry_decision_io::InterventionServer> intervention_server_;
+  rclcpp::Publisher<sentry_decision_msgs::msg::InterventionEvent>::SharedPtr
+      intervention_event_pub_;
+  mutable std::mutex state_mutex_;
+  std::string state_json_ = "{}";
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

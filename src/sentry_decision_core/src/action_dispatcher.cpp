@@ -110,31 +110,43 @@ std::vector<DecisionAction> ActionDispatcher::poll(TimePoint now) {
   return outgoing;
 }
 
+void ActionDispatcher::rearm(DecisionActionKind kind) {
+  slots_.erase(kind);
+}
+
 void ActionDispatcher::reset() {
   slots_.clear();
   next_request_id_ = 1;
 }
 
 void submit_resource_requests(ActionDispatcher& dispatcher, const ResourceRequest& resource) {
+  const auto submit = [&dispatcher](DecisionActionKind kind, int value) {
+    DecisionAction action;
+    action.kind = kind;
+    action.mode = ActionMode::kOneShot;
+    action.value = value;
+    dispatcher.submit(action);
+  };
+  // 本地兑换发弹量（需占领增益点）。
   if (resource.ammo > 0) {
-    DecisionAction action;
-    action.kind = DecisionActionKind::kAmmoExchange;
-    action.mode = ActionMode::kOneShot;
-    action.value = resource.ammo;
-    dispatcher.submit(action);
+    submit(DecisionActionKind::kAmmoExchange, resource.ammo);
   }
+  // 本地兑换血量：仅人工注入 / 调试会用到（规则只允许远程兑换）。
   if (resource.hp > 0) {
-    DecisionAction action;
-    action.kind = DecisionActionKind::kHpExchange;
-    action.mode = ActionMode::kOneShot;
-    action.value = resource.hp;
-    dispatcher.submit(action);
+    submit(DecisionActionKind::kHpExchange, resource.hp);
   }
-  if (resource.revive) {
-    DecisionAction action;
-    action.kind = DecisionActionKind::kFreeResurrect;
-    action.mode = ActionMode::kOneShot;
-    dispatcher.submit(action);
+  // 远程兑换（需脱战，裁判侧确认后 6s 生效）。
+  if (resource.remote_ammo > 0) {
+    submit(DecisionActionKind::kRemoteAmmoExchange, resource.remote_ammo);
+  }
+  if (resource.remote_hp > 0) {
+    submit(DecisionActionKind::kRemoteHpExchange, resource.remote_hp);
+  }
+  // 复活：立即复活优先于确认免费复活。
+  if (resource.instant_revive) {
+    submit(DecisionActionKind::kInstantResurrect, 0);
+  } else if (resource.revive) {
+    submit(DecisionActionKind::kFreeResurrect, 0);
   }
 }
 
