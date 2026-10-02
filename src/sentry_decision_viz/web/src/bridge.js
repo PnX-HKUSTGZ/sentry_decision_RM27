@@ -103,11 +103,24 @@ export function createBridge(options) {
     });
   }
 
+  // 对仿真世界施加具名效果（扣血 / 扣弹 / 摧毁）；步长由 sim.yaml 的 effects 决定。
+  function applyEffect(effect) {
+    return new Promise(function (resolve, reject) {
+      const client = new ROSLIB.Service({
+        ros: ros,
+        name: '/sentry_sim/apply_effect',
+        serviceType: 'sentry_decision_msgs/srv/ApplyEffect',
+      });
+      client.callService({ effect: effect }, resolve, reject);
+    });
+  }
+
   return {
     connect: connect,
     callDebug: callDebug,
     setGameStage: setGameStage,
     setGamePause: setGamePause,
     setSimWorld: setSimWorld,
+    applyEffect: applyEffect,
   };
 }

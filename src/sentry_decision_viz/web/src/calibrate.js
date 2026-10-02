@@ -30,7 +30,7 @@ const rowRefs = [];
 
 function clone(list) {
   return list.map(function (p) {
-    return { name: p.name, x: p.x, y: p.y, yaw: p.yaw || 0 };
+    return { name: p.name, x: p.x, y: p.y, yaw: p.yaw || 0, r: p.r || 0 };
   });
 }
 
@@ -124,6 +124,19 @@ function drawGrid() {
 function drawMarker(point, index) {
   const p = worldToImage(point, FIELD, SCALE);
   const active = index === selected;
+  // 与前方面板一致：半径 > 0 的点画青色虚线环。
+  const radius = Number(point.r) || 0;
+  if (radius > 0) {
+    const rPx = (radius / FIELD.resolution) * SCALE;
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#4ad0c4';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, rPx, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.beginPath();
   ctx.arc(p.x, p.y, active ? 7 : 5, 0, Math.PI * 2);
   ctx.fillStyle = colorFor(index);
@@ -148,7 +161,7 @@ function renderList() {
   listEl.textContent = '';
   const head = document.createElement('div');
   head.className = 'pt-row pt-head';
-  ['', '名称', 'x', 'y', 'yaw', ''].forEach(function (text) {
+  ['', '名称', 'x', 'y', 'yaw', 'r', ''].forEach(function (text) {
     const cell = document.createElement('span');
     cell.textContent = text;
     head.appendChild(cell);
@@ -172,14 +185,19 @@ function renderList() {
     row.appendChild(name);
 
     const inputs = {};
-    ['x', 'y', 'yaw'].forEach(function (axis) {
+    ['x', 'y', 'yaw', 'r'].forEach(function (axis) {
       const input = document.createElement('input');
       input.className = 'pt-num';
-      input.title = axis;
+      input.title = axis === 'r' ? '半径（米，0 = 普通点）' : axis;
       input.value = num(point[axis]);
       input.addEventListener('input', function () {
-        const value = Number(input.value);
+        let value = Number(input.value);
         if (isFinite(value)) {
+          // 半径负数按 0 处理，避免导出被地图加载器拒绝。
+          if (axis === 'r' && value < 0) {
+            value = 0;
+            input.value = num(0);
+          }
           point[axis] = value;
           draw();
           savePoints();
@@ -210,7 +228,7 @@ function renderList() {
     row.appendChild(del);
 
     listEl.appendChild(row);
-    rowRefs.push({ row: row, name: name, x: inputs.x, y: inputs.y, yaw: inputs.yaw });
+    rowRefs.push({ row: row, name: name, x: inputs.x, y: inputs.y, yaw: inputs.yaw, r: inputs.r });
   });
   countEl.textContent = '共 ' + points.length + ' 个';
 }
@@ -237,6 +255,7 @@ function syncInputs() {
   ref.x.value = num(points[selected].x);
   ref.y.value = num(points[selected].y);
   ref.yaw.value = num(points[selected].yaw);
+  ref.r.value = num(points[selected].r);
 }
 
 function canvasPos(event) {
@@ -310,7 +329,11 @@ function exportYaml() {
   ];
   points.forEach(function (p) {
     const pad = ' '.repeat(width - p.name.length + 1);
-    lines.push('  ' + p.name + ':' + pad + '[' + num(p.x) + ', ' + num(p.y) + ', ' + num(p.yaw) + ']');
+    const parts = [num(p.x), num(p.y), num(p.yaw)];
+    if (Number(p.r) > 0) {
+      parts.push(num(p.r));
+    }
+    lines.push('  ' + p.name + ':' + pad + '[' + parts.join(', ') + ']');
   });
   return lines.join('\n') + '\n';
 }
@@ -343,6 +366,7 @@ function parseYaml(text) {
       x: parts[0],
       y: parts[1],
       yaw: parts.length > 2 && isFinite(parts[2]) ? parts[2] : 0,
+      r: parts.length > 3 && isFinite(parts[3]) ? parts[3] : 0,
     });
   });
   return found;
@@ -355,11 +379,18 @@ document.getElementById('add').addEventListener('click', function () {
     x: Math.round(((extent.minX + extent.maxX) / 2) * 100) / 100,
     y: Math.round(((extent.minY + extent.maxY) / 2) * 100) / 100,
     yaw: 0,
+    r: 0,
   });
   selected = points.length - 1;
   renderList();
   draw();
   savePoints();
+});
+
+// 手动重绘：重新按模型生成列表并刷新左侧地图预览。
+document.getElementById('refresh').addEventListener('click', function () {
+  renderList();
+  draw();
 });
 
 document.getElementById('reset').addEventListener('click', function () {

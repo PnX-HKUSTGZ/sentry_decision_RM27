@@ -1,4 +1,5 @@
-// 人工干预控件：比赛阶段 / 暂停 -> 裁判仿真 service；其余走 /decision/debug (service)。
+// 仿真与干预控件：比赛阶段 / 暂停 / 仿真世界 / 仿真效果 -> 裁判仿真 service；
+// 决策侧人工意图走 /decision/debug (service)。
 // 不使用 ManualOverride action：vendored roslib 1.4.1 的 ActionClient 是 ROS 1 actionlib
 // 命名（/<action>/goal 等），无法对接 ROS 2 action 的 /_action/* 服务，故面板统一走 service。
 export function createControlsPanel(el, bridge, onLog, onRefresh) {
@@ -28,15 +29,34 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
   });
   html += '</select><input id="sim-world-value" value="400" size="4"/>';
   html += '<button id="btn-sim-world-set">设置</button></div>';
-  // 决策覆盖：只钉住决策节点的视图，不改仿真世界（用于离线/回放测试）。
-  html += '<div class="row"><span title="只覆盖决策视图，不改仿真世界">决策覆盖</span><select id="world-field">';
-  worldFields.forEach(function (item) {
-    html += '<option value="' + item[0] + '">' + item[1] + '</option>';
+  // 仿真效果：对真实世界施加具名效果（步长来自 config/sim.yaml 的 effects），
+  // 用于模拟赛场事件（自身受击 / 发弹、双方前哨与基地被击毁）。
+  const effectRows = [
+    ['自身', [
+      ['self_damage', '扣血'],
+      ['self_ammo_consume', '扣弹'],
+      ['self_death', '死亡'],
+    ]],
+    ['我方', [
+      ['our_outpost_damage', '前哨站扣血'],
+      ['our_outpost_destroy', '前哨站摧毁'],
+      ['our_base_damage', '基地扣血'],
+    ]],
+    ['敌方', [
+      ['enemy_outpost_damage', '前哨站扣血'],
+      ['enemy_outpost_destroy', '前哨站摧毁'],
+      ['enemy_base_damage', '基地扣血'],
+    ]],
+  ];
+  effectRows.forEach(function (group) {
+    html += '<div class="row"><span>' + group[0] + '</span>';
+    group[1].forEach(function (item) {
+      html +=
+        '<button class="sim-effect" data-effect="' + item[0] + '">' + item[1] + '</button>';
+    });
+    html += '</div>';
   });
-  html += '</select><input id="world-value" value="400" size="4"/>';
-  html += '<button id="btn-world-set">设置</button><button id="btn-world-clear">清除</button></div>';
-  html += '<div class="row"><button id="btn-retreat">强制撤退</button>';
-  html += '<button id="btn-clear">清空干预</button></div>';
+  html += '<div class="row"><button id="btn-clear">清空干预</button></div>';
   html += '<div class="row"><span>模式</span><select id="mode-select">';
   modeOptions.forEach(function (name) {
     html += '<option value="' + name + '">' + name + '</option>';
@@ -122,7 +142,7 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
   });
 
   document.getElementById('btn-reset').addEventListener('click', function () {
-    // 重置裁判仿真的世界与位姿，并清空决策节点的干预 / 世界覆盖 / 模块开关。
+    // 重置裁判仿真的世界与位姿，并清空决策节点的干预 / 模块开关。
     bridge
       .setGameStage(0)
       .then(function () {
@@ -161,23 +181,25 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       });
   });
 
-  document.getElementById('btn-world-set').addEventListener('click', function () {
-    const field = document.getElementById('world-field').value;
-    const value = parseFloat(document.getElementById('world-value').value);
-    if (!isFinite(value)) {
-      onLog('决策覆盖: 取值无效');
-      return;
-    }
-    debug('set_world', '{field: ' + field + ', value: ' + value + '}', '决策覆盖 ' + field);
-  });
-  document.getElementById('btn-world-clear').addEventListener('click', function () {
-    const field = document.getElementById('world-field').value;
-    debug('clear_world', '{field: ' + field + '}', '清除决策覆盖 ' + field);
+  // 仿真效果按钮统一走 /sentry_sim/apply_effect；步长在 sim.yaml，前端只传效果名。
+  Array.prototype.forEach.call(document.querySelectorAll('.sim-effect'), function (button) {
+    button.addEventListener('click', function () {
+      const effect = button.getAttribute('data-effect');
+      bridge
+        .applyEffect(effect)
+        .then(function (response) {
+          const ok = response && response.success;
+          onLog(
+            '仿真效果 ' + effect + ': ' +
+              (ok ? 'ok (' + response.message + ')' : '失败 ' + (response && response.message))
+          );
+        })
+        .catch(function (error) {
+          onLog('仿真效果失败: ' + error + '（裁判仿真节点未运行？）');
+        });
+    });
   });
 
-  document.getElementById('btn-retreat').addEventListener('click', function () {
-    setIntent('tactical_mode', 'retreat', '强制撤退');
-  });
   document.getElementById('btn-clear').addEventListener('click', function () {
     debug('clear_all', '', '清空干预');
   });
@@ -204,9 +226,9 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     setIntent('resource_request', '{ammo: 0, hp: 50, revive: false}', '兑换血量');
   });
 
-  // 未进入「比赛中」时禁用人工意图按钮与输入（世界覆盖 / 清空干预仍可用）。
+  // 未进入「比赛中」时禁用人工意图按钮与输入（仿真世界 / 仿真效果 / 清空干预仍可用）。
   const intentElements = [
-    'btn-retreat', 'btn-mode', 'mode-select', 'lease',
+    'btn-mode', 'mode-select', 'lease',
     'btn-point', 'point-x', 'point-y',
     'btn-ammo', 'btn-hp',
   ].map(function (id) {

@@ -41,14 +41,6 @@ export function imageToWorld(px, py, field, scale) {
   };
 }
 
-// 供标定工具与面板共用的默认点位；与 config/maps/RMUC26.yaml 保持一致。
-export const DEFAULT_POINTS = [
-  { name: 'home', x: -11.47, y: -4.4, yaw: 0.0 },
-  { name: 'healing', x: -12.36, y: -3.47, yaw: 0.0 },
-  { name: 'patrol_a', x: -3.82, y: 5.93, yaw: 0.0 },
-  { name: 'patrol_b', x: -6.17, y: -1.44, yaw: 0.0 },
-  { name: 'enemy_outpost', x: 1.39, y: 6.08, yaw: 0.0 },
-  { name: 'our_outpost', x: -2.55, y: -2.21, yaw: 0.0 },
-  { name: 'central_highland', x: -1.56, y: 3.97, yaw: 0.0 },
-  { name: 'fort', x: -7.37, y: 1.6, yaw: 0.0 },
-];
+// 标定工具的初始点位：空序列，避免把示例点误当成真实地图配置。
+// 真实点位由用户手动维护在 config/maps/*.yaml，并通过「添加点 / 从文本导入」建立。
+export const DEFAULT_POINTS = [];

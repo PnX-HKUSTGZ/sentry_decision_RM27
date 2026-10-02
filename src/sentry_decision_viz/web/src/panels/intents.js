@@ -1,6 +1,6 @@
 import { escapeHtml } from '../format.js';
 
-// 模块与干预面板：渲染 list_state 的模块开关、活跃 Intent、胜者与世界覆盖。
+// 模块与干预面板：渲染 list_state 的模块开关、活跃 Intent、胜者与资源请求。
 export function createIntentsPanel(el) {
   return {
     render: function (state) {
@@ -46,18 +46,6 @@ export function createIntentsPanel(el) {
               return escapeHtml(field) + '→' + escapeHtml(winners[field]);
             })
             .join('<br/>')
-        : '-';
-      html += '</td></tr>';
-
-      html += '<tr><th>决策覆盖</th><td>';
-      const overrides = snapshot.world_overrides || {};
-      const overrideNames = Object.keys(overrides);
-      html += overrideNames.length
-        ? overrideNames
-            .map(function (field) {
-              return escapeHtml(field) + '=' + overrides[field];
-            })
-            .join(' ')
         : '-';
       html += '</td></tr>';
 

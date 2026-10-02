@@ -74,6 +74,10 @@ const model = battlefieldModel(world, decision);
 check(model.self.x === 1 && model.self.y === 2, 'battlefield self');
 check(model.goal.x === 3 && model.goal.y === 4, 'battlefield goal');
 check(model.enemy.x === -1 && model.enemy.y === -2, 'battlefield enemy');
+const zoned = battlefieldModel(world, decision, {
+  points: [{ name: 'sim_home', x: -11.79, y: -3.66, r: 1.5 }],
+});
+check(zoned.points.length === 1 && zoned.points[0].r === 1.5, 'battlefield zone radius passthrough');
 
 const extent = { minX: -8, maxX: 8, minY: -8, maxY: 8 };
 const center = worldToCanvas({ x: 0, y: 0 }, extent, 320, 320);

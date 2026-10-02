@@ -36,6 +36,19 @@ function label(ctx, text, x, y, align) {
   ctx.restore();
 }
 
+// 增益区标签：青色字 + 深色描边，与普通命名点区分。
+function zoneLabel(ctx, text, x, y) {
+  ctx.save();
+  ctx.font = '13px monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(11, 16, 21, 0.9)';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = '#4ad0c4';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 function drawField(ctx, extent, width, height) {
   ctx.fillStyle = '#0b1015';
   ctx.fillRect(0, 0, width, height);
@@ -92,8 +105,40 @@ function drawSelf(ctx, self, extent, width, height) {
   ctx.restore();
 }
 
+// 命名点：半径为 0 的是普通点（橙色实心 + 右侧标签）；
+// 半径 > 0 的是增益区（青色虚线环 + 环下方居中标签）。
 function drawNamedPoints(ctx, points, extent, width, height) {
+  const sx = width / (extent.maxX - extent.minX);
+  const sy = height / (extent.maxY - extent.minY);
+
+  // 先画增益区环（底层），再画普通点，避免环压住其它元素。
   points.forEach(function (point) {
+    const radius = Number(point.r) || 0;
+    if (radius <= 0) {
+      return;
+    }
+    const p = worldToCanvas(point, extent, width, height);
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#4ad0c4';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, radius * sx, radius * sy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#4ad0c4';
+    ctx.fill();
+    // 环可能贴近画布下沿，标签上移避免被裁掉。
+    zoneLabel(ctx, point.name, p.x, Math.min(p.y + radius * sy + 14, height - 4));
+  });
+
+  points.forEach(function (point) {
+    const radius = Number(point.r) || 0;
+    if (radius > 0) {
+      return;
+    }
     const p = worldToCanvas(point, extent, width, height);
     ctx.beginPath();
     ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
