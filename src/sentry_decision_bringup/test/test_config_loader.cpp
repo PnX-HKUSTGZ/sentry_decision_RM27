@@ -18,9 +18,10 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // 半径与地图标定绑定，这里只校验「增益点有正半径、普通点为 0」，不绑定具体数值。
   const auto sim = result.config.point_radius.find("sim_home");
-  if (sim == result.config.point_radius.end() || sim->second != 1.5) {
-    std::printf("FAIL: sim_home 半径应为 1.5\n");
+  if (sim == result.config.point_radius.end() || !(sim->second > 0.0)) {
+    std::printf("FAIL: sim_home 半径应为正\n");
     return 1;
   }
   const auto home = result.config.point_radius.find("home");
