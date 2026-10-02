@@ -9,94 +9,49 @@
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-10-02
+
+> P3：可视化与本地仿真——让决策可观测、可干预、可回放，并完成规则对齐与参数外置。
+
 ### Added
 
-- 地图点支持可选第 4 位区域半径：补给区 / 基地 / 前哨 / 堡垒增益点的半径从 `sim.yaml` 移入 `config/maps/*.yaml`，`sim.yaml` 只保留「角色 → 点名」引用；半径缺失或非正启动即失败
-- `list_state.points` 增加 `r`（半径）；网页面板把 `r > 0` 的点画成青色虚线环，标签置于环下方居中
-- 场地标定工具初始点位改为空序列（不再展示默认点位）；列表可直接编辑 `r`（区域半径）并按半径画出青色虚线环，导出写出第 4 位；新增「刷新预览」按钮
-- 地图与仿真心智模型：补给区圆心改用 `sim_home`（删除 `healing`），新增 `sim_base` 表示基地增益点；基地 / 前哨站增益点仅用于本地兑换、不触发回血
-- 补给区回血新增进入延时 `supply.enter_delay_s`（默认 1s）：进入补给区后先等检测建立再开始回血
-- `referee_sim_node` 新增 `srv/ApplyEffect`（`/sentry_sim/apply_effect`）：按 `config/sim.yaml` 的 `effects` 对仿真世界施加具名效果（自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁）
-- 网页面板新增三行「仿真效果」按钮（自身 / 我方 / 敌方），替代键盘快捷键方案
-- 参数全部外置到 YAML：`config/sim.yaml`（`max_hp` / 导航速度 / 比赛阶段时长 `match` / 补给区 / 增益点）、`config/policies/<POLICY>.yaml`（新增 `safety` 速度限幅与急停开关、`timeouts` 输入有效期、`action` one-shot 超时）；`referee_sim_node` / `MatchStageController` / `WorldModel` / `SafetySupervisor` / `ActionDispatcher` / 离线 `decision_main` 的 `NavSimulator` 源码不再硬编码可调默认值；`referee_sim_node` 新增 `--sim-config`（缺省回退相对路径），`-p` 仍逐项覆盖；增益点圆心按其引用的 `map:` 命名点解析
-- 面板布局调整：左列（60%）战场俯视图在上 + 行为树，右列（40%）世界状态 / 模块 / 人工干预；「场地标定」链接改为新标签页打开；俯视图用 RMUC 底图并叠加命名点（来自 `list_state`，重置后重新读取）
-- 地图切换为 RMUC：`map_profile` 更名 `RMUL26`→`RMUC26`，`config/maps/RMUC26.yaml` 使用网页面板「场地标定」标定出的点位；主面板战场俯视图改用导航仓库 `RMUC2026.pgm` 底图（583×300、0.05 m/px、origin [-14.6, -5.86]），战场 extent 由 `web/src/field.js` 统一；仿真增益点默认坐标、`demo.yaml` `start_pose`、`full_match.yaml` / `intervention.yaml` 断言与 `match_smoke` / `sim_effects_smoke` 同步到新坐标
-- 网页面板新增**场地标定工具** `calibrate.html`（面板页链接「场地标定」）：在 RMUC 底图（来自导航仓库 `RMUC2026.pgm`，0.05 m/px、origin [-14.6, -5.86]）上点选 / 拖拽命名点，右侧列表编辑 x/y/yaw，支持添加 / 删除 / 导入 / 导出 `config/maps` 用的 YAML 片段，点位存 `localStorage`；`web/src/field.js` 提供世界坐标↔像素换算（`format.test.mjs` 覆盖），`viz_smoke` 校验新静态资源
-- 新增 `docs/BELIEF.md`（信念层字段字典）：逐字段记录 `WorldState` / `RefereeState` / `SelfState` / `NavState` / `EnemyState` 的含义、单位、来源裁判消息字段、解码位置与有效性判定；并明确 `EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行）
-- 资源请求打通远程 / 立即复活：`ResourceRequest` 新增 `remote_ammo` / `remote_hp` / `instant_revive`，`submit_resource_requests` 映射到 `kRemoteAmmoExchange` / `kRemoteHpExchange` / `kInstantResurrect`；资源树改为「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」，血量按规则只走脱战远程兑换，新增 `IfCanInstantResurrect` / `IfNotOccupyingGainPoint` / `RequestInstantRevive` / `RequestRemoteHpExchange` / `RequestRemoteAmmoExchange`；新增配置 `resource.remote_hp_times` / `resource.remote_ammo_times` / `resource.remote_ammo_min_coins`；面板「资源请求」与 `list_state` 展示远程次数与复活方式
-- 补给区免费发弹量（规则 5.3.2）：`SimWorld` 记录已领取的「整分钟」，`claim_supply_ammo()` 在机器人进入补给区时一次性发放累积的 100 发/分钟（金币不足也能补弹），`referee_sim_node` 每秒结算并记 ACT 日志
-- 远程兑换 6 秒延迟（规则 5.3.2 / 5.2.1）：`execute_action` 确认时立即扣金币并入队 `pending_remote`，`step_pending_remote()` 6 秒后才加发弹量 / 血量；远程兑换血量在 6 秒内战亡则作废且金币不返还
-- 增益点区域默认启用（补给 1.5m，基地 / 前哨 / 堡垒 1.0m），地图新增 `our_outpost` 命名点；`test_sim_world` 覆盖补给发弹与远程延迟，`test_resource` 覆盖 RMUL 补给位
-- 裁判仿真把决策下发的姿态回写到 `sentry_info_2` 的 bit 12-13，使网页面板「当前姿态」随决策变化（真实系统由 MCU 反馈，这里为仿真近似）
-- `MatchStageController` 新增结算阶段：比赛 420s 耗尽后自动从「比赛中」进入「比赛结算」（`game_status=5`），决策转入 idle；这是“完整比赛”闭环的最后一段
-- 裁判动作前置校验（`sim::execute_action`）：`DecisionActuatorSim` 在改世界前按动作类型校验前置条件，非法动作回 `accepted=false` + 原因，`referee_sim_node` 打印「裁判拒绝动作 ...」；`referee_sim_node` 每拍按机器人位姿判定增益点占领并写回 `event_code`，`SimWorld` 支持 `disengaged` / `can_free_resurrect` / `can_instant_resurrect` / `instant_resurrect_cost` 语义字段与可配置增益点区域
-- 决策树资源节点 `IfOccupyingGainPoint` / `IfDisengaged`，兑换发弹量 / 血量前先判前置条件
-- 新增 `tools/referee_guard_smoke_test.sh` 端到端校验裁判拒绝非法动作并打印日志
-- 新增 `tools/demo.sh` 一键启动脚本：一条命令拉起「网页面板 + 裁判仿真 + 决策节点」，三个进程 stdout 加 `[viz]` / `[sim]` / `[decision]` 前缀并各写日志，`Ctrl+C` 整组停止；宿主运行时自动起容器并映射 8080/9090，`docker/entrypoint.sh` 增加 `demo` 子命令
-- 新增 `docs/ARCHITECTURE.md` §14「可视化与仿真」，以及 `docs/ROADMAP.md` P3 子阶段规划：树状态 `TreeStatus`、Groot2 可选接入、干预 action / service、裁判仿真与场景脚本、干预回放、rosbridge 网页面板。
-- `sentry_decision_msgs`：新增 `TreeNodeStatus` / `TreeStatus` 消息
-- 新增 `sentry_decision_viz` 包：`TreeStatePublisher`（发布 `/decision/tree_status`）与可选 Groot2 桥
-- `decision_node`：新增 `--groot2-port` 参数（默认关闭）
-- `sentry_decision_sim`：新增 `referee_sim_node`（发布 `/sentry/*` 与 odom、提供 `NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与 ROS 无关的场景解析 / 消息级仿真世界
-- 新增场景脚本 `scenario/full_match.yaml` 与端到端测试 `tools/scenario_smoke_test.sh`（巡逻→进攻→撤退→复活）
-- `sentry_decision_msgs`：新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`
-- `sentry_decision_core`：`IntentArbiter` 结果新增逐字段 `winners`；`InterventionController` 支持按字段清除与只读视图
-- `sentry_decision_io`：新增 `InterventionServer`（干预 action / service 服务端与线程安全命令队列）及取值解析
-- `decision_node`：接入干预服务端，发布 `/decision/intervention`，`list_state` 返回 JSON 快照
-- 新增 `tools/intervention_smoke_test.sh` 干预冒烟测试
-- `sentry_decision_core`：`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData` 增干预通道，`ReplaySource::interventions()` 按时刻返回
-- `sentry_decision_io`：`load_replay_data` 读取 `/decision/intervention` 并重建干预命令
-- `sentry_decision_viz`：新增 rosbridge 网页面板（`web/` 静态页、vendored `roslib.min.js`、`viz.launch.py`），含树状态 / 战场 / 世界状态 / 模块与干预面板及干预按钮
-- 新增 `web/test/format.test.mjs`（node 纯逻辑单测，CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`
-- `docker/Dockerfile`：新增 `ros-jazzy-rosbridge-suite`
-- `sentry_decision_core`：`referee_protocol` 按 2026 规则 / 通信协议补齐——`EventCode` 覆盖场地事件全字段，`SentryInfo2` 增加姿态，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState` 增 `info3`
-- `sentry_decision_io`：`sentry_bridge` 解码 `sentry_info_3`
-- `sentry_decision_sim`：`SimWorld` 支持 `sentry_info_3` 场景字段
-- 场景脚本支持 `add_intent` / `disable`（经 `/decision/debug` 注入干预），新增 `scenario/intervention.yaml` 与 `scenario_intervention` 测试
-- `sentry_decision_bringup`：新增 `replay_main` 离线回放入口；`load_replay_data` 支持新格式 `/sentry/*` 上行
-- 新增 `tools/replay_smoke_test.sh`（录制一局场景 bag 后离线重放并校验干预复现）
-- 恢复并接入姿态（stance，2026 规则 §5.6.4）：`SentryStance`、`IntentField::kStance`、`DecisionOutput.stance`、`decode_stance`；战略层按战术模式映射（进攻→进攻姿态、防守→防御姿态、其余→移动姿态），并贯通仲裁、消息与网页面板
-- `referee_sim_node` 新增 `--hold`（场景时间轴跑完后不退出）与 `scenario/demo.yaml` 面板演示世界
-- `sentry_decision_msgs`：新增 `SetGameStage.srv`；`referee_sim_node` 提供 `/sentry_sim/set_game_stage` 与 ROS 无关的 `MatchStageController`（准备 / 15s自检 / 5s倒计时 / 比赛中：只可前进、按秒自动推进、可重置），网页面板新增比赛状态栏与阶段按钮
-- 新增 `tools/match_smoke_test.sh` 比赛阶段冒烟测试
-- `TacticalMode::kIdle`：战略层只在 `game_status=4`（比赛中）执行任务，准备 / 自检 / 倒计时 / 结算输出 idle；`MissionPatrol` 以 `IfTacticalMode` 门控，待机时不下发任务目标
-- 准备阶段改为 3 分钟倒计时；网页面板状态栏用 `MM:SS` 白色显示
-- 网页面板新增世界覆盖表单（自身 / 基地 / 前哨血量、金币、发弹量、剩余时间，走 `/decision/debug set_world`）与「暂停 / 继续」；后者新增 `SetGamePause.srv` 与 `/sentry_sim/set_game_pause`，暂停时冻结计时与机器人运动；场景新增可选 `start_pose`
-- `list_state` 增加 `resource` / `last_action` / `last_ack`，网页面板显示资源请求、最近下发的决策动作与执行回执；`decision_node` 下发动作时记 `[action]` ACT 日志
-- `sentry_decision_msgs`：新增 `SetWorld.srv`；`referee_sim_node` 提供 `/sentry_sim/set_world`，可直接修改仿真世界的真实数值（面板「仿真世界」行）
-- `sentry_decision_sim`：`SimWorld` 新增兑换（`exchange_ammo` / `exchange_hp`，规则 5.3.1 金币结算）与补给区回血（`supply_heal`，近似规则 5.2.1）纯逻辑及 `test_sim_world`；`DecisionActuatorSim` 可在回执时把兑换结算进世界
-- `referee_sim_node` 新增补给区回血（可配置圆心 / 半径 / 回血比例 / `max_hp`），并新增 `tools/sim_effects_smoke_test.sh` 端到端校验兑换与回血
-- `list_state` 增加 `raw_world`（覆盖前的真实世界），网页面板在决策覆盖生效时显示「原始 血/弹/金」
+- **观测与面板**：新增 `sentry_decision_viz`（`TreeStatus` / `TreeNodeStatus`、`/decision/tree_status`、
+  可选 Groot2）与 rosbridge 网页面板（行为树 / 战场俯视图 / 世界状态 / 模块与 Intent / 干预）；
+  新增场地标定工具 `calibrate.html`。
+- **本地仿真**：`referee_sim_node` 发布 `/sentry/*` 五条上行与 odom，提供 `NavigateToPose` action server
+  与 `DecisionCommand`→`DecisionAck` 闭环；ROS 无关的 `SimWorld` 与场景脚本（`set_world` / `expect` /
+  `add_intent` / `disable`）；`tools/demo.sh` 一键起「面板 + 仿真 + 决策」。
+- **比赛与场地**：`MatchStageController`（准备 / 自检 / 倒计时 / 比赛中 / 结算，只可前进、可重置、可暂停）；
+  按位姿判定增益点占领；补给区回血（10%/s，4 分钟后 25%，进入延时 1s）、免费发弹量（每分钟 100 发、可累积）、
+  远程兑换 6 秒延迟与战亡作废；裁判侧动作前置校验。
+- **规则对齐**：`referee_protocol` 按 2026 规则 / 通信协议补齐（`EventCode` 全字段、`SentryInfo3`）；
+  恢复姿态 `SentryStance` 并贯通战略层 / 仲裁 / 消息 / 面板；资源请求打通远程发弹 / 远程血量 / 立即复活。
+- **干预与回放**：`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；`InterventionServer`
+  在 tick 边界应用干预；`IntentArbiter` 逐字段 `winners`；`/decision/intervention` 录制；`replay_main` 离线回放。
+- **仿真效果**：新增 `srv/ApplyEffect`（`/sentry_sim/apply_effect`），按 `config/sim.yaml` 的 `effects`
+  对真实世界施加具名效果（自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁），面板三行按钮。
+- **增益区**：地图点支持可选第 4 位区域半径（补给 / 基地 / 前哨 / 堡垒），`list_state.points` 带 `r`；
+  面板把 `r > 0` 的点画成青色虚线环；标定工具可直接编辑 x/y/yaw/r 并预览。
+- **工具与测试**：`scenario_smoke` / `intervention_smoke` / `replay_smoke` / `match_smoke` /
+  `sim_effects_smoke` / `referee_guard_smoke` / `viz_smoke` 端到端测试，`web/test/format.test.mjs` 纯逻辑单测。
+
+### Changed
+
+- 可调参数全部外置到 YAML：`config/sim.yaml` 与 `config/policies/<POLICY>.yaml`（安全限幅 / 输入超时 /
+  动作超时 / 回血 / 效果），源码不再硬编码默认值，缺失即启动失败。
+- 地图切换为 RMUC：`map_profile` `RMUL26`→`RMUC26`，主面板改用 `RMUC2026.pgm` 底图；补给区 / 增益点
+  圆心与半径来自地图命名点（`sim_home` / `sim_base` / `sim_our_outpost` / `sim_fort`）。
+- 面板收敛仿真干预：保留「仿真世界」并新增「仿真效果」；移除「决策覆盖」与与模式下拉等价的「强制撤退」。
+- 场地标定工具初始为空序列，避免把示例点位误当成实际配置。
 
 ### Fixed
 
-- 移除网页面板「决策覆盖」控件与世界状态面板的「原始 血/弹/金」对照（只保留仿真世界干预）；移除与模式下拉等价的「强制撤退」按钮
-- `RosIoNode` 此前只要收到 5 条裁判消息中任意一条就把 `RefereeState` 判为有效，只到单条时缺失字段会以默认 0 参与决策（可能被误判为「0 血 / 阵亡」）；现要求 `GameInfo` + `SentryInfoOnline` 都出现过才判有效（`referee_sources_ready` + 单测）
-- `EventCode::local_ammo_exchange_point()` 漏判 RMUL 的补给区占用位（bit 2）：RMUL 场次下补给区占领只置 bit 2，此前会被误判为「不在增益点」而拒绝本地兑换，现已同时判 bit 0 / bit 2
-- `referee_sim_node` 的 `NavigateToPose` action server 收到新目标时未中止旧 goal，旧 handle 会悬挂、永远收不到结果；现在接受新目标前先 `abort` 旧目标
-- 网页面板「位姿」行对缺失的 `pos_x` / `pos_y` 直接调用 `toFixed` 会抛异常，已做空值保护
-- 本地兑换发弹量此前不判「是否真的占领增益点」，仿真裁判也照单全收，导致机器人可在场上任意位置按 10 金币/10 发买弹；现在决策端 `IfOccupyingGainPoint` 门控 + 裁判端 `execute_action` 校验（未占领增益点直接拒绝并打印日志），兑换血量同样要求脱战。此前「低弹量切补给又瞬间折返」的现象随之前置条件补齐而消失（无需再按金币抑制补给）
-- `referee_sim_node` 的数值参数改为自动声明 `-p` 覆盖、按实际类型读取：此前 `declare_parameter<double>` 遇到 CLI 的整数写法（如 `-p max_hp:=400`）会在启动时抛类型异常；同时移除并未真正改变比赛时长的 `match_duration_s` 参数，已进行时间改由 `MatchStageController` 的时长推导
-- 人工资源请求改为「每次注入算一次」：重新注入时清除派发器的 one-shot 记忆，此前面板重复点「兑换发弹 / 血量」因同值去重而不再下发
-- 行为树面板整树 IDLE：BT.CPP 4.10 会在完成的 tick 末尾 `resetStatus()`，改为 `TreeStatusRecorder` 订阅状态变化并缓存可见状态，已完成节点保留 SUCCESS / FAILURE
-- `list_state` 始终列出内置四模块（`nav` / `strategic` / `resource` / `recovery`）的生效开关，未显式设置时按默认启用展示
-- 网页面板日志区加高；战场俯视图补充示意场地底图（边界 / 中线 / 中圈 / 半场标注）
-- 战场俯视图 `mode` 文字移至右上角，避免与左上角半场标注重叠
-- 人工接管战术模式（面板「切换模式」/「强制撤退」）现在会在本拍覆盖 `context.strategy.mode`，真正切换任务树分支
-- `scenario/demo.yaml` 补充 `enemy_base_hp`，避免面板把敌方基地血量显示成 0（并非读数错误）
-- 树状态缓存改为每拍 `clear()`：未执行的分支不再残留上一拍的 SUCCESS（此前待机阶段会误显示攻击分支 SUCCESS）
-- 网页面板人工干预改走 `/decision/debug set_intent` service：vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名，无法对接 ROS 2 `ManualOverride` action，导致「切换模式 / 前往点位」等按钮无效果
-- 战场半场标注改为沿 x 轴左右划分（己方 x<0 / 敌方 x>0）；此前按 y 轴上下标注，导致 `home`(-5,3) 看起来在敌方半场
-- 「重置」现在同时恢复机器人初始位姿并清除导航目标（此前只重置世界与阶段，位置不动）
-- 未进入「比赛中」时网页面板的人工意图按钮自动禁用，避免准备阶段误发干预
-- 战场半场用底色区分（己方 x<0 冷色 / 敌方 x>0 暖色）并加竖向中线，消除此前“上下分”的误读
-- 面板 `lease` 默认改为 0（持续到「清空干预」/「重置」），并修正 `lease()` 把 0 误当 5 的问题；有限 lease 按系统时间计算，暂停期间仍会到期
-- 面板 `lease` 从「模式」行移到独立「持续」行并加说明
-- 「兑换发弹 / 血量」经 `resource_request` 意图转成一次性 `DecisionCommand`，不改变任务树；现在可在面板「资源请求 / 最近动作 / 动作回执」与 `[action]` 日志中确认是否尝试 / 成功
-- 裁判仿真的 `DecisionActuatorSim` 此前只回 `DecisionAck` 而不结算：面板「兑换发弹」显示已确认但仿真世界发弹量不变；现在按金币扣减并增加发弹量 / 血量，金币不足回 `accepted=false`
-- 裁判仿真此前完全没有补给区回血逻辑；现在机器人处于补给区且比赛中时按上限血量比例回血
-- 面板「世界」控件只覆盖决策视图、不改仿真世界，容易被误读为「改了世界却没生效」；现在拆成「仿真世界」（真实生效）与「决策覆盖」（仅视图），并显示覆盖前的原始值
-
+- 裁判来源就绪判定：`GameInfo` + `SentryInfoOnline` 同时到达才判 `RefereeState` 有效。
+- `EventCode::local_ammo_exchange_point()` 补判 RMUL 补给位（bit 2）。
+- `NavigateToPose` 收到新目标先 `abort` 旧 goal，避免悬挂。
+- 本地兑换发弹量门控「占领增益点」、兑换血量要求脱战，裁判侧同步校验并打印拒绝原因。
+- 树状态缓存避免整树 IDLE / 残留上一拍 SUCCESS。
+- `-p` 数值参数兼容整数 / 浮点写法；面板「重置」恢复初始位姿并清空导航目标。
 ## [v0.2.0]
 
 ### Added

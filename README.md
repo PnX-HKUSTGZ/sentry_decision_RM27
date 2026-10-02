@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-> :white_check_mark: P1 完成（本地范围）：裁判解码、WorldState 契约、DecisionState 发布、确定性回放与 rosbag 读取、本地仿真（dummy 裁判 + 伪导航）。真实 io 接线待通信包确定；下一步 P2 策略迁移。
+> :white_check_mark: v0.3.0（本地范围）：P1 信念与回放 / P2 策略迁移 / P3 可视化与本地仿真均已完成——裁判解码、行为树决策闭环、网页面板与裁判仿真、场景脚本与离线回放、参数全部外置到 YAML。真实 IO 串口字节层（P2.3b）待 MCU 协议；下一步 v0.3.1：移除决策内部人工干预、简化仲裁优先级。
 
 ## 运行环境
 
@@ -19,7 +19,7 @@
 | 目标运行环境 | Ubuntu 24.04 + ROS 2 Jazzy |
 | 开发宿主 | 若宿主非 Ubuntu 24.04（例如 26.04），通过 Docker 开发与测试 |
 | 构建系统 | colcon + ament_cmake |
-| 关键依赖 | BehaviorTree.CPP v4、rclcpp |
+| 关键依赖 | BehaviorTree.CPP v4、rclcpp、rosbridge（网页面板） |
 
 ## 快速开始
 
@@ -54,7 +54,8 @@ sentry_decision_RM27/
     ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState
     ├── sentry_interfaces/       # 与 auto-aim 的上位机接口契约
     ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
-    ├── sentry_decision_sim/     # 本地仿真：dummy 裁判系统与伪导航
+    ├── sentry_decision_sim/     # 本地仿真：裁判仿真、场景脚本与伪导航
+    ├── sentry_decision_viz/     # 观测：树状态、Groot2 桥与 rosbridge 网页面板
     ├── sentry_decision_nodes/   # 行为树节点插件
     └── sentry_decision_bringup/ # main、launch（行为树见根目录 tree/）
 ```
