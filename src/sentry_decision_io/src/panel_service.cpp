@@ -103,7 +103,15 @@ bool parse_panel_command(const std::string& command, const std::string& args,
       *error = "mode 需要名称（patrol / idle 等）或 0-7";
       return false;
     }
-    const double lease_sec = node["lease_sec"] ? node["lease_sec"].as<double>() : 0.0;
+    double lease_sec = 0.0;
+    if (node["lease_sec"]) {
+      try {
+        lease_sec = node["lease_sec"].as<double>();
+      } catch (const std::exception&) {
+        *error = "lease_sec 必须是数值";
+        return false;
+      }
+    }
     if (!(lease_sec >= 0.0)) {
       *error = "lease_sec 必须 >= 0";
       return false;

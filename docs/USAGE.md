@@ -261,7 +261,8 @@ ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
 ```
 
 覆盖在战略层求值之后、任务树读取之前写入 `context.strategy.mode`，因此会改变任务树分支；
-安全层优先级不受影响。语义见 `docs/ARCHITECTURE.md` §10 / §14.3。
+仅在比赛中（`game_status=4`）生效，未进入比赛中时忽略；安全层优先级不受影响。
+语义见 `docs/ARCHITECTURE.md` §10 / §14.3。
 仿真世界干预见 `docs/ARCHITECTURE.md` §14.4；冒烟测试：`tools/sim_effects_smoke_test.sh`。
 
 ### 4.8 网页面板（rosbridge）

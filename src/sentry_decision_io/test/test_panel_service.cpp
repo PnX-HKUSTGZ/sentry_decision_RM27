@@ -66,6 +66,8 @@ void test_rejects_bad_args() {
   CHECK(!parse_panel_command("set_tactical_mode", "{}", &commands, &list_state, &error));
   CHECK(!parse_panel_command("set_tactical_mode", "{mode: retreat, lease_sec: -1}", &commands,
                              &list_state, &error));
+  CHECK(!parse_panel_command("set_tactical_mode", "{mode: retreat, lease_sec: nope}", &commands,
+                             &list_state, &error));
   CHECK(!parse_panel_command("set_intent", "{}", &commands, &list_state, &error));
   CHECK(!error.empty());
 }

@@ -135,7 +135,7 @@
 
 **保留**
 - 仿真世界干预：`/sentry_sim/set_world`、`/sentry_sim/apply_effect`（在仿真节点，不进入决策）。
-- 战术层覆盖：设置期望 `TacticalMode`（在行为树之外，直接改写 `context.strategy.mode` / `stance`）。
+- 战术层覆盖：设置期望 `TacticalMode`（在行为树之外，仅改写 `context.strategy.mode`）。
 
 **移除**
 - 决策视图世界覆盖（`WorldField` / `InterventionController::apply_world`）。

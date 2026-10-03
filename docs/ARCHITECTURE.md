@@ -392,7 +392,7 @@ BT tick 频率默认 20 Hz（可配置），单线程固定频率执行。
 
 - **仿真世界干预**：`/sentry_sim/set_world`、`/sentry_sim/apply_effect`，由仿真节点直接改真实世界（§14.4）。
 - **战术层覆盖**：`TacticalOverride` 覆盖本拍战术模式，由两个决策入口在 `apply_strategy` 之后应用，
-  任务树照常读取 `context.strategy`，安全层优先级不受影响。
+  仅在比赛中（`game_status == kRunning`）生效；任务树照常读取 `context.strategy`，安全层优先级不受影响。
 
 `TacticalOverride` 是 core 中的纯逻辑组件，接口 `set(mode, lease, now)` / `clear()` / `mode(now)`：
 lease 过期自动失效，`clear()` 立即撤销。

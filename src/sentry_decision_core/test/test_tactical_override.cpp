@@ -50,6 +50,7 @@ void test_clear() {
 
 void test_apply_overrides_context() {
   DecisionContext context;
+  context.world.referee.game_status = GameStatus::kRunning;
   StrategicDecision decision;
   decision.mode = TacticalMode::kPatrol;
   decision.stance = SentryStance::kMove;
@@ -75,12 +76,29 @@ void test_apply_overrides_context() {
 
 void test_apply_without_override_keeps_strategy() {
   DecisionContext context;
+  context.world.referee.game_status = GameStatus::kRunning;
   StrategicDecision decision;
   decision.mode = TacticalMode::kDefend;
   context.apply_strategy(decision);
   TacticalOverride override_value;
   apply_tactical_override(override_value, TimePoint{}, &context);
   CHECK(context.strategy.mode == TacticalMode::kDefend);
+}
+
+void test_apply_ignored_when_not_running() {
+  DecisionContext context;
+  StrategicDecision decision;
+  decision.mode = TacticalMode::kPatrol;
+  context.apply_strategy(decision);
+  TacticalOverride override_value;
+  override_value.set(TacticalMode::kAttack, Duration{0}, TimePoint{});
+  apply_tactical_override(override_value, TimePoint{}, &context);
+  CHECK(context.strategy.mode == TacticalMode::kPatrol);
+  for (const auto& intent : context.intents) {
+    if (intent.field == IntentField::kTacticalMode) {
+      CHECK(std::get<TacticalMode>(intent.value) == TacticalMode::kPatrol);
+    }
+  }
 }
 
 }  // namespace
@@ -91,6 +109,7 @@ int main() {
   test_clear();
   test_apply_overrides_context();
   test_apply_without_override_keeps_strategy();
+  test_apply_ignored_when_not_running();
   if (g_failures == 0) {
     std::printf("all tactical override tests passed\n");
     return 0;

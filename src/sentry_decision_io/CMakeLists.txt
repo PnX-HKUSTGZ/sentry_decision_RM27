@@ -70,6 +70,11 @@ if(BUILD_TESTING)
   add_executable(test_panel_service test/test_panel_service.cpp)
   target_link_libraries(test_panel_service ${PROJECT_NAME} yaml-cpp::yaml-cpp)
   add_test(NAME test_panel_service COMMAND test_panel_service)
+
+  add_executable(test_panel_service_server test/test_panel_service_server.cpp)
+  target_link_libraries(test_panel_service_server ${PROJECT_NAME})
+  ament_target_dependencies(test_panel_service_server rclcpp)
+  add_test(NAME test_panel_service_server COMMAND test_panel_service_server)
 endif()
 
 ament_package()
