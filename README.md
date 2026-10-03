@@ -36,6 +36,9 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentr
 # 运行最小决策闭环
 docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27:jazzy \
   -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup decision_main"
+
+# 一键运行本地仿真（裁判 + 行为树 + 网页面板）
+tools/demo.sh
 ```
 
 完整命令与参数见 [docs/USAGE.md](docs/USAGE.md)。

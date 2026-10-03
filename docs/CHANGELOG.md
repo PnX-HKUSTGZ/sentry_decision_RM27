@@ -9,6 +9,29 @@
 
 ## [Unreleased]
 
+## [v0.3.1] - 2026-10-03
+
+> v0.3.1：收敛调试入口——移除决策内部人工干预，只保留仿真世界与战术层覆盖，降低架构复杂度与 sim2real 风险。
+
+### Added
+
+- core 新增 `TacticalOverride`（`set` / `clear` / `mode`）与 `apply_tactical_override`：在战略层求值之后改写
+  `context.strategy.mode` 并同步 `kTacticalMode` 意图；网页面板提供设置 / 清除与 lease。
+
+### Changed
+
+- `DebugCommand.srv` 收敛为 `list_state` / `set_tactical_mode` / `clear_tactical_mode`；`list_state` 精简为
+  命名点 / 资源请求 / 最近动作 / 动作回执 / 急停 / 战术层覆盖。
+- 仲裁优先级带收敛为 `safety > recovery > tactical > default`，字段所有权去掉 intervention 覆盖者。
+- 网页面板控制面板移除 Intent / 模块 / 世界覆盖，保留仿真世界 / 仿真效果与战术层覆盖。
+
+### Removed
+
+- 决策内部人工干预：意图注入、世界状态覆盖、运行期模块开关，以及 `InterventionController`、
+  `Priority::kIntervention` / `SourceId::kIntervention`。
+- `ManualOverride.action`、`InterventionEvent.msg`、`/decision/intervention` 录制与回放通道、`InterventionServer`。
+- 场景脚本 `add_intent` / `disable` 与 `scenario/intervention.yaml`；`intervention_smoke` 端到端测试。
+
 ## [v0.3.0] - 2026-10-02
 
 > P3：可视化与本地仿真——让决策可观测、可干预、可回放，并完成规则对齐与参数外置。

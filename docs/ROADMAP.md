@@ -127,7 +127,9 @@
 
 设计细节见 `docs/ARCHITECTURE.md` §14。
 
-## v0.3.1 移除决策内部人工干预（计划）
+## v0.3.1 移除决策内部人工干预（已完成，本地）
+
+**状态**：已完成（本地）；容器 8 包 47 测试 0 失败，宿主 core / sim 测试与格式检查通过。
 
 **目标**：调试与测试只通过「仿真世界」和「战术层」干预，去掉对决策内部的人工干预，降低架构复杂度与 sim2real 风险。
 
@@ -207,3 +209,8 @@
   - 已完成（本地）：裁判协议补全——依据 `refs/26UC`（2026 规则 V2.2.0 + 通信协议 V2.0.0）扩展 `referee_protocol`：场地事件全字段、姿态与 `SentryInfo3` 剩余时长。
   - 已完成（本地）：P3.5 文档与验收——场景支持 `add_intent` / `disable`（`scenario_intervention`）；新增 `replay_main` 离线回放（读新格式 `/sentry/*` bag，原时刻重放干预）与 `replay_smoke`（录制 intervention 场景再回放，3 条干预复现）；ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步。
   - P2 主体已完成（本地范围）。
+- **v0.3.1 完成（本地）**：移除决策内部人工干预——删除 `InterventionController` / `Priority::kIntervention` /
+  `SourceId::kIntervention` / `ManualOverride.action` / `InterventionEvent.msg` / `/decision/intervention` 记录与回放通道，
+  新增 core `TacticalOverride`（`set` / `clear` / `mode`，`apply_strategy` 之后改写 `context.strategy.mode` 并同步意图）；
+  `DebugCommand.srv` 收敛为 `list_state` / `set_tactical_mode` / `clear_tactical_mode`；场景去掉 `add_intent` / `disable`；
+  面板控制面板移除 Intent / 模块 / 世界覆盖，保留仿真世界 / 仿真效果与战术层覆盖；ARCHITECTURE / USAGE / CHANGELOG 同步。

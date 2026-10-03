@@ -19,8 +19,11 @@
 
 ### 进行中
 
-- 进行中（v0.3.1）：移除决策内部人工干预（意图注入 / 世界覆盖 / 运行期模块开关），
-  保留仿真世界干预与战术层覆盖。完整计划见 `docs/ROADMAP.md`「v0.3.1 移除决策内部人工干预（计划）」；先改文档再改代码。
+- 已完成（v0.3.1，本地）：移除决策内部人工干预（意图注入 / 世界覆盖 / 运行期模块开关），
+  保留仿真世界干预与战术层覆盖。实现：core 新增 `TacticalOverride` + `apply_tactical_override`，删除 `intervention.*` /
+  `kIntervention` / `/decision/intervention` / `ManualOverride.action` / `InterventionEvent.msg`；io 用 `PanelService`（`list_state` /
+  `set_tactical_mode` / `clear_tactical_mode`）替换 `InterventionServer`；场景去掉 `add_intent` / `disable`；面板收敛。
+  容器 8 包 47 测试 0 失败。计划见 `docs/ROADMAP.md`「v0.3.1」。
 - 文档先行（已完成）：`ARCHITECTURE.md` 按目标态改写（§9 优先级 / §10 战术层覆盖 / §14.3 面板服务 / §14 面板与场景）；
   `USAGE.md` 同步收敛（§4.7 战术层覆盖、移除干预按钮与 `/decision/intervention`）；`BELIEF.md` 去掉决策侧世界覆盖。
 - 已锁定（本地）：补给区圆心并入 `sim_home`（删除 `healing`），新增 `sim_base` 表示基地增益点；基地 / 前哨站增益点仅兑换、不回血；
