@@ -5,7 +5,6 @@
 #include <iterator>
 #include <vector>
 
-#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/io.hpp"
 
 namespace sentry_decision {
@@ -23,8 +22,6 @@ struct ReplayData {
   std::vector<ReplayRecord<RefereeState>> referee;
   std::vector<ReplayRecord<SelfState>> odometry;
   std::vector<ReplayRecord<NavState>> navigation;
-  // 人工干预按原时刻录制，回放时在对应 tick 注入，保证「含干预的回放」可复现。
-  std::vector<ReplayRecord<InterventionCommand>> interventions;
 };
 
 // 确定性输入回放：以固定步长推进仿真时间，返回当前时刻生效的记录。
@@ -55,9 +52,6 @@ class ReplaySource : public RefereeSource, public OdometrySource, public Navigat
   bool referee(RefereeState* out) const override;
   bool odometry(SelfState* out) const override;
   NavState status() const override;
-
-  // 取出自上次调用以来到点（at <= now）的干预命令，游标随之推进；每条只返回一次。
-  std::vector<InterventionCommand> interventions();
 
   // 回放期间不真实下发，只计数，便于回归时断言决策产出的目标序列。
   void send_goal(const Point2D& goal) override;
@@ -91,7 +85,6 @@ class ReplaySource : public RefereeSource, public OdometrySource, public Navigat
   Duration now_{};
   Duration last_at_{};
   std::uint32_t tick_ = 0;
-  std::size_t intervention_cursor_ = 0;
   std::uint32_t sent_goals_ = 0;
   std::uint32_t canceled_goals_ = 0;
   Point2D last_goal_{};

@@ -13,7 +13,6 @@
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
-#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/nav_goal_tracker.hpp"
 #include "sentry_decision_core/replay.hpp"
@@ -89,8 +88,8 @@ Options parse_options(int argc, char** argv) {
 
 }  // namespace
 
-// 离线回放入口：读 rosbag2 -> core 确定性重放 -> 行为树 / 仲裁 / 安全，
-// 并在原时刻注入录到的人工干预。不启动 ROS 节点，只做数据处理。
+// 离线回放入口：读 rosbag2 -> core 确定性重放 -> 行为树 / 仲裁 / 安全。
+// 只回放世界输入，不启动 ROS 节点。
 int main(int argc, char** argv) {
   const Options options = parse_options(argc, argv);
 
@@ -124,9 +123,8 @@ int main(int argc, char** argv) {
     std::cerr << "bag 中没有裁判数据（检查上行话题是否录制）\n";
     return 1;
   }
-  SD_LOG_ACT("replay", "载入 bag: referee=%zu odometry=%zu navigation=%zu interventions=%zu",
-             data.referee.size(), data.odometry.size(), data.navigation.size(),
-             data.interventions.size());
+  SD_LOG_ACT("replay", "载入 bag: referee=%zu odometry=%zu navigation=%zu", data.referee.size(),
+             data.odometry.size(), data.navigation.size());
 
   sentry_decision::DecisionContext context;
   context.config = &loaded.config;
@@ -164,7 +162,6 @@ int main(int argc, char** argv) {
   sentry_decision::WorldModel model(replay, replay, replay, runtime_timeouts);
   sentry_decision::IntentArbiter arbiter;
   sentry_decision::ActionDispatcher dispatcher(action_config);
-  sentry_decision::InterventionController intervention;
   sentry_decision::SafetySupervisor safety(safety_limits);
   sentry_decision::NavGoalTracker nav_tracker;
 
@@ -172,32 +169,19 @@ int main(int argc, char** argv) {
   const int max_ticks = options.ticks > 0 ? options.ticks : 1000000;
   sentry_decision::TacticalMode last_mode = sentry_decision::TacticalMode::kUnknown;
   std::uint32_t mode_changes = 0;
-  std::uint32_t applied_interventions = 0;
 
   for (int tick = 0; tick < max_ticks; ++tick) {
     replay.step(period);
     const TimePoint now = replay.stamp();
 
-    for (const auto& command : replay.interventions()) {
-      sentry_decision::apply_intervention(&intervention, command, now);
-      ++applied_interventions;
-      SD_LOG_ACT("replay", "t=%.1fs 注入干预 kind=%d", replay.now().count() / 1000.0,
-                 static_cast<int>(command.kind));
-    }
-
-    context.world = intervention.apply_world(model.snapshot(now));
+    context.world = model.snapshot(now);
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    sentry_decision::apply_intervention_intents(intervention, now, &context);
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter.clear_source(sentry_decision::SourceId::kSkill);
-    arbiter.clear_source(sentry_decision::SourceId::kIntervention);
     for (const auto& intent : context.intents) {
-      if (!intervention.allows(intent.field)) {
-        continue;
-      }
       arbiter.submit(intent);
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);
@@ -228,9 +212,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  SD_LOG_ACT("replay",
-             "回放结束: tick=%u mode_changes=%u interventions=%u sent_goals=%u canceled=%u",
-             replay.tick(), mode_changes, applied_interventions, replay.sent_goals(),
-             replay.canceled_goals());
+  SD_LOG_ACT("replay", "回放结束: tick=%u mode_changes=%u sent_goals=%u canceled=%u", replay.tick(),
+             mode_changes, replay.sent_goals(), replay.canceled_goals());
   return 0;
 }

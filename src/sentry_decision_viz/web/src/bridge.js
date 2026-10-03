@@ -1,7 +1,7 @@
 // rosbridge 适配：把 ROSLIB 的 topic / service 包成面板易用的接口。
 // 只有这个模块接触全局 ROSLIB，其余模块保持纯数据 / DOM。
 // 不使用 ROSLIB.ActionClient：vendored roslib 1.4.1 的 ActionClient 采用 ROS 1
-// actionlib 命名，无法对接 ROS 2 action，面板的人工干预统一走 service。
+// actionlib 命名，无法对接 ROS 2 action，面板统一走 service。
 export function createBridge(options) {
   const url = options.url;
   let ros = null;

@@ -134,14 +134,8 @@ ScenarioLoadResult load_scenario(const std::string& path) {
     } else if (item["expect"]) {
       event.kind = ScenarioEvent::Kind::kExpect;
       parse_args(item["expect"], context + ".expect", &event.args, &result.errors);
-    } else if (item["add_intent"]) {
-      event.kind = ScenarioEvent::Kind::kAddIntent;
-      parse_args(item["add_intent"], context + ".add_intent", &event.args, &result.errors);
-    } else if (item["disable"]) {
-      event.kind = ScenarioEvent::Kind::kDisable;
-      parse_args(item["disable"], context + ".disable", &event.args, &result.errors);
     } else {
-      result.errors.push_back(context + " 需要 set_world / expect / add_intent / disable");
+      result.errors.push_back(context + " 需要 set_world / expect");
       continue;
     }
     if (event.at > result.scenario.end) {

@@ -13,8 +13,7 @@ ReplaySource::ReplaySource(ReplayData data, TimePoint epoch)
     }
     return last;
   };
-  last_at_ = std::max({max_of(data_.referee), max_of(data_.odometry), max_of(data_.navigation),
-                       max_of(data_.interventions)});
+  last_at_ = std::max({max_of(data_.referee), max_of(data_.odometry), max_of(data_.navigation)});
 }
 
 Duration ReplaySource::step(Duration period) {
@@ -51,16 +50,6 @@ NavState ReplaySource::status() const {
   NavState state = record->value;
   state.stamp = epoch_ + record->at;
   return state;
-}
-
-std::vector<InterventionCommand> ReplaySource::interventions() {
-  std::vector<InterventionCommand> due;
-  while (intervention_cursor_ < data_.interventions.size() &&
-         data_.interventions[intervention_cursor_].at <= now_) {
-    due.push_back(data_.interventions[intervention_cursor_].value);
-    ++intervention_cursor_;
-  }
-  return due;
 }
 
 void ReplaySource::send_goal(const Point2D& goal) {

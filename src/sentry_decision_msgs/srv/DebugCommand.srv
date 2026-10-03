@@ -1,16 +1,12 @@
-# 调试 / 网页面板通用命令（结构化 service，而不是裸 topic）。
+# 面板 service（结构化 service，而不是裸 topic）。
 # command 取值与 args（JSON，YAML 子集）：
-#   set_intent:   {field: nav_goal, value: [x, y], lease_sec: 3.0, reason: "debug"}
-#   clear_intent: {field: nav_goal}
-#   set_world:    {field: self_hp, value: 20}
-#   clear_world:  {field: self_hp}      # 省略 field 表示清除全部覆盖
-#   set_module:   {module: nav, enabled: false}
-#   clear_all:    {}
-#   list_state:   {}
+#   list_state:          {}                         # 返回 state_json 快照
+#   set_tactical_mode:   {mode: retreat, lease_sec: 0}
+#   clear_tactical_mode: {}
 string command
 string args
 ---
 bool success
 string message
-# 仅 list_state 生效：世界 / 模块 / 活跃 Intent / 逐字段胜者的 JSON 快照
+# 仅 list_state 生效：命名点 / 资源 / 最近动作 / 动作回执 / 急停 / 战术层覆盖的 JSON 快照
 string state_json

@@ -27,7 +27,6 @@ enum class SourceId {
   kMission,
   kSkill,
   kRecovery,
-  kIntervention,
   kSupervisor,
 };
 
@@ -36,8 +35,7 @@ enum class Priority : int {
   kDefault = 0,
   kTactical = 1,
   kRecovery = 2,
-  kIntervention = 3,
-  kSafety = 4,
+  kSafety = 3,
 };
 
 enum class TacticalMode {

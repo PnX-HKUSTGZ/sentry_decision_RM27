@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 录制一局场景 bag，再用 replay_main 离线重放，检查干预在原时刻复现。
+# 录制一局场景 bag，再用 replay_main 离线重放，检查世界输入可离线重放。
 set -euo pipefail
 
 SCENARIO="${1:-}"
@@ -30,13 +30,13 @@ rm -rf "${BAG}"
 # 先起录制再起节点，保证从头录到上行与干预。
 ros2 bag record -o "${BAG}" \
   /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info \
-  /aft_mapped_to_init /decision/intervention >/tmp/replay_record.log 2>&1 & REC=$!
+  /aft_mapped_to_init >/tmp/replay_record.log 2>&1 & REC=$!
 sleep 1
 "${DECISION_BIN}" --ticks 0 >/tmp/replay_decision.log 2>&1 & DP=$!
 trap 'kill "${REC}" "${DP}" 2>/dev/null || true' EXIT
 sleep 2
 
-# 跑完整场景（含 add_intent / disable），结束后停止录制。
+# 跑完整场景，结束后停止录制。
 "${SIM_BIN}" --scenario "${SCENARIO}" --rate 20 >/tmp/replay_sim.log 2>&1
 sleep 1
 kill "${REC}" "${DP}" 2>/dev/null || true
@@ -58,7 +58,6 @@ check() {
   fi
 }
 check '载入 bag' '未载入 bag'
-check '注入干预' '未重放人工干预'
 check '回放结束' '回放未结束'
 
 if [[ "${fail}" -ne 0 ]]; then

@@ -1,6 +1,6 @@
 import { escapeHtml } from '../format.js';
 
-// 模块与干预面板：渲染 list_state 的模块开关、活跃 Intent、胜者与资源请求。
+// 资源与动作面板：渲染 list_state 的急停 / 资源请求 / 最近动作 / 动作回执。
 export function createIntentsPanel(el) {
   return {
     render: function (state) {
@@ -9,45 +9,8 @@ export function createIntentsPanel(el) {
         el.textContent = '等待 list_state …';
         return;
       }
-      let html = '<table><tr><th>模块</th><td>';
-      const modules = snapshot.modules || {};
-      const moduleNames = Object.keys(modules);
-      html += moduleNames.length
-        ? moduleNames
-            .map(function (name) {
-              return escapeHtml(name) + '=' + (modules[name] ? 'on' : 'off');
-            })
-            .join(' ')
-        : '-';
-      html += '</td></tr><tr><th>急停</th><td>' + (snapshot.safety_emergency ? '是' : '否') + '</td></tr>';
-
-      html += '<tr><th>Intent</th><td>';
-      const intents = snapshot.intents || [];
-      html += intents.length
-        ? intents
-            .map(function (intent) {
-              return (
-                escapeHtml(intent.field) +
-                '/' +
-                escapeHtml(intent.source) +
-                (intent.effective ? ' ✔' : ' ✘')
-              );
-            })
-            .join('<br/>')
-        : '-';
-      html += '</td></tr>';
-
-      html += '<tr><th>胜者</th><td>';
-      const winners = snapshot.winners || {};
-      const winnerNames = Object.keys(winners);
-      html += winnerNames.length
-        ? winnerNames
-            .map(function (field) {
-              return escapeHtml(field) + '→' + escapeHtml(winners[field]);
-            })
-            .join('<br/>')
-        : '-';
-      html += '</td></tr>';
+      let html = '<table>';
+      html += '<tr><th>急停</th><td>' + (snapshot.safety_emergency ? '是' : '否') + '</td></tr>';
 
       const resource = snapshot.resource || {};
       html +=
