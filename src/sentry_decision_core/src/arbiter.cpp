@@ -14,15 +14,11 @@ struct OwnerRule {
 
 const std::vector<OwnerRule>& owner_rules() {
   static const std::vector<OwnerRule> rules = {
-      {IntentField::kNavGoal, SourceId::kSkill, {SourceId::kSupervisor, SourceId::kIntervention}},
-      {IntentField::kChassisVel,
-       SourceId::kRecovery,
-       {SourceId::kSupervisor, SourceId::kIntervention}},
-      {IntentField::kResourceRequest, SourceId::kSkill, {SourceId::kIntervention}},
-      {IntentField::kTacticalMode, SourceId::kStrategic, {SourceId::kIntervention}},
-      {IntentField::kStance,
-       SourceId::kStrategic,
-       {SourceId::kSupervisor, SourceId::kIntervention}},
+      {IntentField::kNavGoal, SourceId::kSkill, {SourceId::kSupervisor}},
+      {IntentField::kChassisVel, SourceId::kRecovery, {SourceId::kSupervisor}},
+      {IntentField::kResourceRequest, SourceId::kSkill, {}},
+      {IntentField::kTacticalMode, SourceId::kStrategic, {}},
+      {IntentField::kStance, SourceId::kStrategic, {SourceId::kSupervisor}},
   };
   return rules;
 }

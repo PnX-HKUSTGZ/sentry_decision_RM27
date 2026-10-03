@@ -28,7 +28,7 @@ function appendLog(text) {
   store.update({ log: store.get().log.concat([text]).slice(-50) });
 }
 
-// 拉取 list_state（含命名点 / 模块 / 胜者）。轮询与「重置」后都会调用。
+// 拉取 list_state（命名点 / 资源 / 动作状态）。轮询与「重置」后都会调用。
 function refreshListState() {
   if (!store.get().connected) {
     return;
@@ -93,7 +93,7 @@ document.getElementById('connect').addEventListener('click', function () {
   appendLog('连接 ' + urlInput.value);
 });
 
-// list_state 轮询：刷新命名点 / 模块开关 / 活跃 Intent / 逐字段胜者。
+// list_state 轮询：刷新命名点与资源 / 动作状态。
 setInterval(refreshListState, 1000);
 
 appendLog('就绪：点击「连接」');

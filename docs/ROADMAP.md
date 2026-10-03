@@ -127,6 +127,44 @@
 
 设计细节见 `docs/ARCHITECTURE.md` §14。
 
+## v0.3.1 移除决策内部人工干预（已完成，本地）
+
+**状态**：已完成（本地）；容器 8 包 47 测试 0 失败，宿主 core / sim 测试与格式检查通过。
+
+**目标**：调试与测试只通过「仿真世界」和「战术层」干预，去掉对决策内部的人工干预，降低架构复杂度与 sim2real 风险。
+
+**保留**
+- 仿真世界干预：`/sentry_sim/set_world`、`/sentry_sim/apply_effect`（在仿真节点，不进入决策）。
+- 战术层覆盖：设置期望 `TacticalMode`（在行为树之外，仅改写 `context.strategy.mode`）。
+
+**移除**
+- 决策视图世界覆盖（`WorldField` / `InterventionController::apply_world`）。
+- 意图注入（`nav_goal` / `stance` / `resource_request` / `chassis_vel`）。
+- 运行期模块开关（`InterventionController::allows` / `module_switches`；加载期 `tree_manifest.enabled` 保留）。
+- `ManualOverride.action`、`InterventionEvent.msg`、`/decision/intervention` 记录与回放通道。
+- 场景脚本 `add_intent` / `disable` 与 `scenario/intervention.yaml`。
+- 仲裁 `Priority::kIntervention` / `SourceId::kIntervention`。
+
+**新增 / 改造**
+- core 新增 `TacticalOverride`（`set(mode, lease, now)` / `clear()` / `mode(now)`），两个入口在 `apply_strategy` 之后应用。
+- `DebugCommand.srv` 收敛为 `list_state` / `set_tactical_mode` / `clear_tactical_mode`；`InterventionServer` 替换为只读面板服务。
+- `list_state` 只保留面板需要的字段：`points`（含半径）、`resource` / `last_action` / `last_ack`、`safety_emergency`、`tactical_override`。
+- `replay_main` 只回放世界输入（`/sentry/*` + odom），不再有干预通道。
+- 网页面板：保留比赛阶段 / 暂停 / 仿真世界 / 仿真效果 / 战术模式覆盖；移除 Intent、模块开关、世界覆盖相关 UI。
+
+**阶段**
+1. core：移除 `intervention.*` 与 `kIntervention`，新增 `TacticalOverride` + 单测；仲裁 owner 规则去掉 intervention。
+2. io：移除 `intervention_server` / `intervention_convert` / `intervention_types`，改为面板服务；删除 `ManualOverride.action` / `InterventionEvent.msg`。
+3. bringup：`decision_node` / `main` / `replay_main` 接线；`list_state` 精简；移除干预录制。
+4. sim：场景解析去掉 `add_intent` / `disable`；删除 `scenario/intervention.yaml`。
+5. web：`controls.js` / `intents.js` / `bridge.js` / `main.js` 收敛；文档与静态资源同步。
+6. 测试与文档：删除干预相关测试，补 `TacticalOverride` 与面板服务测试；更新 ARCHITECTURE §9 / §10 / §14、USAGE、ROADMAP、CHANGELOG。
+
+**验收**
+- 决策节点不再接受任何直接改写意图 / 世界视图 / 模块开关的接口。
+- 战术层覆盖可设置 / 清除，且安全层优先级不变。
+- 仿真世界干预与之前行为一致；`colcon test` 全绿；面板功能收敛后冒烟通过。
+
 ## P4 切换与冻结
 
 **目标**：新仓库成为默认实现，旧仓库归档。
@@ -171,3 +209,8 @@
   - 已完成（本地）：裁判协议补全——依据 `refs/26UC`（2026 规则 V2.2.0 + 通信协议 V2.0.0）扩展 `referee_protocol`：场地事件全字段、姿态与 `SentryInfo3` 剩余时长。
   - 已完成（本地）：P3.5 文档与验收——场景支持 `add_intent` / `disable`（`scenario_intervention`）；新增 `replay_main` 离线回放（读新格式 `/sentry/*` bag，原时刻重放干预）与 `replay_smoke`（录制 intervention 场景再回放，3 条干预复现）；ARCHITECTURE / ROADMAP / NOTE / USAGE / CHANGELOG 同步。
   - P2 主体已完成（本地范围）。
+- **v0.3.1 完成（本地）**：移除决策内部人工干预——删除 `InterventionController` / `Priority::kIntervention` /
+  `SourceId::kIntervention` / `ManualOverride.action` / `InterventionEvent.msg` / `/decision/intervention` 记录与回放通道，
+  新增 core `TacticalOverride`（`set` / `clear` / `mode`，`apply_strategy` 之后改写 `context.strategy.mode` 并同步意图）；
+  `DebugCommand.srv` 收敛为 `list_state` / `set_tactical_mode` / `clear_tactical_mode`；场景去掉 `add_intent` / `disable`；
+  面板控制面板移除 Intent / 模块 / 世界覆盖，保留仿真世界 / 仿真效果与战术层覆盖；ARCHITECTURE / USAGE / CHANGELOG 同步。

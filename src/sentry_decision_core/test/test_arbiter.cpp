@@ -39,12 +39,12 @@ void test_priority_wins() {
   const TimePoint t0{};
   IntentArbiter arbiter;
   arbiter.submit(make_nav(SourceId::kSkill, Priority::kTactical, t0, 1.0));
-  arbiter.submit(make_nav(SourceId::kIntervention, Priority::kIntervention, t0, 2.0));
+  arbiter.submit(make_nav(SourceId::kSupervisor, Priority::kSafety, t0, 2.0));
   const ArbiterResult result = arbiter.resolve(t0);
   CHECK(result.output.nav_goal.has_value());
   CHECK(result.output.nav_goal->x == 2.0);
   CHECK(result.conflicts.size() == 1);
-  CHECK(result.winners.at(IntentField::kNavGoal) == SourceId::kIntervention);
+  CHECK(result.winners.at(IntentField::kNavGoal) == SourceId::kSupervisor);
 }
 
 void test_lease_expiry() {
@@ -113,8 +113,8 @@ void test_stance_field() {
 
   Intent override_stance;
   override_stance.field = IntentField::kStance;
-  override_stance.source = SourceId::kIntervention;
-  override_stance.priority = Priority::kIntervention;
+  override_stance.source = SourceId::kSupervisor;
+  override_stance.priority = Priority::kSafety;
   override_stance.stamp = t0;
   override_stance.value = SentryStance::kMove;
   arbiter.submit(override_stance);
@@ -125,7 +125,7 @@ void test_fresher_wins_on_tie() {
   const TimePoint t0{};
   IntentArbiter arbiter;
   arbiter.submit(make_nav(SourceId::kSkill, Priority::kTactical, t0, 1.0));
-  arbiter.submit(make_nav(SourceId::kIntervention, Priority::kIntervention, t0, 2.0));
+  arbiter.submit(make_nav(SourceId::kSupervisor, Priority::kTactical, t0, 2.0));
   CHECK(arbiter.resolve(t0).output.nav_goal->x == 2.0);
 }
 

@@ -15,7 +15,7 @@ find_package(ament_cmake REQUIRED)
 add_library(${PROJECT_NAME}
   src/action_dispatcher.cpp
   src/arbiter.cpp
-  src/intervention.cpp
+  src/tactical_override.cpp
   src/logging.cpp
   src/nav_goal_tracker.cpp
   src/referee_protocol.cpp
@@ -69,9 +69,9 @@ if(BUILD_TESTING)
   target_link_libraries(test_safety_supervisor ${PROJECT_NAME})
   add_test(NAME test_safety_supervisor COMMAND test_safety_supervisor)
 
-  add_executable(test_intervention test/test_intervention.cpp)
-  target_link_libraries(test_intervention ${PROJECT_NAME})
-  add_test(NAME test_intervention COMMAND test_intervention)
+  add_executable(test_tactical_override test/test_tactical_override.cpp)
+  target_link_libraries(test_tactical_override ${PROJECT_NAME})
+  add_test(NAME test_tactical_override COMMAND test_tactical_override)
 
   add_executable(test_nav_goal_tracker test/test_nav_goal_tracker.cpp)
   target_link_libraries(test_nav_goal_tracker ${PROJECT_NAME})

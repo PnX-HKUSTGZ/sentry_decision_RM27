@@ -16,10 +16,10 @@
 #include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/arbiter.hpp"
 #include "sentry_decision_core/context.hpp"
-#include "sentry_decision_core/intervention.hpp"
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/nav_goal_tracker.hpp"
 #include "sentry_decision_core/safety_supervisor.hpp"
+#include "sentry_decision_core/tactical_override.hpp"
 #include "sentry_decision_core/world_model.hpp"
 #include "sentry_decision_nodes/nodes.hpp"
 #include "sentry_decision_nodes/rule_based_strategic_policy.hpp"
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
 
   sentry_decision::IntentArbiter arbiter;
   sentry_decision::ActionDispatcher dispatcher(action_config);
-  sentry_decision::InterventionController intervention;
+  sentry_decision::TacticalOverride tactical_override;
   sentry_decision::SafetySupervisor safety(safety_limits);
   sentry_decision_sim::DecisionActuatorSim actuator(2);
   const Duration period{static_cast<std::int64_t>(1000.0 / options.rate_hz)};
@@ -197,20 +197,16 @@ int main(int argc, char** argv) {
     const TimePoint now = epoch + period * tick;
     referee.update(now);
     navigation.update(now);
-    context.world = intervention.apply_world(world_model.snapshot(now));
+    context.world = world_model.snapshot(now);
     context.clear_intents();
     context.apply_strategy(policy.decide(context.world));
-    apply_intervention_intents(intervention, now, &context);
+    apply_tactical_override(tactical_override, now, &context);
     tree.tickOnce();
 
-    // 每 tick 重建来源：清掉旧干预意图，避免模块关闭后上一 tick 的意图仍生效。
+    // 每 tick 重建来源：清掉上一拍的树内意图，避免残留。
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);
     arbiter.clear_source(sentry_decision::SourceId::kSkill);
-    arbiter.clear_source(sentry_decision::SourceId::kIntervention);
     for (const auto& intent : context.intents) {
-      if (!intervention.allows(intent.field)) {
-        continue;  // 运行期模块开关关闭时，丢弃该字段的意图
-      }
       arbiter.submit(intent);
     }
     const sentry_decision::ArbiterResult result = arbiter.resolve(now);

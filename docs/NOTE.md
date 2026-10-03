@@ -19,10 +19,17 @@
 
 ### 进行中
 
+- 已完成（v0.3.1，本地）：移除决策内部人工干预（意图注入 / 世界覆盖 / 运行期模块开关），
+  保留仿真世界干预与战术层覆盖。实现：core 新增 `TacticalOverride` + `apply_tactical_override`，删除 `intervention.*` /
+  `kIntervention` / `/decision/intervention` / `ManualOverride.action` / `InterventionEvent.msg`；io 用 `PanelService`（`list_state` /
+  `set_tactical_mode` / `clear_tactical_mode`）替换 `InterventionServer`；场景去掉 `add_intent` / `disable`；面板收敛。
+  容器 8 包 47 测试 0 失败。计划见 `docs/ROADMAP.md`「v0.3.1」。
+- 文档先行（已完成）：`ARCHITECTURE.md` 按目标态改写（§9 优先级 / §10 战术层覆盖 / §14.3 面板服务 / §14 面板与场景）；
+  `USAGE.md` 同步收敛（§4.7 战术层覆盖、移除干预按钮与 `/decision/intervention`）；`BELIEF.md` 去掉决策侧世界覆盖。
 - 已锁定（本地）：补给区圆心并入 `sim_home`（删除 `healing`），新增 `sim_base` 表示基地增益点；基地 / 前哨站增益点仅兑换、不回血；
   补给区回血加进入延时 `supply.enter_delay_s`（默认 1s）；仿真世界干预收敛为 `/sentry_sim/set_world` 与新增的
   `/sentry_sim/apply_effect`（步长 `sim.yaml: effects`，面板三行按钮：自身 / 我方 / 敌方）；面板删除「决策覆盖」与「强制撤退」。
-  决策内部干预（意图注入 / 世界覆盖 / 运行期模块开关）是否整体移除，待单独立项。
+  决策内部干预（意图注入 / 世界覆盖 / 运行期模块开关）已立项，见 ROADMAP v0.3.1。
 - 已锁定（本地）：地图点支持可选第 4 位区域半径，补给区 / 增益点半径从 `sim.yaml` 移入 `maps/*.yaml`；
   面板按半径把增益区画成青色虚线环（`list_state.points.r`）；标定工具初始空序列，列表可直接编辑
   x/y/yaw/r 并按 r 画环，新增「刷新预览」重绘。标定工具的文件读写（需本地后端）已放弃。

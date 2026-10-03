@@ -15,18 +15,16 @@ if [[ -f "${OVERLAY}/setup.bash" ]]; then
 fi
 set -u
 
-DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/decision_node"
 SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_sim_node"
 SCENARIO="$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml"
 
-"${DECISION_BIN}" --ticks 0 >/tmp/effects_decision.log 2>&1 & DP=$!
 # 把补给区设成覆盖全场的圆，保证机器人整局都在补给区内，便于验证回血 / 兑换。
 # （RMUC 场地约 29×15m，机器人会直奔远处目标，半径太小会中途离开增益点。）
 "${SIM_BIN}" --scenario "${SCENARIO}" --hold \
   --ros-args -p supply_center_x:=0.0 -p supply_center_y:=0.0 -p supply_radius:=40.0 \
   -p max_hp:=400 -p supply_heal_late_after_s:=240 \
   >/tmp/effects_sim.log 2>&1 & SP=$!
-trap 'kill "${DP}" "${SP}" 2>/dev/null || true' EXIT
+trap 'kill "${SP}" 2>/dev/null || true' EXIT
 sleep 3
 
 # 仿真节点若因参数 / 依赖问题启动失败，尽早暴露，避免卡在 service 调用。
@@ -88,10 +86,12 @@ sleep 1
 ammo0="$(online_field bullets_remaining)"
 coin0="$(game_field coin_remaining)"
 
-# 注入人工资源请求（每次注入都应视为一次新的兑换）。
+# 直接向下位机侧发一次本地兑换发弹动作（kind 1 = 本地兑换发弹，value = 发数）。
+exchange_seq=8000
 inject_exchange() {
-  timeout 5 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
-    "{command: 'set_intent', args: \"{field: resource_request, value: {ammo: 50, hp: 0, revive: false}, lease_sec: 0, reason: 'smoke'}\"}" \
+  exchange_seq=$((exchange_seq + 1))
+  timeout 5 ros2 topic pub --once /sentry/decision_command sentry_interfaces/msg/DecisionCommand \
+    "{request_id: ${exchange_seq}, action: {kind: 1, mode: 0, interval_ms: 0, value: 50}}" \
     >/dev/null 2>&1 || true
 }
 
@@ -109,7 +109,7 @@ if [[ -z "${coin1}" || $((coin0 - coin1)) -ne 50 ]]; then
   fail=1
 fi
 
-# 再次注入同值请求：one-shot 记忆应被清除，可再次兑换。
+# 再次发起兑换：应再次结算。
 inject_exchange
 sleep 2
 ammo2="$(online_field bullets_remaining)"
@@ -124,9 +124,6 @@ if [[ -z "${coin2}" || $((coin1 - coin2)) -ne 50 ]]; then
 fi
 
 # 远程兑换延迟（规则 5.3.2）：确认即扣金币，发弹量 6s 后才到账。
-# 关闭 resource 模块，避免决策树在低弹量时自行发起本地兑换干扰观测。
-timeout 5 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
-  "{command: 'set_module', args: '{module: resource, enabled: false}'}" >/dev/null 2>&1 || true
 set_world coins 500.0
 set_world self_ammo 100.0
 set_world sentry_info_2 1.0

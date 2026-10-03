@@ -34,7 +34,7 @@ tools/demo.sh
 | 网页面板（rosbridge :9090 + 页面 :8080） | `ros2 launch sentry_decision_viz viz.launch.py` |
 | 离线回放 | `ros2 run sentry_decision_bringup replay_main --bag <bag>` |
 | 查看决策状态 | `ros2 topic echo /decision/state`（或 `/decision/tree_status`、`/decision/world_state`） |
-| 查询干预 / 模块状态 | `ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand "{command: 'list_state', args: ''}"` |
+| 查询决策状态（面板） | `ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand "{command: 'list_state', args: ''}"` |
 | 宿主纯逻辑测试 | `tools/host_core_test.sh` |
 | 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
 | 格式检查 | `tools/format.sh --check` |
@@ -164,10 +164,9 @@ ros2 node info /sentry_decision_io
 | `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
 | `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
 | `/decision/tree_status` | `sentry_decision_msgs/TreeStatus` | 行为树节点状态与 active path（transient local） |
-| `/decision/intervention` | `sentry_decision_msgs/InterventionEvent` | 已应用的人工干预（可回放，见 §4.7） |
 
 ```bash
-ros2 bag record /decision/state /decision/world_state /decision/tree_status /decision/intervention
+ros2 bag record /decision/state /decision/world_state /decision/tree_status
 ```
 
 `decision_node` 已接线以上发布；`decision_main` 无 ROS，不发布。
@@ -245,41 +244,26 @@ timeline:
 `set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`stance`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
 `start_pose` 为可选的机器人初始位姿：进程启动与「重置」都会应用，避免默认停在场地中央。
 
-`add_intent` 与 `disable` 经 `/decision/debug` 注入干预，把「人工干预」写成可提交的测试用例：
+端到端回归由 `tools/scenario_smoke_test.sh` 驱动（注册为 `scenario_full_match`）。
 
-```yaml
-  - at: 3.0
-    add_intent: { field: nav_goal, value: "[7.0, 1.0]", lease_sec: 0 }
-  - at: 5.0
-    add_intent: { field: stance, value: "defense", lease_sec: 0 }
-  - at: 7.0
-    disable: { modules: "nav" }
-```
+### 4.7 战术层覆盖
 
-端到端回归由 `tools/scenario_smoke_test.sh` 驱动（注册为 `scenario_full_match` 与 `scenario_intervention`）。
-
-### 4.7 人工干预
-
-`decision_node` 提供结构化干预入口（走同一仲裁，安全仍最高）：
+调试只保留「仿真世界」与「战术层」两类入口，决策内部不提供人工写入口。战术层覆盖通过 `/decision/debug`：
 
 ```bash
-# 通用调试 / 状态查询（service）
+# 覆盖本拍战术模式（lease_sec 0 表示不过期）
 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
-  "{command: 'set_world', args: '{field: self_hp, value: 20}'}"
+  "{command: 'set_tactical_mode', args: '{mode: retreat, lease_sec: 0}'}"
+ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
+  "{command: 'clear_tactical_mode', args: ''}"
 ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
   "{command: 'list_state', args: ''}"
-ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand \
-  "{command: 'set_module', args: '{module: nav, enabled: false}'}"
-
-# 带 lease 的意图接管（action），goal 保持执行态直到过期或被取消
-ros2 action send_goal /decision/manual_override \
-  sentry_decision_msgs/action/ManualOverride \
-  "{field: 0, value: '[1.0, 2.0]', lease_sec: 3.0, reason: 'manual'}"
 ```
 
-`field` 与 `value` 语法、action / service 语义见 `docs/ARCHITECTURE.md` §14.3。
-所有已应用的干预发布到 `/decision/intervention`，可随 rosbag 录制并在回放中复现（P3.3）。
-冒烟测试：`tools/intervention_smoke_test.sh`（也注册为 `intervention_smoke`）。
+覆盖在战略层求值之后、任务树读取之前写入 `context.strategy.mode`，因此会改变任务树分支；
+仅在比赛中（`game_status=4`）生效，未进入比赛中时忽略；安全层优先级不受影响。
+语义见 `docs/ARCHITECTURE.md` §10 / §14.3。
+仿真世界干预见 `docs/ARCHITECTURE.md` §14.4；冒烟测试：`tools/sim_effects_smoke_test.sh`。
 
 ### 4.8 网页面板（rosbridge）
 
@@ -298,14 +282,13 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
   不会被 BT.CPP 的 tick 末重置刷成 IDLE）；
 - 中间战场俯视图（RMUC2026 场地底图，来源导航仓库 `RMUC2026.pgm`，0.05 m/px、origin `[-14.6, -5.86]`；
   叠加己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
-- 右侧 `WorldState` 与模块 / 活跃 Intent / 逐字段胜者 / 资源请求 / 最近动作 / 动作回执
-  （每秒轮询 `list_state`）；
+- 右侧 `WorldState` 与资源请求 / 最近动作 / 动作回执（每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
-  「重置」回未开始，并清空决策节点的干预 / 模块开关；
+  「重置」回未开始，并清除战术层覆盖；
 - 仿真控制：「仿真世界」直接改裁判仿真的真实世界；「仿真效果」三行按钮
   （自身：扣血 / 扣弹 / 死亡；我方 / 敌方：前哨站扣血 / 摧毁、基地扣血）模拟赛场事件，
   步长来自 `config/sim.yaml` 的 `effects`；
-- 人工干预按钮（决策侧）：切换模式、前往点位、兑换发弹 / 血量、模块启用 / 禁用、清空干预。
+- 战术层覆盖：模式下拉 + 设置 / 清除按钮（`set_tactical_mode` / `clear_tactical_mode`）。
 
 > 决策只有收到 `game_status=4`（比赛中）才执行任务；未开始 / 准备 / 自检 / 倒计时 / 结算阶段输出
 > `idle`，不下发任务导航目标，因此「准备阶段不动、开始比赛后才进攻/巡逻」。
@@ -321,7 +304,7 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 `stage` 除 0（重置）外必须大于当前阶段，否则返回 `success=false`；准备 / 自检 / 倒计时归零后
 自动进入下一阶段。冒烟测试：`tools/match_smoke_test.sh`（也注册为 `match_smoke`）。
 
-**右键「人工干预」区控件说明**：
+**右键「面板」区控件说明**：
 
 | 控件 | 作用 | 底层调用 |
 | --- | --- | --- |
@@ -329,28 +312,12 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 | 暂停 / 继续 | 冻结比赛计时与机器人运动（odom 保持最后位置） | `/sentry_sim/set_game_pause` |
 | 仿真世界 设置 | 直接改裁判仿真的真实世界：自身 / 基地 / 前哨血量、金币、发弹量、剩余时间 | `/sentry_sim/set_world` |
 | 仿真效果 三行按钮 | 对真实世界施加具名效果：自身扣血 / 扣弹 / 死亡；我方 / 敌方前哨扣血 / 摧毁、基地扣血 | `/sentry_sim/apply_effect`（步长见 `config/sim.yaml` 的 `effects`） |
-| 模式 + 切换 | 把战术模式改成所选值（patrol/attack/defend/retreat/heal/respawn） | `set_intent {field: tactical_mode}` |
-| 点位 + 前往 | 人工接管导航目标 `[x, y]`，优先于任务树 | `set_intent {field: nav_goal}` |
-| 模块 启用 / 禁用 | 运行期关闭某模块后，该字段的意图（含人工干预）被丢弃 | `/decision/debug set_module` |
-| 兑换发弹 / 血量 | 注入资源请求（ammo / hp） | `set_intent {field: resource_request}` |
-| 清空干预 | 清空全部人工干预 / 世界覆盖 / 模块开关 | `/decision/debug clear_all` |
+| 模式 + 设置 / 清除 | 设置或清除战术层覆盖（patrol/attack/defend/retreat/heal/respawn） | `/decision/debug set_tactical_mode` / `clear_tactical_mode` |
 
-> 面板人工干预统一走 `/decision/debug` 的 `set_intent` service，不使用 `ManualOverride` action：
-> vendored roslib 1.4.1 的 `ActionClient` 是 ROS 1 actionlib 命名（`/<action>/goal` 等），
-> 无法对接 ROS 2 action 的 `/_action/*` 服务。action 接口本身仍可用
-> `ros2 action send_goal /decision/manual_override ...` 直接调用。
+> 战术层覆盖 `lease` 默认 **0**：一直生效，直到点「清除」或「重置」；填正数则按秒到期后
+> 自动交还战略层（lease 用系统时间计算，暂停期间仍会到期）。
 
-> 「持续」一行的 `lease` 默认 **0**：人工接管一直生效，直到点「清空干预」或「重置」。
-> 填正数则按秒到期后自动交还任务树（注意：lease 用系统时间计算，暂停期间仍会到期；
-> 想让它跨暂停持续，请保持 0）。
-
-> 「兑换发弹 / 血量」注入的是 `resource_request` 意图，由决策层转成一次性 `DecisionCommand`
-> 动作下发给执行端，**不经过任务树**，所以行为树不会有分支变化；是否尝试 / 成功看右侧
-> 「资源请求 / 最近动作 / 动作回执」，或决策节点日志的 `[action] 下发 ...` 与
-> `[action] 动作 N 已确认`。
-
-未进入「比赛中」时，决策侧人工意图按钮自动禁用，避免准备阶段误发干预；
-仿真世界 / 仿真效果与「清空干预」仍可用。
+未进入「比赛中」时战术层覆盖按钮自动禁用；仿真世界 / 仿真效果仍可用。
 
 > 兑换会真正结算进仿真世界，且**裁判侧会校验前置条件**：非法动作不改变世界、回执 `rejected`，
 > 并在仿真日志打印「裁判拒绝动作 ...」。规则依据：
@@ -360,8 +327,7 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 >
 > 资源树按「立即复活 > 免费复活 > 远程兑换血量 > 本地兑换发弹量 > 远程兑换发弹量」求值
 > （`tree/resource/root.xml`）：
-> - **血量兑换按规则只走远程**（`IfDisengaged` + 金币 + `RequestRemoteHpExchange`），
->   本地血量兑换只保留给面板人工注入 / 调试；
+> - **血量兑换按规则只走远程**（`IfDisengaged` + 金币 + `RequestRemoteHpExchange`）；
 > - **本地兑换发弹量**需占领增益点（`IfOccupyingGainPoint`）；不在增益点且脱战时改走
 >   **远程兑换发弹量**（`IfNotOccupyingGainPoint`）；
 > - **立即复活**需 `can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则确认免费复活。
@@ -376,8 +342,7 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > 在 6 秒内战亡则作废且金币不返还。相关次数 / 金币阈值见 `resource.remote_*_times` /
 > `resource.remote_ammo_min_coins`。
 
-人工意图与任务树走同一仲裁，安全层始终最高；它们只影响本 tick 起的输出，不会写回裁判数据。
-「模式」接管只改变任务选择，不会伪造裁判的 `game_status`。
+战术层覆盖只改变任务选择，不写回裁判数据，也不会伪造裁判的 `game_status`。
 
 需要镜像包含 `ros-jazzy-rosbridge-suite`（见 `docker/Dockerfile`）。纯逻辑单测：
 ```bash
@@ -399,20 +364,19 @@ node src/sentry_decision_viz/web/test/format.test.mjs
   （与主面板一致），导出时写出第 4 位。编辑即时重绘，也可点「刷新预览」强制重绘。
 - 纯逻辑（`fieldExtent` / `worldToImage` / `imageToWorld`）由 `web/test/format.test.mjs` 覆盖。
 
-
 ### 4.9 离线回放（replay_main）
 
-`decision_node` 与 `referee_sim_node` 运行时用 rosbag 录下上行与干预，赛后用 `replay_main` 离线重放：
+`decision_node` 与 `referee_sim_node` 运行时用 rosbag 录下上行，赛后用 `replay_main` 离线重放：
 
 ```bash
 ros2 bag record -o match_bag \
   /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info \
-  /aft_mapped_to_init /decision/intervention
+  /aft_mapped_to_init
 
 ros2 run sentry_decision_bringup replay_main --bag match_bag
 ```
 
-`replay_main` 读 `/sentry/*`（新格式）或旧标量话题，逐 tick 重跑行为树 / 仲裁 / 安全，并在原时刻注入录到的 `/decision/intervention`；以 `ACT` 日志输出现模式变化与最终统计。含干预的同一份 bag 两次回放逐 tick 一致（`replay_determinism`）。端到端冒烟：`tools/replay_smoke_test.sh`（也注册为 `replay_smoke`）。
+`replay_main` 读 `/sentry/*`（新格式）或旧标量话题，逐 tick 重跑行为树 / 仲裁 / 安全；以 `ACT` 日志输出现模式变化与最终统计。同一份 bag 两次回放逐 tick 一致（`replay_determinism`）。端到端冒烟：`tools/replay_smoke_test.sh`（也注册为 `replay_smoke`）。
 
 ## 5. 命令参数
 
@@ -501,7 +465,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `--bag` | 必填 | rosbag2 路径（含 `/sentry/*` 上行与 `/decision/intervention`） |
+| `--bag` | 必填 | rosbag2 路径（含 `/sentry/*` 上行） |
 | `--ticks` | `0` | 最多回放 tick 数，`0` 表示回放到数据结束 |
 | `--rate` | `20.0` | 回放步长频率（Hz），取值 `(0, 1000]` |
 | `--odom-topic` | `/aft_mapped_to_init` | 里程计话题 |
@@ -514,7 +478,7 @@ ros2 run sentry_decision_io io_node --ros-args \
 | 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
 | 容器全量 | `docker/entrypoint.sh test` |
 | io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
-| 场景 / 干预 / 回放 / 面板 / 比赛阶段 / 世界结算冒烟 | `tools/scenario_smoke_test.sh`、`tools/intervention_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh`、`tools/sim_effects_smoke_test.sh` |
+| 场景 / 回放 / 面板 / 比赛阶段 / 世界结算冒烟 | `tools/scenario_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh`、`tools/sim_effects_smoke_test.sh` |
 | 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
 | 格式检查 | `tools/format.sh --check` |
 

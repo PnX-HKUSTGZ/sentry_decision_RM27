@@ -26,8 +26,7 @@ add_library(${PROJECT_NAME}
   src/decision_state_convert.cpp
   src/decision_state_publisher.cpp
   src/rosbag_replay.cpp
-  src/intervention_convert.cpp
-  src/intervention_server.cpp)
+  src/panel_service.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>")
@@ -68,14 +67,14 @@ if(BUILD_TESTING)
   target_link_libraries(test_sentry_bridge ${PROJECT_NAME})
   add_test(NAME test_sentry_bridge COMMAND test_sentry_bridge)
 
-  add_executable(test_intervention_convert test/test_intervention_convert.cpp)
-  target_link_libraries(test_intervention_convert ${PROJECT_NAME} yaml-cpp::yaml-cpp)
-  add_test(NAME test_intervention_convert COMMAND test_intervention_convert)
+  add_executable(test_panel_service test/test_panel_service.cpp)
+  target_link_libraries(test_panel_service ${PROJECT_NAME} yaml-cpp::yaml-cpp)
+  add_test(NAME test_panel_service COMMAND test_panel_service)
 
-  add_executable(test_intervention_server test/test_intervention_server.cpp)
-  target_link_libraries(test_intervention_server ${PROJECT_NAME})
-  ament_target_dependencies(test_intervention_server rclcpp rclcpp_action)
-  add_test(NAME test_intervention_server COMMAND test_intervention_server)
+  add_executable(test_panel_service_server test/test_panel_service_server.cpp)
+  target_link_libraries(test_panel_service_server ${PROJECT_NAME})
+  ament_target_dependencies(test_panel_service_server rclcpp)
+  add_test(NAME test_panel_service_server COMMAND test_panel_service_server)
 endif()
 
 ament_package()
