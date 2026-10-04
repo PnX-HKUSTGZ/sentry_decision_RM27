@@ -46,12 +46,20 @@ timeline:
       nav_goal_x: -11.71
       nav_goal_y: -3.22
 
-  # 阵亡 -> 复活（6），不发导航目标。
+  # 阵亡 -> 确认免费复活（读条 10s）-> 以 10% 上限血复活 -> 撤退回血。
+  # 战亡时剩余 420s -> 读条 = 10 + (420-420)/10 = 10s（基地 5000 血、不在补给区，不加速）。
   - at: 9.0
     set_world:
       self_hp: 0
-  - at: 10.5
+      game_time_remaining: 420
+  - at: 11.0
     expect:
       tactical_mode: respawn
       stance: move
       has_nav_goal: false
+      resource_revive: true
+  - at: 21.0
+    expect:
+      tactical_mode: retreat      # 10% 血量（40）< retreat_hp（50）
+      has_nav_goal: true
+      resource_revive: false

@@ -45,6 +45,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
       {"action.one_shot_timeout_ms", {true, true}},
+      {"action.revive_poll_interval_ms", {true, true}},
   };
   return rules;
 }

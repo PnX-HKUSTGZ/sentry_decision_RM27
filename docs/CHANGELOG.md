@@ -9,13 +9,12 @@
 
 ## [Unreleased]
 
-### Changed
-
-- `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
-  200ms 会偶发判失效触发急停抖动，进而导致面板位姿闪烁。
-
 ### Added
 
+- 裁判仿真实现复活机制（规则 5.2.2）：战亡后按公式开始复活读条（`10 + round((420-剩余)/10) + 20*累计立即复活次数`），
+  每秒 +1、补给区或基地血量 <2000 时 +4；待复活期间导出 `info1.can_free_resurrect`；
+  确认免费复活后读条完成即以 10% 上限血量复活；兑换立即复活累计次数并回满血。
+- 场景 `full_match.yaml` 覆盖「阵亡 → 确认复活 → 10% 血量复活 → 撤退」链路。
 - 双仓库联调：`RosIoNode` 新增 `odom_frame`，非空时用 TF `map->odom` 把 odom 系位姿转成 map 系；
   抽出纯逻辑变换 `pose_to_map` + 单测。
 - `decision_node` 支持 `--ros-args` 透传，可在启动时覆盖 `RosIoNode` 的 ROS 参数。
@@ -23,6 +22,19 @@
   不发 odom，位姿改取 `/decision/world_state`。
 - `tools/demo.sh` 新增 `--with-nav` / `--nav-silent`：起真实导航容器（`rm27net` + PCD）并联调。
 - 新增 `docs/sim_dual_repo.md`（双仓库联调设计与接口契约）。
+
+### Changed
+
+- 确认免费复活 / 兑换立即复活改为 `MODE_POLLED`（协议 `0x0120` bit 0 / 1 是电平位），
+  重发间隔由 `action.revive_poll_interval_ms` 配置。
+- `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
+  200ms 会偶发判失效触发急停抖动，进而导致面板位姿闪烁。
+
+### Fixed
+
+- 仿真链路中机器人阵亡后不再「只停在 `respawn` 模式」：裁判侧从未按死活导出
+  `info1.can_free_resurrect`，且 `kFreeResurrect` 只回执不结算，导致决策不发起确认复活、
+  血量也不会恢复。现由仿真裁判统一按规则推导复活状态并结算。
 
 ### Removed
 

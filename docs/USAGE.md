@@ -333,7 +333,9 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > - **血量兑换按规则只走远程**（`IfDisengaged` + 金币 + `RequestRemoteHpExchange`）；
 > - **本地兑换发弹量**需占领增益点（`IfOccupyingGainPoint`）；不在增益点且脱战时改走
 >   **远程兑换发弹量**（`IfNotOccupyingGainPoint`）；
-> - **立即复活**需 `can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则确认免费复活。
+> - **立即复活**需待复活、`can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则在待复活期间
+>   **确认免费复活**：战亡后裁判立即开始复活读条（总长 = `10 + round((420-战亡时剩余)/10) + 20*累计立即复活次数`，
+>   在补给区或己方基地血量 <2000 时每秒 +4）；读条完成且已确认时以 **10% 上限血量**复活。
 >
 > 金币不足 / 未脱战 / 不在增益点都会被裁判拒绝（`动作回执` 行显示 `rejected` 与原因）。
 > 补给区自动回血：机器人处于补给区（默认 `sim_home` 点附近）且比赛中时，按上限血量的

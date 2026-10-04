@@ -16,6 +16,16 @@ struct PendingRemoteExchange {
   int remaining_ms = 0;  // 距离生效还剩的毫秒
 };
 
+// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区或己方基地血量 <2000 时每秒
+// +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
+struct RespawnState {
+  bool pending = false;      // 处于待复活（战亡且未复活）状态
+  bool confirmed = false;    // 哨兵已确认复活（协议 0x0120 bit 0 = 1）
+  int total_progress = 0;    // 本次复活所需总读条，战亡瞬间按公式锁定
+  int current_progress = 0;  // 当前读条进度
+  int instant_count = 0;     // 本局累计兑换立即复活次数（计入读条公式）
+};
+
 // 消息级仿真世界：字段与 sentry_interfaces 上行消息一一对应。
 //
 // 为什么不复用 core 的 RefereeState：那边存的是解码后的 event / info1 / info2 / info3，
@@ -54,6 +64,8 @@ struct SimWorld {
   int supply_ammo_claimed_minutes = 0;
   // 远程兑换延迟队列（规则 5.3.2 发弹量 / 5.2.1 血量：确认后 6 秒生效）。
   std::vector<PendingRemoteExchange> pending_remote;
+  // 复活读条状态（规则 5.2.2）。
+  RespawnState respawn;
 
   // TeamInfo
   int base_hp = 0;
@@ -134,6 +146,25 @@ struct RemoteStepResult {
 // 推进远程兑换延迟：到期项生效。远程血量在 6 秒内战亡则作废，金币不返还。
 RemoteStepResult step_pending_remote(SimWorld* world, int elapsed_ms, int max_hp);
 
+// 复活读条总长度（规则 5.2.2）：10 + round((420 - 战亡时剩余秒数)/10) + 20*累计立即复活次数。
+int respawn_bar_total(int game_time_remaining, int instant_resurrect_count);
+
+// 依据「是否战亡」开始 / 结束复活读条，并把 info1.can_free_resurrect（bit 19）同步为 pending。
+// 每拍调用，幂等；战亡瞬间同时清零射击热量（规则 5.2.2）。
+void sync_respawn(SimWorld* world);
+
+// 每秒推进复活读条的结果。
+struct RespawnStepResult {
+  bool advanced = false;  // 本拍推进了读条
+  bool revived = false;   // 读条完成且已确认，发生复活
+  int progress = 0;       // 推进后的读条进度
+  int total = 0;          // 总读条
+  int healed = 0;         // 本次恢复的血量
+};
+
+// 推进 1 秒复活读条；读条完成且已确认时以 10% 上限血复活。speed_up 为「补给区或基地 <2000 血」。
+RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up);
+
 // ---- 增益点占领判定（裁判侧）----
 
 // 一个增益点区域（圆）。radius <= 0 表示不启用。
@@ -182,11 +213,11 @@ struct ActionOutcome {
   std::string detail;
 };
 
-// 裁判侧结算一个决策动作（非法动作不修改世界）：
+// 裁判侧结算一个决策动作（非法动作不改世界；调用前会先 sync_respawn 同步死活与 info1 位段）：
 //   kAmmoExchange       本地兑换发弹量：需占领增益点（表 5-8），1 金币/发
 //   kHpExchange         兑换血量：需脱战（规则 5.2.1 仅允许远程兑换），1 金币/点（简化）
-//   kFreeResurrect      需 info1.can_free_resurrect
-//   kInstantResurrect   需 info1.can_instant_resurrect 且金币 >= 所需
+//   kFreeResurrect      需待复活；置 confirmed，读条完成即以 10% 上限血复活
+//   kInstantResurrect   需待复活、info1.can_instant_resurrect 且金币 >= 所需；回满血并累计次数
 //   kRemoteAmmoExchange 需脱战；value = 次数，150 金币/次、每次 +100 发
 //   kRemoteHpExchange   需脱战；value = 次数，按规则公式计费、+60% 上限血量
 ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAction& action,

@@ -65,6 +65,7 @@ inline sentry_decision::ActionDispatcherConfig action_config_from_config(
     const sentry_decision::PolicyConfig* config) {
   sentry_decision::ActionDispatcherConfig action_config;
   action_config.one_shot_timeout = ms_from_config(config, "action.one_shot_timeout_ms");
+  action_config.revive_poll_interval = ms_from_config(config, "action.revive_poll_interval_ms");
   return action_config;
 }
 

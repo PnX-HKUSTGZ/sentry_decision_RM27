@@ -90,6 +90,10 @@ flowchart LR
 | `info2` | `SentryInfo2` | `SentryInfoOnline.sentry_info_2` | 脱战、剩余可兑换、姿态（`stance`） |
 | `info3` | `SentryInfo3` | `SentryInfoOnline.sentry_info_3` | 各姿态剩余时长 |
 
+> 复活（规则 5.2.2）：`info1.can_free_resurrect`（bit 19）表示当前可否确认免费复活，
+> 仿真裁判在待复活（`self_hp<=0`）期间置 1；`can_instant_resurrect`（bit 20）与成本（bit 21-30）
+> 来自裁判。决策只消费标志，不感知读条；读条与结算建模在 `sentry_decision_sim`（见 ARCHITECTURE §14.4）。
+
 > 注：`SentryInfoOnline.sentry_pos` 当前**未合并**；自身位姿来自 odom（见 `SelfState.pose`）。
 > `SentryInfoOffline` 的目标锁定字段（`is_get` / `armor_pos` / `armor_num`）当前**未接入**（见 §7）。
 

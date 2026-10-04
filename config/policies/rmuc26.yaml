@@ -27,3 +27,4 @@ timeouts:
   navigation_ms: 500            # 导航状态有效期
 action:
   one_shot_timeout_ms: 500      # one-shot 动作超时未 ack 记 WARN
+  revive_poll_interval_ms: 200  # 电平类复活动作（确认免费/立即复活）的重发间隔

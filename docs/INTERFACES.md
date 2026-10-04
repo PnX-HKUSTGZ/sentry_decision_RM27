@@ -90,6 +90,8 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 
 - **OneShot（边沿）**：决策侧只在「请求由无到有」时发一条命令；MCU 执行一次即完成，不应重复。
 - **Polled（轮询）**：决策侧按 `interval_ms` 周期性发送当前期望值；MCU 以最新一条为准，停止发送即按超时失效。
+  协议里属于**电平位**的动作（确认免费复活 / 兑换立即复活，`0x0120` bit 0 / bit 1）配置为 Polled，
+  由 `action.revive_poll_interval_ms` 控制重发间隔；其余兑换类动作是边沿触发，配置为 OneShot。
 - 每个 `DecisionCommand` 带唯一 `request_id`，MCU 执行后以 `DecisionAck` 回传同一个 `request_id`。
 
 ## 7. 回执（ack）链路

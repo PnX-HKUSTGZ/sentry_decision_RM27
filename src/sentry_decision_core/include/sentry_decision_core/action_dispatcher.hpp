@@ -12,6 +12,8 @@ namespace sentry_decision {
 // 该时长由 config/policies/<POLICY>.yaml 的 action 段提供，源码不设默认值。
 struct ActionDispatcherConfig {
   Duration one_shot_timeout;
+  // 电平类动作（确认免费复活 / 兑换立即复活）的轮询间隔；0 表示每 tick 重发。
+  Duration revive_poll_interval;
 };
 
 // 决策动作派发器：把决策层每 tick 的期望动作转成「本 tick 实际要发送的命令」，
@@ -40,6 +42,11 @@ class ActionDispatcher {
   // 人工干预（如面板重复点「兑换发弹」）需要它：意图持续存在时同值请求本会被去重。
   void rearm(DecisionActionKind kind);
   void reset();
+
+  // 电平类动作的轮询间隔（供 submit_resource_requests 读取）。
+  Duration revive_poll_interval() const {
+    return config_.revive_poll_interval;
+  }
 
  private:
   struct Slot {

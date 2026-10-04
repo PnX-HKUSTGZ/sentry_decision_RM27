@@ -171,6 +171,7 @@ class RefereeSimNode : public rclcpp::Node {
     last_stage_tick_ = SteadyClock::now();
     last_supply_tick_ = last_stage_tick_;
     last_remote_tick_ = last_stage_tick_;
+    last_respawn_tick_ = last_stage_tick_;
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -341,8 +342,11 @@ class RefereeSimNode : public rclcpp::Node {
   void handle_accepted(const std::shared_ptr<GoalHandle>& handle) {
     // 新目标抢占旧目标：先 abort 旧 handle，避免其悬挂、永远收不到结果。
     if (goal_handle_) {
-      auto previous = std::make_shared<NavigateToPose::Result>();
-      goal_handle_->abort(previous);
+      if (goal_handle_->is_active()) {
+        auto previous = std::make_shared<NavigateToPose::Result>();
+        goal_handle_->abort(previous);
+      }
+      goal_handle_.reset();
     }
     goal_handle_ = handle;
     sentry_decision::Point2D goal;
@@ -395,6 +399,7 @@ class RefereeSimNode : public rclcpp::Node {
       actuator_.reset();
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
+      last_respawn_tick_ = last_supply_tick_;
       in_supply_ = false;
       supply_seconds_in_zone_ = 0;
     }
@@ -550,6 +555,28 @@ class RefereeSimNode : public rclcpp::Node {
     }
   }
 
+  // 按真实秒推进复活读条（规则 5.2.2）；读条完成且已确认复活时以 10% 上限血复活。
+  void step_respawn() {
+    if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
+      return;
+    }
+    const TimePoint now = SteadyClock::now();
+    while (now - last_respawn_tick_ >= Duration{1000}) {
+      last_respawn_tick_ += Duration{1000};
+      if (world_.self_hp > 0) {
+        continue;
+      }
+      // 规则 5.2.2：位于补给区或己方基地血量 <2000 时读条加速（每秒 +4）。
+      const bool speed_up = in_supply_zone() || world_.base_hp < 2000;
+      const sentry_decision_sim::RespawnStepResult step =
+          sentry_decision_sim::step_respawn(&world_, max_hp_, speed_up);
+      if (step.revived) {
+        SD_LOG_ACT("sim", "复活读条完成（%d/%d）：血量恢复至 %d/%d", step.progress, step.total,
+                   world_.self_hp, max_hp_);
+      }
+    }
+  }
+
   // 按机器人位置生成「占领增益点」状态并写回世界事件位（供上行消息与裁判校验）。
   void update_occupancy() {
     sentry_decision_sim::GainZones zones;
@@ -564,6 +591,8 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void tick() {
+    // 先同步复活状态：战亡即开始读条并导出 info1.can_free_resurrect（供本拍动作校验与上行）。
+    sentry_decision_sim::sync_respawn(&world_);
     if (provide_nav_) {
       nav_.update(SteadyClock::now());
       finish_goal_if_done();
@@ -576,6 +605,8 @@ class RefereeSimNode : public rclcpp::Node {
     step_remote_exchanges();
     step_game_stage();
     step_supply();
+    step_respawn();
+    sentry_decision_sim::sync_respawn(&world_);
     publish_uplinks();
     if (provide_nav_) {
       publish_odom();
@@ -751,6 +782,18 @@ class RefereeSimNode : public rclcpp::Node {
     exit_code_ = 1;
   }
 
+  // 结束前终止仍在运行的目标：否则 shutdown 后 action server 析构会对已失效 goal 发 result。
+  void abort_active_goal() {
+    if (!goal_handle_) {
+      return;
+    }
+    if (goal_handle_->is_active()) {
+      auto result = std::make_shared<NavigateToPose::Result>();
+      goal_handle_->abort(result);
+    }
+    goal_handle_.reset();
+  }
+
   void finish() {
     finished_ = true;
     if (failures_.empty()) {
@@ -759,6 +802,7 @@ class RefereeSimNode : public rclcpp::Node {
     } else {
       SD_LOG_ERROR("sim", "场景 %s 失败（%zu 项）", scenario_.name.c_str(), failures_.size());
     }
+    abort_active_goal();
     rclcpp::shutdown();
   }
 
@@ -772,6 +816,7 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_stage_tick_{};
   TimePoint last_supply_tick_{};
   TimePoint last_remote_tick_{};
+  TimePoint last_respawn_tick_{};
   bool in_supply_ = false;
   // 连续在补给区内的整秒数（进入当拍为 0），用于回血进入延时。
   int supply_seconds_in_zone_ = 0;
