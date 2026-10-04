@@ -36,10 +36,10 @@ SelfState make_odom(double x, double y, double yaw, double vx, double vy, double
 
 void test_identity() {
   const auto out =
-      sentry_decision_io::pose_to_map({0.0, 0.0, 0.0}, make_odom(1.0, -2.0, 0.5, 0.3, -0.4, 1.2));
+      sentry_decision_io::pose_to_map({0.0, 0.0, 0.0}, make_odom(1.0, -2.0, 0.0, 0.3, -0.4, 1.2));
   CHECK(near(out.pose.x, 1.0));
   CHECK(near(out.pose.y, -2.0));
-  CHECK(near(out.pose.yaw, 0.5));
+  CHECK(near(out.pose.yaw, 0.0));
   CHECK(near(out.vx, 0.3));
   CHECK(near(out.vy, -0.4));
   CHECK(near(out.wz, 1.2));
@@ -51,6 +51,16 @@ void test_translation_only() {
       sentry_decision_io::pose_to_map({-11.7, 2.9, 0.0}, make_odom(0.5, 0.25, 0.0, 1.0, 0.0, 0.0));
   CHECK(near(out.pose.x, -11.2));
   CHECK(near(out.pose.y, 3.15));
+}
+
+void test_velocity_uses_map_heading() {
+  const double half_pi = 1.5707963267948966;
+  // twist 在 child frame；map 系朝向 = map->odom yaw + odom 自身 yaw = pi。
+  const auto out = sentry_decision_io::pose_to_map({1.0, 2.0, half_pi},
+                                                   make_odom(0.0, 0.0, half_pi, 1.0, 0.0, 0.5));
+  CHECK(near(out.vx, -1.0));
+  CHECK(near(out.vy, 0.0));
+  CHECK(near(out.wz, 0.5));
 }
 
 void test_translation_and_rotation() {
@@ -70,6 +80,7 @@ int main() {
   test_identity();
   test_translation_only();
   test_translation_and_rotation();
+  test_velocity_uses_map_heading();
 
   if (g_failures != 0) {
     std::printf("%d check(s) failed\n", g_failures);

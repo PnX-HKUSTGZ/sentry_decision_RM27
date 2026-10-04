@@ -24,8 +24,13 @@ inline sentry_decision::SelfState pose_to_map(const MapToOdom& transform,
   out.pose.x = transform.x + c * odom.pose.x - s * odom.pose.y;
   out.pose.y = transform.y + s * odom.pose.x + c * odom.pose.y;
   out.pose.yaw = transform.yaw + odom.pose.yaw;
-  out.vx = c * odom.vx - s * odom.vy;
-  out.vy = s * odom.vx + c * odom.vy;
+  // nav_msgs/Odometry 的 twist 表达在 child_frame_id 系（机器人自身），而非 header.frame_id。
+  // 因此线速度要按 map 系朝向（map->odom ∘ odom->child）旋转，而不是只按 map->odom。
+  const double yaw_map = transform.yaw + odom.pose.yaw;
+  const double cm = std::cos(yaw_map);
+  const double sm = std::sin(yaw_map);
+  out.vx = cm * odom.vx - sm * odom.vy;
+  out.vy = sm * odom.vx + cm * odom.vy;
   return out;
 }
 

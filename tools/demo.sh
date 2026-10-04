@@ -84,9 +84,9 @@ if [[ ! -f /.dockerenv ]]; then
     if [[ "${nav_ok}" != 1 ]]; then
       echo "[demo] 等待 /navigate_to_pose 超时，导航容器日志尾部：" >&2
       docker logs "${NAV_CONTAINER}" 2>&1 | tail -15 >&2
-    else
-      echo "[demo] 导航就绪，启动决策容器"
+      exit 1
     fi
+    echo "[demo] 导航就绪，启动决策容器"
     set +e
     docker run --rm "${tty[@]}" "${user_args[@]}" "${ports[@]}" --network "${NETWORK}" \
       -v "${ROOT}":/ws -w /ws \
@@ -151,6 +151,7 @@ if [[ "${with_nav}" == 1 ]]; then
   done
   if [[ "${nav_ready}" != 1 ]]; then
     echo "[demo] 未等到 /navigate_to_pose：请确认导航容器已启动" >&2
+    exit 1
   fi
   # 双仓库：裁判仿真不提供伪导航，位姿取决策回传的 map 系 /decision/world_state；
   # 决策订阅真实导航的 /odometry（odom 系）并用 TF map->odom 转成 map 系。

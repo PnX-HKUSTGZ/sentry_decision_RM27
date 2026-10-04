@@ -314,6 +314,10 @@ class RefereeSimNode : public rclcpp::Node {
           declare_parameter<std::string>("decision_world_state_topic", "/decision/world_state");
       world_state_sub_ = create_subscription<sentry_decision_msgs::msg::WorldState>(
           world_state_topic_, 10, [this](sentry_decision_msgs::msg::WorldState::SharedPtr msg) {
+            // 只在位姿有效时更新：TF 未就绪时 self_valid=false 仍会携带旧/默认位姿。
+            if (!msg->self_valid) {
+              return;
+            }
             sim_pose_.x = msg->pos_x;
             sim_pose_.y = msg->pos_y;
             sim_pose_.yaw = msg->yaw;
