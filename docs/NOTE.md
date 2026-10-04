@@ -3,6 +3,30 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
+## 当前 sprint（v0.4.0 双仓库联调）
+
+### 已完成
+
+- 移除决策内部仿真暂停：`SetGamePause.srv`、`referee_sim_node` 暂停服务、`MatchStageController` /
+  `NavSimulator` 暂停状态、网页面板暂停按钮、`match_smoke` 暂停断言。
+- 定位走真实重定位：PCD 落位 `sentry_navgation_RM27/src/pb2025_nav_bringup/pcd/simulation/RMUC2026.pcd`，
+  `slam:=False` 下 `relocalization_manager` `LOCALIZING -> LOCALIZED`，`map->base_footprint` ≈ 出生点。
+  曾评估的 `slam:=True` 与静态 `map->odom` 方案均放弃（SLAM 以起点为原点，无法与绝对地图对齐）。
+- 决策侧方案 A（tf2）：`decision_node` 支持 `--ros-args` 透传；`RosIoNode` 新增 `odom_frame`，
+  用 TF `map->odom` 把 odom 位姿转 map 系；`pose_to_map` 纯逻辑 + 单测。
+- `referee_sim_node` 新增 `provide_nav`：双仓库时 `false`，不自建导航 action / odom，位姿取
+  `/decision/world_state`。
+- `tools/demo.sh` 新增 `--with-nav` / `--nav-silent`；`docs/sim_dual_repo.md` 记录接口契约。
+- 端到端实测：`tools/demo.sh --with-nav --nav-silent`，比赛开始后决策下发 `(1.39, 6.08)`，
+  真实 Nav2 驱动机器人从出生点移动到 `(-9.33, -4.10)`（map 系）。
+- 抖动修复：`timeouts.odometry_ms` 200 -> 500（`/odometry` 由点云回调驱动、约 10Hz）；
+  实测静止 90s 与运动 25s 均无新增急停。`demo.sh` 无 X11 时自动关导航 RViz、导航容器退出时快速报错。
+- 容器 `colcon test`：8 包 / 49 测试 0 失败。
+
+### 待办
+
+- 无（下一步见 `docs/sim_dual_repo.md` 与 `docs/ROADMAP.md`）。
+
 ## 当前 sprint（P3 可视化与仿真）
 
 ### 已锁定决策

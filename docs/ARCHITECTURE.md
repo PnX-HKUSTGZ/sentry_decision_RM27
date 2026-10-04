@@ -57,6 +57,8 @@ flowchart TD
 
 逐字段的来源（对应哪条裁判消息 / 位段）、单位、解码位置与有效性规则见 **docs/BELIEF.md**（信念层字段字典，
 单一事实来源）。`RosIoNode` 额外要求 `GameInfo` 与 `SentryInfoOnline` 都出现过，缺失来源不以默认 0 参与决策；
+双仓库联调时 `RosIoNode` 订阅 odom 系位姿，并以 TF `map->odom` 转成 map 系（`odom_frame` 非空时启用，
+留空则话题本身即 map 系）；
 `EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行），详见该文档 §7。
 
 ### 3.2 意图层
@@ -464,7 +466,7 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 | `TreeStatePublisher` | `sentry_decision_viz` | 采集 BT 节点状态并发布 `/decision/tree_status` |
 | Groot2 桥 | `sentry_decision_viz` | 可选地把行为树挂到 `BT::Groot2Publisher`，供 Groot2 实时连接 |
 | 网页面板 | `sentry_decision_viz/web` | 纯静态页：树状态、战场俯视图、WorldState、仿真与战术覆盖按钮 |
-| `referee_sim_node` | `sentry_decision_sim` | ROS 侧裁判仿真：发 `/sentry/*` 与 odom，跑导航 action server 与动作回执 |
+| `referee_sim_node` | `sentry_decision_sim` | ROS 侧裁判仿真：发 `/sentry/*`；`provide_nav` 为真（默认）时还提供伪导航 action 与 odom |
 | `DebugCommand` 服务端 | `sentry_decision_io` | 面板状态与战术层覆盖 service，转成线程安全命令队列 |
 
 `sentry_decision_viz` 依赖 `core`、`sentry_decision_msgs` 与 `behaviortree_cpp`，
@@ -513,9 +515,11 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 
 `referee_sim_node` 复用 core 中 ROS 无关的仿真组件，把本地仿真接到真实 IO 路径上：
 
-- 发布 `sentry_interfaces` 的五条上行消息与 odom，驱动 `decision_node`；
-- 内嵌 `NavSimulator` 作为 `NavigateToPose` action server，并在收到 `DecisionCommand` 后用
-  `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+- 发布 `sentry_interfaces` 的五条上行消息，驱动 `decision_node`；
+- `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
+  在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+- `provide_nav=false` 时不自建导航 action、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
+  补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；
 - **动作前置校验**：执行端 `execute_action()` 是动作合法性的权威，校验通过才会改世界；非法动作
   返回 `accepted=false` + `code`/`detail`，节点在 `publish_ack` 打印「裁判拒绝动作 ...」。
   规则依据：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点（表 5-8）；兑换血量与远程兑换
@@ -558,8 +562,7 @@ timeline:
 （`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒
 递减并自动进入下一阶段。控制器未被调用前不干预场景设定的 `game_status` / `game_time_remaining`，
 因此既有场景测试不受影响。场景可声明 `start_pose: [x, y, yaw]` 作为机器人初始位姿，进程启动与
-「重置」都会应用（重置同时清空导航目标）。另提供 `SetGamePause`（`/sentry_sim/set_game_pause`）：
-暂停时冻结计时与 `NavSimulator` 运动，odom 仍刷新时间戳以免被判失效，恢复后从当前时刻继续。
+「重置」都会应用（重置同时清空导航目标）。
 `/sentry_sim/set_world` 与 `/sentry_sim/apply_effect` 作用于仿真世界真实值，不进入决策节点。
 
 战略层只在 `GameStatus::kRunning`（比赛中）时执行任务，其余阶段输出 `TacticalMode::kIdle`；
@@ -575,7 +578,7 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
 - 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
   只可前进；重置同时调用 `/decision/debug clear_tactical_mode` 清除战术层覆盖；
 - 仿真控制：「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与三行「仿真效果」按钮
-  （`/sentry_sim/apply_effect`，步长来自 `config/sim.yaml` 的 `effects`），以及暂停按钮；
+  （`/sentry_sim/apply_effect`，步长来自 `config/sim.yaml` 的 `effects`）；
 - 战术层覆盖：模式下拉 + 设置 / 清除按钮，通过 `/decision/debug` 的
   `set_tactical_mode` / `clear_tactical_mode` service 下发；未进入「比赛中」时自动禁用；
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/

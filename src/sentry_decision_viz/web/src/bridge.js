@@ -79,18 +79,6 @@ export function createBridge(options) {
     });
   }
 
-  // 暂停 / 恢复裁判仿真（冻结计时与机器人运动）。
-  function setGamePause(paused) {
-    return new Promise(function (resolve, reject) {
-      const client = new ROSLIB.Service({
-        ros: ros,
-        name: '/sentry_sim/set_game_pause',
-        serviceType: 'sentry_decision_msgs/srv/SetGamePause',
-      });
-      client.callService({ paused: paused }, resolve, reject);
-    });
-  }
-
   // 直接修改裁判仿真的模拟世界（字段同场景 set_world）。
   function setSimWorld(field, value) {
     return new Promise(function (resolve, reject) {
@@ -119,7 +107,6 @@ export function createBridge(options) {
     connect: connect,
     callDebug: callDebug,
     setGameStage: setGameStage,
-    setGamePause: setGamePause,
     setSimWorld: setSimWorld,
     applyEffect: applyEffect,
   };

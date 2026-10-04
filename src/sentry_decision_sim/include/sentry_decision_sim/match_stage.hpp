@@ -40,16 +40,8 @@ class MatchStageController {
   // 推进 1 秒（计时 + 自动进入下一阶段）；由调用方按真实秒调用。
   void tick_second();
 
-  // 暂停 / 恢复：暂停时计时与自动推进停止，阶段保持不变。
-  void set_paused(bool paused) {
-    paused_ = paused;
-  }
-
   bool active() const {
     return active_;
-  }
-  bool paused() const {
-    return paused_;
   }
   MatchStage stage() const {
     return stage_;
@@ -70,7 +62,6 @@ class MatchStageController {
 
   MatchDurations durations_;
   bool active_ = false;
-  bool paused_ = false;
   MatchStage stage_ = MatchStage::kNotStarted;
   int remaining_ = 0;
   bool counting_ = false;

@@ -20,7 +20,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ApplyEffect.srv"
   "srv/DebugCommand.srv"
   "srv/SetGameStage.srv"
-  "srv/SetGamePause.srv"
   "srv/SetWorld.srv"
   DEPENDENCIES std_msgs geometry_msgs)
 

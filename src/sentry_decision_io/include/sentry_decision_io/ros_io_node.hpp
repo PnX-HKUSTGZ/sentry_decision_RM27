@@ -1,5 +1,8 @@
 #pragma once
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
 #include <geometry_msgs/msg/twist.hpp>
 #include <memory>
 #include <mutex>
@@ -12,6 +15,7 @@
 #include <vector>
 
 #include "sentry_decision_core/io.hpp"
+#include "sentry_decision_io/pose_transform.hpp"
 #include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
@@ -57,7 +61,14 @@ class RosIoNode : public rclcpp::Node,
   std::vector<sentry_decision::ActionAck> take_acks();
 
  private:
+  // odom_frame_ 非空时，用 TF map->odom 把订阅到的 odom 系位姿转成 map 系。
+  bool lookup_map_to_odom(MapToOdom* out);
+
   std::string map_frame_;
+  std::string odom_frame_;
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
+  bool tf_warned_ = false;
 
   mutable std::mutex referee_mutex_;
   sentry_decision::RefereeState referee_;

@@ -9,6 +9,27 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
+  200ms 会偶发判失效触发急停抖动，进而导致面板位姿闪烁。
+
+### Added
+
+- 双仓库联调：`RosIoNode` 新增 `odom_frame`，非空时用 TF `map->odom` 把 odom 系位姿转成 map 系；
+  抽出纯逻辑变换 `pose_to_map` + 单测。
+- `decision_node` 支持 `--ros-args` 透传，可在启动时覆盖 `RosIoNode` 的 ROS 参数。
+- `referee_sim_node` 新增 `provide_nav`（默认 `true`）；双仓库时置 `false`，不自建 `/navigate_to_pose`、
+  不发 odom，位姿改取 `/decision/world_state`。
+- `tools/demo.sh` 新增 `--with-nav` / `--nav-silent`：起真实导航容器（`rm27net` + PCD）并联调。
+- 新增 `docs/sim_dual_repo.md`（双仓库联调设计与接口契约）。
+
+### Removed
+
+- 移除仿真暂停：`SetGamePause.srv`、`referee_sim_node` 的暂停服务、`MatchStageController` /
+  `NavSimulator` 的暂停状态、网页面板暂停按钮，以及 `match_smoke` 的暂停断言。暂停会引入
+  与时间基准 / 恢复相关的额外状态，sim2real 风险高于收益。
+
 ## [v0.3.1] - 2026-10-03
 
 > v0.3.1：收敛调试入口——移除决策内部人工干预，只保留仿真世界与战术层覆盖，降低架构复杂度与 sim2real 风险。
