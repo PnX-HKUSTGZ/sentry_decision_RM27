@@ -13,6 +13,8 @@ find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosbag2_storage REQUIRED)
 find_package(sentry_decision_core REQUIRED)
@@ -32,7 +34,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   "$<INSTALL_INTERFACE:include>")
 ament_target_dependencies(${PROJECT_NAME}
   sentry_decision_core sentry_decision_msgs sentry_interfaces rclcpp rclcpp_action nav2_msgs
-  nav_msgs geometry_msgs std_msgs rosbag2_cpp rosbag2_storage)
+  nav_msgs geometry_msgs std_msgs rosbag2_cpp rosbag2_storage tf2_ros)
 target_link_libraries(${PROJECT_NAME} yaml-cpp::yaml-cpp)
 
 add_executable(io_node src/io_main.cpp)
@@ -51,12 +53,16 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
 ament_export_dependencies(
   sentry_decision_core sentry_decision_msgs sentry_interfaces rclcpp rclcpp_action nav2_msgs
-  nav_msgs geometry_msgs std_msgs rosbag2_cpp rosbag2_storage)
+  nav_msgs geometry_msgs std_msgs rosbag2_cpp rosbag2_storage tf2_ros)
 
 if(BUILD_TESTING)
   add_executable(test_decision_state_convert test/test_decision_state_convert.cpp)
   target_link_libraries(test_decision_state_convert ${PROJECT_NAME})
   add_test(NAME test_decision_state_convert COMMAND test_decision_state_convert)
+
+  add_executable(test_pose_transform test/test_pose_transform.cpp)
+  target_link_libraries(test_pose_transform ${PROJECT_NAME})
+  add_test(NAME test_pose_transform COMMAND test_pose_transform)
 
   add_executable(test_rosbag_replay test/test_rosbag_replay.cpp)
   target_link_libraries(test_rosbag_replay ${PROJECT_NAME})

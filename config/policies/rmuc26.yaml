@@ -23,7 +23,7 @@ safety:
   require_odometry: true        # 里程计数据无效时急停
 timeouts:
   referee_ms: 500               # 裁判上行有效期
-  odometry_ms: 200              # 里程计有效期
+  odometry_ms: 500              # 里程计有效期：/odometry 由点云回调驱动、约 10Hz，过短会偶发判失效导致急停抖动
   navigation_ms: 500            # 导航状态有效期
 action:
   one_shot_timeout_ms: 500      # one-shot 动作超时未 ack 记 WARN

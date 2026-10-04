@@ -1,5 +1,8 @@
 #include "sentry_decision_io/ros_io_node.hpp"
 
+#include <tf2/exceptions.h>
+#include <tf2/time.h>
+
 #include <cmath>
 #include <exception>
 
@@ -8,9 +11,18 @@
 
 namespace sentry_decision_io {
 
+namespace {
+
+double yaw_from_quaternion(double x, double y, double z, double w) {
+  return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+}
+
+}  // namespace
+
 RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
     : rclcpp::Node("sentry_decision_io", options) {
   map_frame_ = declare_parameter<std::string>("map_frame", "map");
+  odom_frame_ = declare_parameter<std::string>("odom_frame", "");
   const auto game_info_topic =
       declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
   const auto online_info_topic =
@@ -92,23 +104,40 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
 
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       odom_topic, 10, [this](nav_msgs::msg::Odometry::SharedPtr msg) {
-        std::lock_guard<std::mutex> lock(odometry_mutex_);
-        odometry_.pose.x = msg->pose.pose.position.x;
-        odometry_.pose.y = msg->pose.pose.position.y;
+        sentry_decision::SelfState state;
+        state.pose.x = msg->pose.pose.position.x;
+        state.pose.y = msg->pose.pose.position.y;
         const auto& q = msg->pose.pose.orientation;
-        odometry_.pose.yaw =
-            std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-        odometry_.vx = msg->twist.twist.linear.x;
-        odometry_.vy = msg->twist.twist.linear.y;
-        odometry_.wz = msg->twist.twist.angular.z;
-        odometry_.stamp = sentry_decision::SteadyClock::now();
-        odometry_.valid = true;
+        state.pose.yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w);
+        state.vx = msg->twist.twist.linear.x;
+        state.vy = msg->twist.twist.linear.y;
+        state.wz = msg->twist.twist.angular.z;
+        state.stamp = sentry_decision::SteadyClock::now();
+        state.valid = true;
+        // 双仓库：odom 话题在 odom 系，需用 TF map->odom 转成 map 系。TF 未就绪时
+        // 丢弃本帧并标记失效，绝不把 odom 系坐标误当 map 系。
+        if (!odom_frame_.empty()) {
+          MapToOdom map_to_odom;
+          if (!lookup_map_to_odom(&map_to_odom)) {
+            std::lock_guard<std::mutex> lock(odometry_mutex_);
+            odometry_.valid = false;
+            return;
+          }
+          state = pose_to_map(map_to_odom, state);
+        }
+        std::lock_guard<std::mutex> lock(odometry_mutex_);
+        odometry_ = state;
       });
 
   cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic, 10);
   decision_pub_ =
       create_publisher<sentry_interfaces::msg::DecisionCommand>(decision_command_topic, 10);
   nav_client_ = rclcpp_action::create_client<NavigateToPose>(this, navigate_action);
+
+  if (!odom_frame_.empty()) {
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
+  }
 }
 
 bool RosIoNode::referee(sentry_decision::RefereeState* out) const {
@@ -124,6 +153,25 @@ bool RosIoNode::odometry(sentry_decision::SelfState* out) const {
   std::lock_guard<std::mutex> lock(odometry_mutex_);
   *out = odometry_;
   return odometry_.valid;
+}
+
+bool RosIoNode::lookup_map_to_odom(MapToOdom* out) {
+  try {
+    const geometry_msgs::msg::TransformStamped tf =
+        tf_buffer_->lookupTransform(map_frame_, odom_frame_, tf2::TimePointZero);
+    out->x = tf.transform.translation.x;
+    out->y = tf.transform.translation.y;
+    const auto& q = tf.transform.rotation;
+    out->yaw = yaw_from_quaternion(q.x, q.y, q.z, q.w);
+    tf_warned_ = false;
+    return true;
+  } catch (const tf2::TransformException& ex) {
+    if (!tf_warned_) {
+      SD_LOG_WARN("io", "map->%s 变换不可用，丢弃 odom: %s", odom_frame_.c_str(), ex.what());
+      tf_warned_ = true;
+    }
+    return false;
+  }
 }
 
 std::optional<sentry_interfaces::msg::DecisionAck> RosIoNode::last_ack() const {

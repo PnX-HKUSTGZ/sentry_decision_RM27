@@ -19,9 +19,9 @@
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
+#include "sentry_decision_msgs/msg/world_state.hpp"
 #include "sentry_decision_msgs/srv/apply_effect.hpp"
 #include "sentry_decision_msgs/srv/debug_command.hpp"
-#include "sentry_decision_msgs/srv/set_game_pause.hpp"
 #include "sentry_decision_msgs/srv/set_game_stage.hpp"
 #include "sentry_decision_msgs/srv/set_world.hpp"
 #include "sentry_decision_sim/decision_actuator_sim.hpp"
@@ -165,6 +165,7 @@ class RefereeSimNode : public rclcpp::Node {
     initial_world_ = world_;
     start_pose_ = scenario_.start_pose.value_or(nav_.pose());
     nav_.set_pose(start_pose_);
+    sim_pose_ = start_pose_;
     // 动作执行端在回执时把兑换结算进仿真世界（扣金币、加血量/发弹量）。
     actuator_.bind_world(&world_, max_hp_);
     last_stage_tick_ = SteadyClock::now();
@@ -198,6 +199,14 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void declare_and_create_interfaces() {
+    // 是否由本节点提供伪导航（action server + odom）。双仓库联调设 false：
+    // 导航由真实 Nav2 提供，本节点只保留裁判仿真，位姿取 /decision/world_state。
+    if (has_parameter("provide_nav")) {
+      provide_nav_ = get_parameter("provide_nav").as_bool();
+    } else {
+      provide_nav_ = declare_parameter<bool>("provide_nav", true);
+    }
+
     // 补给区回血 / 血量上限：仿真近似规则 5.2.1（占领补给区每秒回上限血量的
     // 10%，比赛 4 分钟后为 25%）。默认值来自 config/sim.yaml（点位取自其引用的 map）；
     // 命令行 -p 覆盖优先级最高。
@@ -270,16 +279,6 @@ class RefereeSimNode : public rclcpp::Node {
           handle_set_game_stage(*request, *response);
         });
 
-    // 网页面板 / 手动暂停比赛（仅仿真）。
-    const auto set_game_pause_service =
-        declare_parameter<std::string>("set_game_pause_service", "/sentry_sim/set_game_pause");
-    set_game_pause_server_ = create_service<sentry_decision_msgs::srv::SetGamePause>(
-        set_game_pause_service,
-        [this](const std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Request> request,
-               std::shared_ptr<sentry_decision_msgs::srv::SetGamePause::Response> response) {
-          handle_set_game_pause(*request, *response);
-        });
-
     // 直接修改仿真世界（网页面板 / 演示用），字段同场景 set_world。
     const auto set_world_service =
         declare_parameter<std::string>("set_world_service", "/sentry_sim/set_world");
@@ -301,13 +300,29 @@ class RefereeSimNode : public rclcpp::Node {
         });
 
     using namespace std::placeholders;
-    action_server_ = rclcpp_action::create_server<NavigateToPose>(
-        this, navigate_action,
-        [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const NavigateToPose::Goal> goal) {
-          return handle_goal(*goal);
-        },
-        [this](const std::shared_ptr<GoalHandle> handle) { return handle_cancel(handle); },
-        [this](const std::shared_ptr<GoalHandle> handle) { handle_accepted(handle); });
+    if (provide_nav_) {
+      action_server_ = rclcpp_action::create_server<NavigateToPose>(
+          this, navigate_action,
+          [this](const rclcpp_action::GoalUUID&, std::shared_ptr<const NavigateToPose::Goal> goal) {
+            return handle_goal(*goal);
+          },
+          [this](const std::shared_ptr<GoalHandle> handle) { return handle_cancel(handle); },
+          [this](const std::shared_ptr<GoalHandle> handle) { handle_accepted(handle); });
+    } else {
+      // 双仓库：真实导航负责下发目标与底盘；本节点只用决策回传的 map 系位姿。
+      world_state_topic_ =
+          declare_parameter<std::string>("decision_world_state_topic", "/decision/world_state");
+      world_state_sub_ = create_subscription<sentry_decision_msgs::msg::WorldState>(
+          world_state_topic_, 10, [this](sentry_decision_msgs::msg::WorldState::SharedPtr msg) {
+            // 只在位姿有效时更新：TF 未就绪时 self_valid=false 仍会携带旧/默认位姿。
+            if (!msg->self_valid) {
+              return;
+            }
+            sim_pose_.x = msg->pos_x;
+            sim_pose_.y = msg->pos_y;
+            sim_pose_.yaw = msg->yaw;
+          });
+    }
   }
 
   rclcpp_action::GoalResponse handle_goal(const NavigateToPose::Goal& goal) {
@@ -372,10 +387,11 @@ class RefereeSimNode : public rclcpp::Node {
     }
     if (reset_requested) {
       world_ = initial_world_;
-      nav_.set_pose(start_pose_);
-      nav_.cancel_goal();
-      match_.set_paused(false);
-      nav_.set_paused(false);
+      if (provide_nav_) {
+        nav_.set_pose(start_pose_);
+        nav_.cancel_goal();
+      }
+      sim_pose_ = start_pose_;
       actuator_.reset();
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
@@ -390,18 +406,6 @@ class RefereeSimNode : public rclcpp::Node {
     response.message = "ok";
     SD_LOG_ACT("sim", "比赛阶段 -> %d（剩余 %ds）", static_cast<int>(match_.stage()),
                match_.remaining_seconds());
-  }
-
-  // 暂停 / 恢复：冻结比赛计时与机器人运动，odom 仍刷新时间戳（保持有效）。
-  void handle_set_game_pause(const sentry_decision_msgs::srv::SetGamePause::Request& request,
-                             sentry_decision_msgs::srv::SetGamePause::Response& response) {
-    match_.set_paused(request.paused);
-    nav_.set_paused(request.paused);
-    last_stage_tick_ = SteadyClock::now();  // 恢复时从当前时刻继续计时
-    response.success = true;
-    response.paused = match_.paused();
-    response.message = match_.paused() ? "已暂停" : "已恢复";
-    SD_LOG_ACT("sim", "比赛%s", match_.paused() ? "已暂停" : "已恢复");
   }
 
   // 直接修改仿真世界：字段与场景 set_world 一致，失败给出原因。
@@ -464,9 +468,14 @@ class RefereeSimNode : public rclcpp::Node {
     sync_world_stage();
   }
 
+  // 当前位姿来源：独立仿真用伪导航；双仓库联调用 /decision/world_state（map 系）。
+  sentry_decision::Point2D current_pose() const {
+    return provide_nav_ ? nav_.pose() : sim_pose_;
+  }
+
   // 机器人是否在补给区（以配置的圆心 + 半径判定）。
   bool in_supply_zone() const {
-    const sentry_decision::Point2D pose = nav_.pose();
+    const sentry_decision::Point2D pose = current_pose();
     return std::hypot(pose.x - supply_center_x_, pose.y - supply_center_y_) <= supply_radius_;
   }
 
@@ -484,9 +493,6 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void apply_supply_second() {
-    if (match_.paused()) {
-      return;
-    }
     if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
       return;
     }
@@ -535,7 +541,7 @@ class RefereeSimNode : public rclcpp::Node {
     }
   }
 
-  // 按真实秒推进补给区回血；暂停时仍推进计时基准，避免恢复后补算。
+  // 按真实秒推进补给区回血。
   void step_supply() {
     const TimePoint now = SteadyClock::now();
     while (now - last_supply_tick_ >= Duration{1000}) {
@@ -551,16 +557,18 @@ class RefereeSimNode : public rclcpp::Node {
     zones.base_buff = {base_buff_center_x_, base_buff_center_y_, base_buff_radius_};
     zones.our_outpost_buff = {our_outpost_center_x_, our_outpost_center_y_, our_outpost_radius_};
     zones.fort_buff = {fort_buff_center_x_, fort_buff_center_y_, fort_buff_radius_};
-    const sentry_decision::Point2D pose = nav_.pose();
+    const sentry_decision::Point2D pose = current_pose();
     const sentry_decision_sim::Occupancy occupancy =
         sentry_decision_sim::evaluate_occupancy(zones, pose.x, pose.y);
     sentry_decision_sim::apply_occupancy(&world_, occupancy);
   }
 
   void tick() {
-    nav_.update(SteadyClock::now());
+    if (provide_nav_) {
+      nav_.update(SteadyClock::now());
+      finish_goal_if_done();
+    }
     update_occupancy();
-    finish_goal_if_done();
     actuator_.update();
     for (const auto& ack : actuator_.take_acks()) {
       publish_ack(ack);
@@ -569,7 +577,9 @@ class RefereeSimNode : public rclcpp::Node {
     step_game_stage();
     step_supply();
     publish_uplinks();
-    publish_odom();
+    if (provide_nav_) {
+      publish_odom();
+    }
     step_scenario();
   }
 
@@ -799,6 +809,10 @@ class RefereeSimNode : public rclcpp::Node {
   DecisionView last_decision_;
   std::string odom_topic_;
   std::string map_frame_;
+  bool provide_nav_ = true;
+  sentry_decision::Point2D sim_pose_{};
+  std::string world_state_topic_;
+  rclcpp::Subscription<sentry_decision_msgs::msg::WorldState>::SharedPtr world_state_sub_;
 
   rclcpp::Publisher<sentry_interfaces::msg::GameInfo>::SharedPtr game_info_pub_;
   rclcpp::Publisher<sentry_interfaces::msg::SentryInfoOnline>::SharedPtr online_info_pub_;
@@ -810,7 +824,6 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Subscription<sentry_interfaces::msg::DecisionCommand>::SharedPtr decision_command_sub_;
   rclcpp::Subscription<sentry_decision_msgs::msg::DecisionState>::SharedPtr decision_state_sub_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;
-  rclcpp::Service<sentry_decision_msgs::srv::SetGamePause>::SharedPtr set_game_pause_server_;
   rclcpp::Service<sentry_decision_msgs::srv::SetWorld>::SharedPtr set_world_server_;
   rclcpp::Service<sentry_decision_msgs::srv::ApplyEffect>::SharedPtr apply_effect_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;

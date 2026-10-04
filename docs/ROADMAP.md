@@ -18,6 +18,7 @@
 | P1 信念与回放 | 接管 I/O 并打通回放 | 单节点 io、裁判解码 + 单测、WorldState 融合、DecisionState 发布、replay 适配器 | 旧 rosbag 回放得到一致的 WorldState；同一回放可确定性复现 |
 | P2 策略迁移 | 用新架构复现旧决策 | 多子树 + 插件清单、战术 / 技能模块、nav_policy + nav_executor、IntentArbiter 接入、intervention 模块 | 同场景下新旧输出（目标点 / 模式 / 姿态）一致；抢占与 halt 契约测试通过 |
 | P3 可视化与仿真 | 可观测、可手动干预 | TreeStatePublisher、Groot2、rosbridge 战场页、referee_simulator、场景脚本 | 网页实时显示树状态与机器人 / 敌方位置；仿真驱动完整对局；干预可记录与回放 |
+| P3.5 双仓库联调 | 导航接入本地仿真 | `odom_frame` + tf2 坐标变换、`provide_nav` 解耦、`demo.sh --with-nav`、`docs/sim_dual_repo.md` | 真实 Nav2 驱动决策目标；面板显示真实点位；导航可静默 |
 | P4 切换与冻结 | 新仓库成为默认 | 实车 / 仿真跑通、旧仓库打 tag 归档、迁移报告 | 24.04 实车与容器行为一致；文档齐全 |
 
 ## P0 骨架（已完成）
@@ -150,7 +151,7 @@
 - `DebugCommand.srv` 收敛为 `list_state` / `set_tactical_mode` / `clear_tactical_mode`；`InterventionServer` 替换为只读面板服务。
 - `list_state` 只保留面板需要的字段：`points`（含半径）、`resource` / `last_action` / `last_ack`、`safety_emergency`、`tactical_override`。
 - `replay_main` 只回放世界输入（`/sentry/*` + odom），不再有干预通道。
-- 网页面板：保留比赛阶段 / 暂停 / 仿真世界 / 仿真效果 / 战术模式覆盖；移除 Intent、模块开关、世界覆盖相关 UI。
+- 网页面板：保留比赛阶段 / 仿真世界 / 仿真效果 / 战术模式覆盖；移除 Intent、模块开关、世界覆盖相关 UI。
 
 **阶段**
 1. core：移除 `intervention.*` 与 `kIntervention`，新增 `TacticalOverride` + 单测；仲裁 owner 规则去掉 intervention。

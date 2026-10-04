@@ -1,4 +1,4 @@
-// 仿真与战术层覆盖控件：比赛阶段 / 暂停 / 仿真世界 / 仿真效果 -> 裁判仿真 service；
+// 仿真与战术层覆盖控件：比赛阶段 / 仿真世界 / 仿真效果 -> 裁判仿真 service；
 // 战术层覆盖 -> /decision/debug (service)。面板不使用 ROS action 客户端：vendored roslib
 // 1.4.1 的 ActionClient 是 ROS 1 actionlib 命名，无法对接 ROS 2 action，故面板统一走 service。
 export function createControlsPanel(el, bridge, onLog, onRefresh) {
@@ -19,7 +19,6 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
   html += '<button id="btn-stage-2">15s自检</button>';
   html += '<button id="btn-stage-3">5s倒计时</button>';
   html += '<button id="btn-stage-4">开始比赛</button>';
-  html += '<button id="btn-pause">暂停</button>';
   html += '<button id="btn-reset">重置</button></div>';
   // 仿真世界：直接改裁判仿真的真实世界（兑换/回血据此演变）。
   html += '<div class="row"><span title="直接修改裁判仿真的真实世界">仿真世界</span><select id="sim-world-field">';
@@ -110,29 +109,11 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     });
   });
 
-  // 暂停 / 恢复：冻结比赛计时与机器人运动。
-  let paused = false;
-  const pauseButton = document.getElementById('btn-pause');
-  pauseButton.addEventListener('click', function () {
-    bridge
-      .setGamePause(!paused)
-      .then(function (response) {
-        paused = !!(response && response.paused);
-        pauseButton.textContent = paused ? '继续' : '暂停';
-        onLog(response && response.message ? response.message : paused ? '已暂停' : '已恢复');
-      })
-      .catch(function (error) {
-        onLog('暂停失败: ' + error);
-      });
-  });
-
   document.getElementById('btn-reset').addEventListener('click', function () {
     // 重置裁判仿真的世界与位姿，并清除决策节点的战术层覆盖。
     bridge
       .setGameStage(0)
       .then(function () {
-        paused = false;
-        pauseButton.textContent = '暂停';
         onLog('比赛已重置到未开始（含位置）');
         return bridge.callDebug('clear_tactical_mode', '');
       })

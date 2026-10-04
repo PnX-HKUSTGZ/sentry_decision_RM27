@@ -1,6 +1,0 @@
-# 暂停 / 恢复裁判仿真（仅模拟 / 演示用）：暂停比赛计时与机器人运动，odom 保持最后位置。
-bool paused
----
-bool success
-bool paused
-string message

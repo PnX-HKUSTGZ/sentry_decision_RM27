@@ -119,7 +119,11 @@ tools/demo.sh            # 宿主直接运行；自动起容器并映射 8080/90
   | `tools/demo.sh --build` | 先 `colcon build` 再启动 |
   | `tools/demo.sh --scenario <容器内路径>` | 指定场景（默认 `demo.yaml`） |
   | `tools/demo.sh --rate 20` | 仿真频率 |
+  | `tools/demo.sh --with-nav` | 双仓库联调：额外起真实导航容器（`rm27net` + PCD），决策用 TF 把 `/odometry` 转 map 系 |
+  | `tools/demo.sh --with-nav --nav-silent` | 同上，导航不开 RViz |
 
+- 双仓库联调需要导航镜像 `rm27_nav:jazzy` 与 PCD（见 `docs/sim_dual_repo.md`）；决策侧
+  `referee_sim_node` 以 `provide_nav:=false` 运行，位姿来自 `/decision/world_state`。
 - 已经在容器里时同样可用：`tools/demo.sh` 会自动识别容器环境；也可用
   `docker/entrypoint.sh demo`。
 - 宿主运行需镜像已构建、8080/9090 空闲；面板地址 `http://localhost:8080`。
@@ -309,13 +313,12 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 | 控件 | 作用 | 底层调用 |
 | --- | --- | --- |
 | 比赛阶段 / 重置 | 推进阶段；重置回未开始并恢复机器人初始位姿 | `/sentry_sim/set_game_stage` |
-| 暂停 / 继续 | 冻结比赛计时与机器人运动（odom 保持最后位置） | `/sentry_sim/set_game_pause` |
 | 仿真世界 设置 | 直接改裁判仿真的真实世界：自身 / 基地 / 前哨血量、金币、发弹量、剩余时间 | `/sentry_sim/set_world` |
 | 仿真效果 三行按钮 | 对真实世界施加具名效果：自身扣血 / 扣弹 / 死亡；我方 / 敌方前哨扣血 / 摧毁、基地扣血 | `/sentry_sim/apply_effect`（步长见 `config/sim.yaml` 的 `effects`） |
 | 模式 + 设置 / 清除 | 设置或清除战术层覆盖（patrol/attack/defend/retreat/heal/respawn） | `/decision/debug set_tactical_mode` / `clear_tactical_mode` |
 
 > 战术层覆盖 `lease` 默认 **0**：一直生效，直到点「清除」或「重置」；填正数则按秒到期后
-> 自动交还战略层（lease 用系统时间计算，暂停期间仍会到期）。
+> 自动交还战略层（lease 用系统时间计算）。
 
 未进入「比赛中」时战术层覆盖按钮自动禁用；仿真世界 / 仿真效果仍可用。
 
@@ -407,6 +410,9 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | `--plugin` | 空 | 节点插件 `.so` 路径 |
 | `--groot2-port` | `0` | Groot2 监听端口，`0` 表示关闭（范围 `[0, 65535]`） |
 
+其内部 `RosIoNode` 的 ROS 参数（见 §5.3）可在 `--ros-args` 之后透传，例如
+`decision_node --ros-args -p odom_topic:=/odometry -p odom_frame:=odom`。
+
 ### 5.3 io_node 参数
 
 均为 ROS 参数，可用 `--ros-args -p name:=value` 覆盖。
@@ -422,6 +428,7 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | `decision_ack_topic` | `/sentry/decision_ack` | 动作回执（DecisionAck） |
 | `decision_command_topic` | `/sentry/decision_command` | 决策下行（DecisionCommand） |
 | `odom_topic` | `/aft_mapped_to_init` | 里程计（Odometry） |
+| `odom_frame` | 空 | 非空时用 TF `map->odom` 把 odom 位姿转 map 系（双仓库设 `odom`） |
 | `cmd_vel_topic` | `cmd_vel` | 速度指令（Twist） |
 | `navigate_action` | `navigate_to_pose` | 导航 action（NavigateToPose） |
 
@@ -444,7 +451,6 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--hold` | 关 | 场景时间轴跑完后不退出，保持最后一个世界状态（面板演示） |
 | `--sim-config` | 编译期绝对路径 | 仿真参数 YAML；该路径不存在时回退到相对路径 `config/sim.yaml` |
 | `--ros-args -p set_game_stage_service` | `/sentry_sim/set_game_stage` | 比赛阶段设置服务名 |
-| `--ros-args -p set_game_pause_service` | `/sentry_sim/set_game_pause` | 暂停 / 恢复服务名 |
 | `--ros-args -p set_world_service` | `/sentry_sim/set_world` | 直接修改仿真世界的服务名 |
 | `--ros-args -p apply_effect_service` | `/sentry_sim/apply_effect` | 施加具名仿真效果的服务名 |
 | `--ros-args -p max_hp` | `400` | 哨兵上限血量（用于兑换 / 回血上限） |
@@ -460,6 +466,8 @@ ros2 run sentry_decision_io io_node --ros-args \
 | `--ros-args -p decision_state_topic` | `/decision/state` | 场景断言订阅的决策状态话题 |
 | `--ros-args -p odom_topic` | `/aft_mapped_to_init` | 里程计发布话题 |
 | `--ros-args -p navigate_action` | `navigate_to_pose` | 提供的导航 action 名 |
+| `--ros-args -p provide_nav` | `true` | 是否提供伪导航（action server + odom）；双仓库设 `false` |
+| `--ros-args -p decision_world_state_topic` | `/decision/world_state` | `provide_nav=false` 时位姿来源 |
 
 ### 5.5 replay_main 参数
 

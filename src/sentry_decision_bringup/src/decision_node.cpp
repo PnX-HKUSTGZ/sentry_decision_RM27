@@ -81,6 +81,9 @@ Options parse_options(int argc, char** argv) {
       options.plugin = next("--plugin");
     } else if (arg == "--groot2-port") {
       options.groot2_port = std::stoi(next("--groot2-port"));
+    } else if (arg == "--ros-args") {
+      // 其余 ROS 参数（节点参数 / 重映射）留给 rclcpp，与 referee_sim_node 一致。
+      break;
     } else {
       std::cerr << "未知参数: " << arg << "\n";
       std::exit(2);

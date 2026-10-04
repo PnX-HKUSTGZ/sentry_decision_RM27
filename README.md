@@ -39,6 +39,9 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27
 
 # 一键运行本地仿真（裁判 + 行为树 + 网页面板）
 tools/demo.sh
+
+# 双仓库联合仿真
+tools/demo.sh --with-nav [--nav-silent] # 是否关闭 RViz
 ```
 
 完整命令与参数见 [docs/USAGE.md](docs/USAGE.md)。
