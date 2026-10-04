@@ -28,6 +28,8 @@ struct DecisionContext {
   const PolicyConfig* config = nullptr;
   // 本 tick 的战略层结论；任务树读取它做任务选择。
   StrategicDecision strategy;
+  // 战略层跨 tick 记忆（撤退迟滞等），显式放进数据契约。
+  StrategicMemory strategy_memory;
   std::vector<Intent> intents;
   // 巡逻技能状态，按 loop_id 索引（见 PatrolCursor）。
   std::map<std::string, PatrolCursor> patrol;

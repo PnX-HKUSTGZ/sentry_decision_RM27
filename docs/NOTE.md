@@ -21,11 +21,12 @@
 - 初版主决策树（还原上一赛季）：战略层三条规则 + 任务树重排（进攻 > 高地循环 > 后方巡逻 > 守堡垒）；
   新增 PatrolLoop 技能节点（到点停留 nav.patrol_dwell_s 秒）与 tree/skill/patrol_loop.xml；
   游标存 DecisionContext.patrol。移除进攻时间窗。
+- 撤退迟滞：低于 retreat_hp 进入撤退后保持到 recovery_hp 才离开补给区；迟滞状态放
+  DecisionContext.strategy_memory，StrategicPolicy::decide 增 memory 参数。
 - 文档：ARCHITECTURE §14.4 / USAGE / CHANGELOG / NOTE 同步。
 
 ### 待办
 
-- 高地 3 点（highland_a/b/c）与后方 2 点（patrol_a/b）坐标待场地标定。
 - 初版决策树其余修复项（待补）。
 
 ## 历史 sprint（v0.4.0 双仓库联调）

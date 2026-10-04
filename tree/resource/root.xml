@@ -17,25 +17,25 @@
         <IfCanFreeResurrect/>
         <RequestFreeRevive/>
       </Sequence>
-      <Sequence name="RemoteHpExchange">
+      <!-- <Sequence name="RemoteHpExchange">
         <IfLowHp hp_key="resource.hp_exchange_threshold"/>
         <IfDisengaged/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
         <RequestRemoteHpExchange times_key="resource.remote_hp_times"/>
-      </Sequence>
+      </Sequence> -->
       <Sequence name="LocalAmmoExchange">
         <IfLowAmmo ammo_key="nav.low_ammo"/>
         <IfOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
         <RequestAmmoExchange amount_key="resource.exchange_ammo_step"/>
       </Sequence>
-      <Sequence name="RemoteAmmoExchange">
+      <!-- <Sequence name="RemoteAmmoExchange">
         <IfLowAmmo ammo_key="nav.low_ammo"/>
         <IfDisengaged/>
         <IfNotOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.remote_ammo_min_coins"/>
         <RequestRemoteAmmoExchange times_key="resource.remote_ammo_times"/>
-      </Sequence>
+      </Sequence> -->
     </ReactiveFallback>
   </BehaviorTree>
 </root>

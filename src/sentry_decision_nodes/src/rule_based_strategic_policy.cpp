@@ -33,6 +33,9 @@ RuleBasedStrategicPolicy RuleBasedStrategicPolicy::from_config(const PolicyConfi
   if (const auto value = config.number("nav.retreat_hp")) {
     thresholds.retreat_hp = static_cast<int>(*value);
   }
+  if (const auto value = config.number("nav.recovery_hp")) {
+    thresholds.recovery_hp = static_cast<int>(*value);
+  }
   if (const auto value = config.number("nav.low_ammo")) {
     thresholds.low_ammo = static_cast<int>(*value);
   }
@@ -42,21 +45,41 @@ RuleBasedStrategicPolicy RuleBasedStrategicPolicy::from_config(const PolicyConfi
   return RuleBasedStrategicPolicy(thresholds);
 }
 
-StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world) const {
+StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world,
+                                                   StrategicMemory* memory) const {
   const RefereeState& referee = world.referee;
   if (!referee.valid) {
     return make_decision(TacticalMode::kUnknown);
   }
-  // 只有「比赛中」才执行任务；准备 / 自检 / 倒计时 / 结算阶段保持待机，不下发任务意图。
+  // 只有「比赛中」才执行任务；准备 / 自检 / 倒计时 / 结算阶段保持待机。
   if (referee.game_status != GameStatus::kRunning) {
     return make_decision(TacticalMode::kIdle);
   }
   if (referee.self_hp <= 0) {
+    if (memory != nullptr) {
+      memory->retreat_latched = false;
+    }
     return make_decision(TacticalMode::kRespawn);
   }
-  if (referee.self_hp <= thresholds_.retreat_hp) {
+
+  // 撤退迟滞：低于 retreat_hp 进入；已进入则保持到血量恢复到
+  // recovery_hp，避免刚到阈值就离开补给区。
+  bool retreat = referee.self_hp <= thresholds_.retreat_hp;
+  if (memory != nullptr) {
+    if (memory->retreat_latched) {
+      if (referee.self_hp >= thresholds_.recovery_hp) {
+        memory->retreat_latched = false;
+      } else {
+        retreat = true;
+      }
+    } else if (retreat) {
+      memory->retreat_latched = true;
+    }
+  }
+  if (retreat) {
     return make_decision(TacticalMode::kRetreat);
   }
+
   if (referee.self_ammo <= thresholds_.low_ammo) {
     return make_decision(TacticalMode::kHeal);
   }

@@ -64,7 +64,7 @@ TickResult tick(BT::Tree& tree, DecisionContext& context, const PolicyConfig& co
   context.world = world;
   context.world.stamp = now;
   context.clear_intents();
-  context.apply_strategy(policy.decide(context.world));
+  context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
   tree.tickOnce();
 
   IntentArbiter arbiter;

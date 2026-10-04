@@ -210,7 +210,7 @@ class DecisionNode : public rclcpp::Node {
     apply_tactical_commands(now);
     context_.world = world_model_.snapshot(now);
     context_.clear_intents();
-    context_.apply_strategy(policy_.decide(context_.world));
+    context_.apply_strategy(policy_.decide(context_.world, &context_.strategy_memory));
     sentry_decision::apply_tactical_override(tactical_override_, now, &context_);
     // 清空上一拍的树状态缓存，让快照只反映本拍执行的节点。
     tree_publisher_->begin_tick();

@@ -16,7 +16,7 @@
   后方巡逻，否则回堡垒防守。任务优先级在 `mission/root.xml` 重排。
 - 巡逻技能：`PatrolLoop` 节点 + `tree/skill/patrol_loop.xml`——按命名点列表循环，到点后停留
   `nav.patrol_dwell_s` 秒再切下一点；游标显式存于 `DecisionContext.patrol`（按 `loop_id` 区分）。
-- 地图新增高地 3 个巡逻点 `highland_a/b/c`（暂定坐标，待场地标定）。
+- 地图新增高地 3 个巡逻点 `highland_a/b/c`。
 
 ### Changed
 
@@ -46,6 +46,9 @@
 
 ### Fixed
 
+- 撤退迟滞：低于 `nav.retreat_hp` 进入撤退后，保持到血量恢复到 `nav.recovery_hp` 才离开补给区
+  （设为上限血量即回满才走），不再刚高于进入阈值就切回主任务。迟滞状态显式存于
+  `DecisionContext.strategy_memory`，策略接口 `StrategicPolicy::decide(world, memory)` 相应调整。
 - 仿真链路中机器人阵亡后不再「只停在 `respawn` 模式」：裁判侧从未按死活导出
   `info1.can_free_resurrect`，且 `kFreeResurrect` 只回执不结算，导致决策不发起确认复活、
   血量也不会恢复。现由仿真裁判统一按规则推导复活状态并结算。

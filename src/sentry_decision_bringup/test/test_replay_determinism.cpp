@@ -103,7 +103,7 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
     replay.step(period);
     context.world = model.snapshot(replay.stamp());
     context.clear_intents();
-    context.apply_strategy(policy.decide(context.world));
+    context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
     tree.tickOnce();
 
     arbiter.clear_source(SourceId::kStrategic);

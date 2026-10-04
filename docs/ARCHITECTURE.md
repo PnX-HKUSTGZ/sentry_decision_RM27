@@ -557,7 +557,7 @@ timeline:
   - at: 3.0
     set_world: { enemy_outpost_hp: 0 }
   - at: 4.5
-    expect:    { tactical_mode: patrol, nav_goal_x: -1.56, nav_goal_y: 3.97 }  # -> 高地巡逻
+    expect:    { tactical_mode: patrol, nav_goal_x: 2.49, nav_goal_y: 4.05 }  # -> 高地巡逻
   - at: 9.0
     set_world: { game_time_remaining: 100 }
   - at: 10.5

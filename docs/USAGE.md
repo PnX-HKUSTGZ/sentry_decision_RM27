@@ -235,6 +235,9 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 低血撤退 / 低弹补给 / 阵亡复活的优先级高于主策略。巡逻 = 对当前命名点持续发目标，到点后停留
 `nav.patrol_dwell_s` 秒再去下一点（循环）。
 
+撤退带**迟滞**：血量低于 `nav.retreat_hp` 进入撤退并在补给区回血，保持到恢复到 `nav.recovery_hp`
+才离开（把 `nav.recovery_hp` 设为哨兵上限血量即「回满才走」），避免刚过进入阈值就切回主任务。
+
 场景 YAML 结构（`full_match.yaml` 跑通「进攻→高地→后方巡逻→守堡垒→撤退→复活」）：
 
 ```yaml
@@ -250,7 +253,7 @@ timeline:
   - at: 3.0
     set_world: { enemy_outpost_hp: 0 }
   - at: 4.5
-    expect:    { tactical_mode: patrol, nav_goal_x: -1.56, nav_goal_y: 3.97 }  # -> 高地巡逻
+    expect:    { tactical_mode: patrol, nav_goal_x: 2.49, nav_goal_y: 4.05 }  # -> 高地巡逻
   - at: 9.0
     set_world: { game_time_remaining: 100 }        # 双方前哨皆毁且剩余 <= 180s
   - at: 10.5

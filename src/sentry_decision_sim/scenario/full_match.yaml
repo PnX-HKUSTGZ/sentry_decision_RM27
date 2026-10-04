@@ -32,8 +32,8 @@ timeline:
     expect:
       tactical_mode: patrol
       stance: move
-      nav_goal_x: -1.56
-      nav_goal_y: 3.97
+      nav_goal_x: 2.49
+      nav_goal_y: 4.05
 
   # 规则 3：双方前哨皆毁且剩余 420s（> 180s）-> 后方巡逻，首点 patrol_a。
   - at: 6.0

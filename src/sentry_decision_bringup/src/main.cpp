@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
     navigation.update(now);
     context.world = world_model.snapshot(now);
     context.clear_intents();
-    context.apply_strategy(policy.decide(context.world));
+    context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
     apply_tactical_override(tactical_override, now, &context);
     tree.tickOnce();
 

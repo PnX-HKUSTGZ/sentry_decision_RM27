@@ -68,7 +68,7 @@ std::optional<Point2D> run_goal(const std::string& tree_path, const PolicyConfig
 
   const RuleBasedStrategicPolicy policy = RuleBasedStrategicPolicy::from_config(config);
   context.clear_intents();
-  context.apply_strategy(policy.decide(context.world));
+  context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
   tree.tickOnce();
 
   IntentArbiter arbiter;
