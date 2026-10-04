@@ -25,4 +25,25 @@ class EmitNavGoalFromPoint : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
+// Node:         PatrolLoop
+// Category:     Action (stateful, RUNNING / 循环巡逻)
+// Purpose:      按命名点列表循环巡逻：对当前点持续请求导航目标，到达后停留 dwell_key
+// 秒再切换下一点。 Inputs:       points: string (端口, 逗号分隔的命名点，如
+// "highland_a,highland_b,highland_c")
+//               dwell_key: string (端口, 配置 key, 到达后停留秒数，如 "nav.patrol_dwell_s")
+//               loop_id: string (端口, 巡逻线标识，用于区分状态；缺省用节点名)
+// Blackboard:   read: context(config.points, config.numbers, world.nav.reached, world.stamp)
+//               write: context.intents, context.patrol
+// Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
+// Side Effects: 每 tick 写一条 kNavGoal 意图；按 loop_id 维护 context.patrol 游标。
+// See:          tree/skill/patrol_loop.xml
+class PatrolLoop : public BT::StatefulActionNode {
+ public:
+  PatrolLoop(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus onStart() override;
+  BT::NodeStatus onRunning() override;
+  void onHalted() override;
+};
+
 }  // namespace sentry_decision

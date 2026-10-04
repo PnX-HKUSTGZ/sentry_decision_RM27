@@ -11,6 +11,20 @@
 
 ### Added
 
+- 初版主决策树（还原上一赛季）：`RuleBasedStrategicPolicy` 三条规则——敌前哨存活→进攻敌方前哨；
+  敌前哨毁且我前哨存活→中央高地 3 点循环；双方前哨皆毁→剩余大于 `strategic.fort_after_remaining_s`
+  后方巡逻，否则回堡垒防守。任务优先级在 `mission/root.xml` 重排。
+- 巡逻技能：`PatrolLoop` 节点 + `tree/skill/patrol_loop.xml`——按命名点列表循环，到点后停留
+  `nav.patrol_dwell_s` 秒再切下一点；游标显式存于 `DecisionContext.patrol`（按 `loop_id` 区分）。
+- 地图新增高地 3 个巡逻点 `highland_a/b/c`（暂定坐标，待场地标定）。
+
+### Changed
+
+- 移除进攻时间窗：改为敌前哨存活即进攻，不再由 `strategic.attack_window_*` 限制。
+- `full_match.yaml` 场景改为覆盖「进攻→高地→后方巡逻→守堡垒→撤退→复活」全链路。
+
+### Added
+
 - 裁判仿真实现复活机制（规则 5.2.2）：战亡后按公式开始复活读条（`10 + round((420-剩余)/10) + 20*累计立即复活次数`），
   每秒 +1、补给区或基地血量 <2000 时 +4；待复活期间导出 `info1.can_free_resurrect`；
   确认免费复活后读条完成即以 10% 上限血量复活；兑换立即复活累计次数并回满血。

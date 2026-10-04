@@ -13,8 +13,8 @@ resource:
   remote_ammo_times: 1          # 每次远程发弹量兑换的次数（1 次 = 100 发）
   remote_ammo_min_coins: 150    # 远程兑换发弹量一次所需金币（150 金币/100 发）
 strategic:
-  attack_window_min_remaining: 0
-  attack_window_max_remaining: 420
+  # 双方前哨皆毁且剩余时间 <= 该值 -> 回堡垒防守；否则后方巡逻（规则 3，4 分钟）。
+  fort_after_remaining_s: 180
 safety:
   max_vx: 3.0                   # 速度限幅（m/s）
   max_vy: 3.0

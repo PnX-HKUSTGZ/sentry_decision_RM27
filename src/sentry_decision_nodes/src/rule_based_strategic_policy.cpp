@@ -36,11 +36,8 @@ RuleBasedStrategicPolicy RuleBasedStrategicPolicy::from_config(const PolicyConfi
   if (const auto value = config.number("nav.low_ammo")) {
     thresholds.low_ammo = static_cast<int>(*value);
   }
-  if (const auto value = config.number("strategic.attack_window_min_remaining")) {
-    thresholds.attack_window_min_remaining = static_cast<int>(*value);
-  }
-  if (const auto value = config.number("strategic.attack_window_max_remaining")) {
-    thresholds.attack_window_max_remaining = static_cast<int>(*value);
+  if (const auto value = config.number("strategic.fort_after_remaining_s")) {
+    thresholds.fort_after_remaining = static_cast<int>(*value);
   }
   return RuleBasedStrategicPolicy(thresholds);
 }
@@ -63,15 +60,19 @@ StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world) cons
   if (referee.self_ammo <= thresholds_.low_ammo) {
     return make_decision(TacticalMode::kHeal);
   }
-  if (referee.our_outpost_hp <= 0) {
-    return make_decision(TacticalMode::kDefend);
-  }
-  if (referee.enemy_outpost_hp > 0 &&
-      referee.game_time_remaining >= thresholds_.attack_window_min_remaining &&
-      referee.game_time_remaining <= thresholds_.attack_window_max_remaining) {
+  // 规则 1：敌方前哨存活即进攻（不再受进攻时间窗限制）。
+  if (referee.enemy_outpost_hp > 0) {
     return make_decision(TacticalMode::kAttack);
   }
-  return make_decision(TacticalMode::kPatrol);
+  // 规则 2：敌方前哨被毁、我方前哨存活 -> 高地循环（任务树按前哨条件区分高地 / 后方）。
+  if (referee.our_outpost_hp > 0) {
+    return make_decision(TacticalMode::kPatrol);
+  }
+  // 规则 3：双方前哨皆毁 -> 时间 < 4min（剩余 > 阈值）后方巡逻，否则回堡垒防守。
+  if (referee.game_time_remaining > thresholds_.fort_after_remaining) {
+    return make_decision(TacticalMode::kPatrol);
+  }
+  return make_decision(TacticalMode::kDefend);
 }
 
 }  // namespace sentry_decision

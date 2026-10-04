@@ -16,12 +16,16 @@
 
 ### 已完成
 
-- 调查并复现：阵亡不发起确认复活 + 不恢复血量，根因在仿真裁判侧（决策树 `test_free_revive` 正确）。
-- 文档：ARCHITECTURE §14.4 / BELIEF / INTERFACES / CHANGELOG 同步。
+- 复活完整修复（规则 5.2.2）：`sim_world` / `referee_sim_node` 读条与 10% 血量复活，复活动作改 kPolled；
+  `full_match` 覆盖阵亡→确认→复活。已提交 f3d54f4。
+- 初版主决策树（还原上一赛季）：战略层三条规则 + 任务树重排（进攻 > 高地循环 > 后方巡逻 > 守堡垒）；
+  新增 PatrolLoop 技能节点（到点停留 nav.patrol_dwell_s 秒）与 tree/skill/patrol_loop.xml；
+  游标存 DecisionContext.patrol。移除进攻时间窗。
+- 文档：ARCHITECTURE §14.4 / USAGE / CHANGELOG / NOTE 同步。
 
 ### 待办
 
-- `sim_world` / `referee_sim_node` 复活读条实现与单测；`full_match.yaml` 场景断言。
+- 高地 3 点（highland_a/b/c）与后方 2 点（patrol_a/b）坐标待场地标定。
 - 初版决策树其余修复项（待补）。
 
 ## 历史 sprint（v0.4.0 双仓库联调）

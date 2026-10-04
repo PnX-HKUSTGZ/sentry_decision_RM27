@@ -225,7 +225,17 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 > 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
 > 演示世界从「未开始」起，比赛阶段由网页面板按钮或 `/sentry_sim/set_game_stage` 服务推进。
 
-场景 YAML 结构（`full_match.yaml` 跑通巡逻→进攻→撤退→复活）：
+主策略（`RuleBasedStrategicPolicy`，还原上一赛季打法）：
+
+1. **敌方前哨存活** → 进攻敌方前哨（`kAttack`）；
+2. **敌方前哨被毁、我方前哨存活** → 中央高地 3 点循环巡逻（`kPatrol`，任务树按前哨条件区分高地 / 后方）；
+3. **双方前哨皆毁** → 剩余时间 > `strategic.fort_after_remaining_s`（默认 180s，即前 4 分钟）后方巡逻，
+   否则回堡垒防守（`kDefend`）。
+
+低血撤退 / 低弹补给 / 阵亡复活的优先级高于主策略。巡逻 = 对当前命名点持续发目标，到点后停留
+`nav.patrol_dwell_s` 秒再去下一点（循环）。
+
+场景 YAML 结构（`full_match.yaml` 跑通「进攻→高地→后方巡逻→守堡垒→撤退→复活」）：
 
 ```yaml
 name: full_match
@@ -236,13 +246,15 @@ world:                          # 初始世界（时间轴之前应用）
   enemy_outpost_hp: 1500
 timeline:
   - at: 2.0
-    expect:    { tactical_mode: patrol, has_nav_goal: true }
+    expect:    { tactical_mode: attack, has_nav_goal: true }   # 敌前哨存活 -> 进攻
   - at: 3.0
-    set_world: { game_time_remaining: 300 }
-  - at: 6.0
-    set_world: { self_hp: 40 }
-  - at: 7.5
-    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
+    set_world: { enemy_outpost_hp: 0 }
+  - at: 4.5
+    expect:    { tactical_mode: patrol, nav_goal_x: -1.56, nav_goal_y: 3.97 }  # -> 高地巡逻
+  - at: 9.0
+    set_world: { game_time_remaining: 100 }        # 双方前哨皆毁且剩余 <= 180s
+  - at: 10.5
+    expect:    { tactical_mode: defend, nav_goal_x: -7.37, nav_goal_y: 1.60 }  # -> 守堡垒
 ```
 
 `set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`stance`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。

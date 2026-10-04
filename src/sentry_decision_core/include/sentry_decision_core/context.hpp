@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -10,6 +13,13 @@
 
 namespace sentry_decision {
 
+// 巡逻游标：技能层「巡逻」的显式状态（按 loop_id 区分高地 / 后方等巡逻线）。
+// 放在数据契约里而不是节点成员，保证决策状态显式、可观测。
+struct PatrolCursor {
+  int index = 0;                         // 当前巡逻点下标
+  std::optional<TimePoint> dwell_start;  // 到点后的停留起始时刻；未在停留时为空
+};
+
 // 一次 tick 的决策上下文：当前世界状态 + 本 tick 的意图缓冲。
 // 行为树节点只读写它，不直接接触 ROS。
 struct DecisionContext {
@@ -19,6 +29,8 @@ struct DecisionContext {
   // 本 tick 的战略层结论；任务树读取它做任务选择。
   StrategicDecision strategy;
   std::vector<Intent> intents;
+  // 巡逻技能状态，按 loop_id 索引（见 PatrolCursor）。
+  std::map<std::string, PatrolCursor> patrol;
 
   void clear_intents() {
     intents.clear();

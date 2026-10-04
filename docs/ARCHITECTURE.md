@@ -553,17 +553,25 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 world:   { self_hp: 400, self_ammo: 100, enemy_outpost_hp: 1500 }
 timeline:
   - at: 2.0
-    expect:    { tactical_mode: patrol, has_nav_goal: true }
+    expect:    { tactical_mode: attack, has_nav_goal: true }   # 敌前哨存活 -> 进攻
   - at: 3.0
-    set_world: { game_time_remaining: 300 }
-  - at: 6.0
-    set_world: { self_hp: 40 }
-  - at: 7.5
-    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
+    set_world: { enemy_outpost_hp: 0 }
+  - at: 4.5
+    expect:    { tactical_mode: patrol, nav_goal_x: -1.56, nav_goal_y: 3.97 }  # -> 高地巡逻
+  - at: 9.0
+    set_world: { game_time_remaining: 100 }
+  - at: 10.5
+    expect:    { tactical_mode: defend, nav_goal_x: -7.37, nav_goal_y: 1.60 }  # -> 守堡垒
 ```
 
 场景支持 `set_world` / `expect`：在事件时刻改世界或断言决策输出，因此场景脚本可直接把测试用例写成时间轴。
 场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
+
+主策略 `RuleBasedStrategicPolicy` 按上一赛季还原为三条规则：**敌前哨存活 → 进攻；敌前哨毁且我前哨存活 →
+中央高地 3 点循环；双方前哨皆毁 → 剩余 > `strategic.fort_after_remaining_s` 后方巡逻，否则守堡垒**；
+撤退 / 补给 / 复活优先级高于主策略。巡逻由技能 `tree/skill/patrol_loop.xml` + `nav` 模块的 `PatrolLoop` 节点实现：
+每 tick 对当前命名点发导航意图，`world.nav.reached` 后停留 `nav.patrol_dwell_s` 秒再切下一点，
+游标（index / 停留起点）显式存在 `DecisionContext.patrol`，按 `loop_id` 区分高地与后方两条巡逻线。
 
 比赛阶段由 ROS 无关的 `MatchStageController` 管理，并通过 `/sentry_sim/set_game_stage`
 （`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒

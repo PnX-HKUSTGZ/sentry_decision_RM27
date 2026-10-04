@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <!--
-  任务：双方前哨存活时进攻敌方前哨。
-  进入条件：战略模式 = kAttack(2)。
-  退出条件：前哨被击毁或超出进攻时间窗。
-  抢占关系：低于高地，高于巡逻。
+  任务：敌方前哨存活时进攻敌方前哨。
+  进入条件：战略模式 = kAttack(2)（战略层：敌方前哨血量 > 0）。
+  退出条件：敌方前哨被击毁或被更高优先级任务（撤退 / 补给 / 复活）抢占。
+  抢占关系：低于补给，高于高地 / 后方巡逻 / 防守。
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionAttackOutpost">
   <BehaviorTree ID="MissionAttackOutpost">

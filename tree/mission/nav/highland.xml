@@ -1,15 +1,18 @@
 <?xml version="1.0"?>
 <!--
-  任务：敌方前哨被击毁后转中央高地辅助。
-  进入条件：敌方前哨血量 <= 0（且我方前哨存活，否则被防守任务抢先）。
-  退出条件：条件不再成立。
-  抢占关系：低于防守，高于进攻 / 巡逻。
+  任务：敌方前哨被毁、我方前哨存活时，在中央高地 3 个点位循环巡逻。
+  进入条件：战略模式 = kPatrol(1) 且敌方前哨已毁、我方前哨存活。
+  退出条件：前哨条件变化（我方前哨被毁 / 敌方前哨重建）。
+  抢占关系：低于进攻，高于后方巡逻 / 防守。
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionHighland">
   <BehaviorTree ID="MissionHighland">
-    <Sequence name="HighlandSequence">
+    <ReactiveSequence name="HighlandSequence">
+      <IfTacticalMode mode="1"/>
       <IfEnemyOutpostDead/>
-      <SubTree ID="GotoNamedPoint" target_point="central_highland"/>
-    </Sequence>
+      <IfOurOutpostAlive/>
+      <SubTree ID="PatrolPoints" points="highland_a,highland_b,highland_c"
+               dwell_key="nav.patrol_dwell_s" loop_id="highland"/>
+    </ReactiveSequence>
   </BehaviorTree>
 </root>

@@ -1,15 +1,16 @@
 <?xml version="1.0"?>
 <!--
-  任务：巡逻（默认任务）。
-  进入条件：战略模式 = kPatrol(1)。未进入比赛中（kIdle）时不匹配，因此不下发任务。
+  任务：后方巡逻（默认巡逻任务）。
+  进入条件：战略模式 = kPatrol(1)（未被高地的前哨条件分支命中时，含双方前哨皆毁且时间 < 4min）。
   退出条件：被更高优先级任务抢占。
-  抢占关系：优先级最低。
+  抢占关系：低于高地，高于防守。
 -->
 <root BTCPP_format="4" main_tree_to_execute="MissionPatrol">
   <BehaviorTree ID="MissionPatrol">
-    <Sequence name="PatrolSequence">
+    <ReactiveSequence name="BackPatrolSequence">
       <IfTacticalMode mode="1"/>
-      <SubTree ID="GotoNamedPoint" target_point="patrol_a"/>
-    </Sequence>
+      <SubTree ID="PatrolPoints" points="patrol_a,patrol_b"
+               dwell_key="nav.patrol_dwell_s" loop_id="back"/>
+    </ReactiveSequence>
   </BehaviorTree>
 </root>
