@@ -113,12 +113,14 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
         return false;
       }
     }
-    if (root["nav_start"]) {
-      const YAML::Node start = root["nav_start"];
-      const std::string point = start["point"] ? start["point"].as<std::string>() : "";
+    // 回起点：nav_start.point 可选，缺省用 map 的 start；两者都缺则启动报错，不用 (0,0) 兜底。
+    {
+      const YAML::Node nav_start = root["nav_start"];
+      const std::string point =
+          nav_start && nav_start["point"] ? nav_start["point"].as<std::string>() : "start";
       const auto it = points.find(point);
       if (it == points.end()) {
-        *error = "nav_start: 未知命名点 '" + point + "'";
+        *error = "缺少回起点命名点 '" + point + "'（map 需定义 start，或用 nav_start.point 指定）";
         return false;
       }
       out->start_x = it->second.x;
