@@ -23,6 +23,8 @@
   游标存 DecisionContext.patrol。移除进攻时间窗。
 - 撤退迟滞：低于 retreat_hp 进入撤退后保持到 recovery_hp 才离开补给区；迟滞状态放
   DecisionContext.strategy_memory，StrategicPolicy::decide 增 memory 参数。
+- 双仓库「重置」回起点：`referee_sim_node` 在 `provide_nav=false` 下建 `NavigateToPose` 客户端，
+  重置时发回起点目标（map 新增 `start`，sim.yaml 新增 `nav_start`）；独立模式仍瞬移。
 - 文档：ARCHITECTURE §14.4 / USAGE / CHANGELOG / NOTE 同步。
 
 ### 待办

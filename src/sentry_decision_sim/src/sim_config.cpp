@@ -113,6 +113,17 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
         return false;
       }
     }
+    if (root["nav_start"]) {
+      const YAML::Node start = root["nav_start"];
+      const std::string point = start["point"] ? start["point"].as<std::string>() : "";
+      const auto it = points.find(point);
+      if (it == points.end()) {
+        *error = "nav_start: 未知命名点 '" + point + "'";
+        return false;
+      }
+      out->start_x = it->second.x;
+      out->start_y = it->second.y;
+    }
     if (root["effects"]) {
       const YAML::Node effects = root["effects"];
       out->effects.self_damage = yaml_number(effects, "self_damage", out->effects.self_damage);

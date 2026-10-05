@@ -518,8 +518,9 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 - 发布 `sentry_interfaces` 的五条上行消息，驱动 `decision_node`；
 - `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
   在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
-- `provide_nav=false` 时不自建导航 action、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
-  补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；
+- `provide_nav=false` 时不自建导航 action server、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
+  补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；此时重置无法瞬移真实机器人，改为用
+  `NavigateToPose` **客户端**下发一个回起点目标（坐标来自 `config/sim.yaml` 的 `nav_start` 命名点）；
 - **动作前置校验**：执行端 `execute_action()` 是动作合法性的权威，校验通过才会改世界；非法动作
   返回 `accepted=false` + `code`/`detail`，节点在 `publish_ack` 打印「裁判拒绝动作 ...」。
   规则依据：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点（表 5-8）；兑换血量与远程兑换

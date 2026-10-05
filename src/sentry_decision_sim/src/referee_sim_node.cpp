@@ -231,6 +231,9 @@ class RefereeSimNode : public rclcpp::Node {
     fort_buff_center_x_ = declare_number_param("fort_buff_center_x", sim_.fort_x);
     fort_buff_center_y_ = declare_number_param("fort_buff_center_y", sim_.fort_y);
     fort_buff_radius_ = declare_number_param("fort_buff_radius", sim_.fort_radius);
+    // 双仓库重置：回起点导航目标坐标（独立模式不用）。
+    start_x_ = declare_number_param("start_x", sim_.start_x);
+    start_y_ = declare_number_param("start_y", sim_.start_y);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -323,7 +326,28 @@ class RefereeSimNode : public rclcpp::Node {
             sim_pose_.y = msg->pos_y;
             sim_pose_.yaw = msg->yaw;
           });
+      // 双仓库下仿真不能瞬移真实机器人：重置时改为下发一个回起点的导航目标。
+      nav_reset_client_ = rclcpp_action::create_client<NavigateToPose>(this, navigate_action);
     }
+  }
+
+  // 双仓库：下发「回起点」导航目标（坐标来自 config/sim.yaml 的 nav_start）。
+  void send_reset_nav_goal() {
+    if (!nav_reset_client_) {
+      return;
+    }
+    if (!nav_reset_client_->action_server_is_ready()) {
+      SD_LOG_WARN("sim", "重置：导航 action server 未就绪，跳过回起点目标");
+      return;
+    }
+    NavigateToPose::Goal goal;
+    goal.pose.header.frame_id = map_frame_;
+    goal.pose.header.stamp = now();
+    goal.pose.pose.position.x = start_x_;
+    goal.pose.pose.position.y = start_y_;
+    goal.pose.pose.orientation.w = 1.0;
+    nav_reset_client_->async_send_goal(goal);
+    SD_LOG_ACT("sim", "重置：下发回起点导航目标 (%.2f, %.2f)", start_x_, start_y_);
   }
 
   rclcpp_action::GoalResponse handle_goal(const NavigateToPose::Goal& goal) {
@@ -392,10 +416,17 @@ class RefereeSimNode : public rclcpp::Node {
     if (reset_requested) {
       world_ = initial_world_;
       if (provide_nav_) {
+        // 独立仿真：直接瞬移伪导航到起点。
         nav_.set_pose(start_pose_);
         nav_.cancel_goal();
+        sim_pose_ = start_pose_;
+      } else {
+        // 双仓库：仿真不能瞬移真实机器人，改为下发回起点导航目标。
+        sim_pose_.x = start_x_;
+        sim_pose_.y = start_y_;
+        sim_pose_.yaw = 0.0;
+        send_reset_nav_goal();
       }
-      sim_pose_ = start_pose_;
       actuator_.reset();
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
@@ -839,6 +870,9 @@ class RefereeSimNode : public rclcpp::Node {
   double fort_buff_center_x_ = 0.0;
   double fort_buff_center_y_ = 0.0;
   double fort_buff_radius_ = 0.0;
+  // 双仓库重置：回起点坐标。
+  double start_x_ = 0.0;
+  double start_y_ = 0.0;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
@@ -872,6 +906,8 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Service<sentry_decision_msgs::srv::SetWorld>::SharedPtr set_world_server_;
   rclcpp::Service<sentry_decision_msgs::srv::ApplyEffect>::SharedPtr apply_effect_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
+  // 双仓库：仅用于重置时下发回起点目标。
+  rclcpp_action::Client<NavigateToPose>::SharedPtr nav_reset_client_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;
 };

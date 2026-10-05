@@ -39,6 +39,9 @@
 
 ### Changed
 
+- 双仓库「重置」改为下发回起点导航目标：仿真在 `provide_nav=false` 下无法瞬移真实机器人，
+  重置时用 `NavigateToPose` 客户端把机器人开回 spawn（`config/sim.yaml` 的 `nav_start` /
+  map 的 `start`）；独立模式仍直接瞬移。
 - 确认免费复活 / 兑换立即复活改为 `MODE_POLLED`（协议 `0x0120` bit 0 / 1 是电平位），
   重发间隔由 `action.revive_poll_interval_ms` 配置。
 - `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
