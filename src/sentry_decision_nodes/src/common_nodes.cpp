@@ -70,6 +70,23 @@ BT::NodeStatus IfEnemyOutpostDead::tick() {
                                                       : BT::NodeStatus::FAILURE;
 }
 
+// [IfOurOutpostAlive]
+IfOurOutpostAlive::IfOurOutpostAlive(const std::string& name, const BT::NodeConfig& config)
+    : BT::SyncActionNode(name, config) {}
+
+BT::PortsList IfOurOutpostAlive::providedPorts() {
+  return {};
+}
+
+BT::NodeStatus IfOurOutpostAlive::tick() {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.referee.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  return context->world.referee.our_outpost_hp > 0 ? BT::NodeStatus::SUCCESS
+                                                   : BT::NodeStatus::FAILURE;
+}
+
 // [EmitTacticalMode]
 EmitTacticalMode::EmitTacticalMode(const std::string& name, const BT::NodeConfig& config)
     : BT::SyncActionNode(name, config) {}
@@ -129,6 +146,7 @@ void register_common_nodes(BT::BehaviorTreeFactory& factory) {
   factory.registerNodeType<IfLowHp>("IfLowHp");
   factory.registerNodeType<IfTacticalMode>("IfTacticalMode");
   factory.registerNodeType<IfEnemyOutpostDead>("IfEnemyOutpostDead");
+  factory.registerNodeType<IfOurOutpostAlive>("IfOurOutpostAlive");
   factory.registerNodeType<EmitTacticalMode>("EmitTacticalMode");
   factory.registerNodeType<EmitNavGoal>("EmitNavGoal");
 }

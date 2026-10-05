@@ -30,6 +30,8 @@ struct SimConfig {
   double supply_heal_ratio = 0.0;
   double supply_heal_ratio_late = 0.0;
   double supply_heal_late_after_s = 0.0;
+  // 双仓库模式重置时的回起点坐标（命名点，默认 map 的 start）。
+  double start_x = 0.0, start_y = 0.0;
   double base_x = 0.0, base_y = 0.0, base_radius = 0.0;
   double our_x = 0.0, our_y = 0.0, our_radius = 0.0;
   double fort_x = 0.0, fort_y = 0.0, fort_radius = 0.0;

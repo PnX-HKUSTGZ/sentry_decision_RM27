@@ -22,6 +22,10 @@ supply:
   heal_ratio: 0.10
   heal_ratio_late: 0.25
   heal_late_after_s: 240
+# 双仓库模式：重置时由仿真侧下发「回起点」导航目标（仿真无法瞬移真实机器人）。
+# 坐标取自 map 的命名点（默认 RMUC2026 spawn）。
+nav_start:
+  point: start
 gain_zones:
   # 补给区（sim_home）会回血；以下三者只用于本地兑换，不回血。
   # 半径同样取自各地图点的第 4 位。

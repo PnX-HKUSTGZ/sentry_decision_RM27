@@ -33,45 +33,69 @@ RuleBasedStrategicPolicy RuleBasedStrategicPolicy::from_config(const PolicyConfi
   if (const auto value = config.number("nav.retreat_hp")) {
     thresholds.retreat_hp = static_cast<int>(*value);
   }
+  if (const auto value = config.number("nav.recovery_hp")) {
+    thresholds.recovery_hp = static_cast<int>(*value);
+  }
   if (const auto value = config.number("nav.low_ammo")) {
     thresholds.low_ammo = static_cast<int>(*value);
   }
-  if (const auto value = config.number("strategic.attack_window_min_remaining")) {
-    thresholds.attack_window_min_remaining = static_cast<int>(*value);
-  }
-  if (const auto value = config.number("strategic.attack_window_max_remaining")) {
-    thresholds.attack_window_max_remaining = static_cast<int>(*value);
+  if (const auto value = config.number("strategic.fort_after_remaining_s")) {
+    thresholds.fort_after_remaining = static_cast<int>(*value);
   }
   return RuleBasedStrategicPolicy(thresholds);
 }
 
-StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world) const {
+StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world,
+                                                   StrategicMemory* memory) const {
   const RefereeState& referee = world.referee;
   if (!referee.valid) {
     return make_decision(TacticalMode::kUnknown);
   }
-  // 只有「比赛中」才执行任务；准备 / 自检 / 倒计时 / 结算阶段保持待机，不下发任务意图。
+  // 只有「比赛中」才执行任务；准备 / 自检 / 倒计时 / 结算阶段保持待机。
   if (referee.game_status != GameStatus::kRunning) {
     return make_decision(TacticalMode::kIdle);
   }
   if (referee.self_hp <= 0) {
+    if (memory != nullptr) {
+      memory->retreat_latched = false;
+    }
     return make_decision(TacticalMode::kRespawn);
   }
-  if (referee.self_hp <= thresholds_.retreat_hp) {
+
+  // 撤退迟滞：低于 retreat_hp 进入；已进入则保持到血量恢复到
+  // recovery_hp，避免刚到阈值就离开补给区。
+  bool retreat = referee.self_hp <= thresholds_.retreat_hp;
+  if (memory != nullptr) {
+    if (memory->retreat_latched) {
+      if (referee.self_hp >= thresholds_.recovery_hp) {
+        memory->retreat_latched = false;
+      } else {
+        retreat = true;
+      }
+    } else if (retreat) {
+      memory->retreat_latched = true;
+    }
+  }
+  if (retreat) {
     return make_decision(TacticalMode::kRetreat);
   }
+
   if (referee.self_ammo <= thresholds_.low_ammo) {
     return make_decision(TacticalMode::kHeal);
   }
-  if (referee.our_outpost_hp <= 0) {
-    return make_decision(TacticalMode::kDefend);
-  }
-  if (referee.enemy_outpost_hp > 0 &&
-      referee.game_time_remaining >= thresholds_.attack_window_min_remaining &&
-      referee.game_time_remaining <= thresholds_.attack_window_max_remaining) {
+  // 规则 1：敌方前哨存活即进攻（不再受进攻时间窗限制）。
+  if (referee.enemy_outpost_hp > 0) {
     return make_decision(TacticalMode::kAttack);
   }
-  return make_decision(TacticalMode::kPatrol);
+  // 规则 2：敌方前哨被毁、我方前哨存活 -> 高地循环（任务树按前哨条件区分高地 / 后方）。
+  if (referee.our_outpost_hp > 0) {
+    return make_decision(TacticalMode::kPatrol);
+  }
+  // 规则 3：双方前哨皆毁 -> 时间 < 4min（剩余 > 阈值）后方巡逻，否则回堡垒防守。
+  if (referee.game_time_remaining > thresholds_.fort_after_remaining) {
+    return make_decision(TacticalMode::kPatrol);
+  }
+  return make_decision(TacticalMode::kDefend);
 }
 
 }  // namespace sentry_decision

@@ -7,15 +7,22 @@
 > [注意] 本文档是项目历史的单一事实来源，应随项目演进保持更新。
 > [注意] 本文档不是所有变更的完整清单；只记录重要变更并保持简洁易读。完整变更见版本控制系统（如 Git）历史。
 
-## [Unreleased]
+## [v0.4.1] - 2026-10-05
 
-### Changed
-
-- `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
-  200ms 会偶发判失效触发急停抖动，进而导致面板位姿闪烁。
+> v0.4.1：功能修复与初版决策树——复活链路按规则 5.2.2 落地，双仓库联调补齐位姿 / 重置 / 面板，
+> 并还原上一赛季主策略与巡逻技能。
 
 ### Added
 
+- 初版主决策树（还原上一赛季）：`RuleBasedStrategicPolicy` 三条规则——敌前哨存活→进攻敌方前哨；
+  敌前哨毁且我前哨存活→中央高地 3 点循环；双方前哨皆毁→剩余大于 `strategic.fort_after_remaining_s`
+  后方巡逻，否则回堡垒防守。任务优先级在 `mission/root.xml` 重排。
+- 巡逻技能：`PatrolLoop` 节点 + `tree/skill/patrol_loop.xml`——按命名点列表循环，到点后停留
+  `nav.patrol_dwell_s` 秒再切下一点；游标显式存于 `DecisionContext.patrol`（按 `loop_id` 区分）。
+- 地图新增高地 3 个巡逻点 `highland_a/b/c`。
+- 裁判仿真实现复活机制（规则 5.2.2）：战亡后按公式开始复活读条（`10 + round((420-剩余)/10) + 20*累计立即复活次数`），
+  每秒 +1、补给区或基地血量 <2000 时 +4；待复活期间导出 `info1.can_free_resurrect`；
+  确认免费复活后读条完成即以 10% 上限血量复活；兑换立即复活累计次数并回满血。
 - 双仓库联调：`RosIoNode` 新增 `odom_frame`，非空时用 TF `map->odom` 把 odom 系位姿转成 map 系；
   抽出纯逻辑变换 `pose_to_map` + 单测。
 - `decision_node` 支持 `--ros-args` 透传，可在启动时覆盖 `RosIoNode` 的 ROS 参数。
@@ -23,6 +30,29 @@
   不发 odom，位姿改取 `/decision/world_state`。
 - `tools/demo.sh` 新增 `--with-nav` / `--nav-silent`：起真实导航容器（`rm27net` + PCD）并联调。
 - 新增 `docs/sim_dual_repo.md`（双仓库联调设计与接口契约）。
+
+### Changed
+
+- 移除进攻时间窗：改为敌前哨存活即进攻，不再由 `strategic.attack_window_*` 限制。
+- `full_match.yaml` 场景改为覆盖「进攻→高地→后方巡逻→守堡垒→撤退→复活」全链路。
+- 双仓库「重置」改为下发回起点导航目标：仿真在 `provide_nav=false` 下无法瞬移真实机器人，
+  重置时用 `NavigateToPose` 客户端把机器人开回 spawn（`config/sim.yaml` 的 `nav_start` /
+  map 的 `start`）；独立模式仍直接瞬移。
+- 确认免费复活 / 兑换立即复活改为 `MODE_POLLED`（协议 `0x0120` bit 0 / 1 是电平位），
+  重发间隔由 `action.revive_poll_interval_ms` 配置。
+- `timeouts.odometry_ms` 由 200ms 调到 500ms：双仓库的 `/odometry` 由点云回调驱动（约 10Hz 且带抖动），
+  200ms 会偶发判失效触发急停抖动，进而导致面板位姿闪烁。
+
+### Fixed
+
+- 撤退迟滞：低于 `nav.retreat_hp` 进入撤退后，保持到血量恢复到 `nav.recovery_hp` 才离开补给区
+  （设为上限血量即回满才走），不再刚高于进入阈值就切回主任务。迟滞状态显式存于
+  `DecisionContext.strategy_memory`，策略接口 `StrategicPolicy::decide(world, memory)` 相应调整。
+- 仿真链路中机器人阵亡后不再「只停在 `respawn` 模式」：裁判侧从未按死活导出
+  `info1.can_free_resurrect`，且 `kFreeResurrect` 只回执不结算，导致决策不发起确认复活、
+  血量也不会恢复。现由仿真裁判统一按规则推导复活状态并结算。
+- 网页面板：世界状态键值对齐；右侧拆成「世界状态 / 资源与动作 / 战术层覆盖」三个面板（标题加粗、
+  面板间留距）；右栏收窄并保证窄屏时地图占满整行。
 
 ### Removed
 

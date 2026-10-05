@@ -47,6 +47,33 @@ bool parse_tactical_mode(const std::string& name, int* out) {
   return true;
 }
 
+// 写 info1 bit 19（协议 0x020D：当前是否可以确认免费复活）。
+void set_can_free_resurrect(SimWorld* world, bool enabled) {
+  if (enabled) {
+    world->sentry_info_1 |= (1u << 19);
+  } else {
+    world->sentry_info_1 &= ~(1u << 19);
+  }
+}
+
+// 读条完成且已确认时以 10% 上限血复活并清理状态；返回是否发生复活。
+bool try_complete_respawn(SimWorld* world, int max_hp) {
+  if (world == nullptr || !world->respawn.pending || !world->respawn.confirmed) {
+    return false;
+  }
+  if (world->respawn.current_progress < world->respawn.total_progress) {
+    return false;
+  }
+  // 规则 5.2.2：完成读条复活时血量恢复至上限血量的 10%，射击热量重置为 0。
+  world->self_hp = std::max(1, static_cast<int>(std::lround(max_hp * 0.10)));
+  world->current_heat = 0;
+  world->respawn.pending = false;
+  world->respawn.confirmed = false;
+  world->respawn.current_progress = 0;
+  set_can_free_resurrect(world, false);
+  return true;
+}
+
 }  // namespace
 
 bool apply_world_field(SimWorld* world, const std::string& field, const ScenarioValue& value,
@@ -424,6 +451,57 @@ RemoteStepResult step_pending_remote(SimWorld* world, int elapsed_ms, int max_hp
   return result;
 }
 
+int respawn_bar_total(int game_time_remaining, int instant_resurrect_count) {
+  // 规则 5.2.2：所需复活读条 = 10 + (420 - 战亡时剩余秒数)/10 + 20*累计兑换立即复活次数，
+  // 小数部分四舍五入。剩余时长超过 420s（赛前）时按 0 处理。
+  const double tens = std::max(0.0, (420.0 - game_time_remaining) / 10.0);
+  const int instant_count = std::max(0, instant_resurrect_count);
+  return 10 + static_cast<int>(std::lround(tens)) + 20 * instant_count;
+}
+
+void sync_respawn(SimWorld* world) {
+  if (world == nullptr) {
+    return;
+  }
+  if (world->self_hp > 0) {
+    if (world->respawn.pending) {
+      world->respawn.pending = false;
+      world->respawn.confirmed = false;
+      world->respawn.current_progress = 0;
+    }
+    set_can_free_resurrect(world, false);
+    return;
+  }
+  if (!world->respawn.pending) {
+    // 战亡：立即开始读条，总长按战亡瞬间的比赛剩余时长锁定；射击热量重置为 0（规则 5.2.2）。
+    world->respawn.pending = true;
+    world->respawn.confirmed = false;
+    world->respawn.current_progress = 0;
+    world->respawn.total_progress =
+        respawn_bar_total(world->game_time_remaining, world->respawn.instant_count);
+    world->current_heat = 0;
+  }
+  set_can_free_resurrect(world, true);
+}
+
+RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up) {
+  RespawnStepResult result;
+  if (world == nullptr || !world->respawn.pending) {
+    return result;
+  }
+  // 规则 5.2.2：每秒 +1；位于补给区或己方基地血量 <2000 时每秒 +4。
+  const int step = speed_up ? 4 : 1;
+  world->respawn.current_progress =
+      std::min(world->respawn.total_progress, world->respawn.current_progress + step);
+  result.advanced = true;
+  result.progress = world->respawn.current_progress;
+  result.total = world->respawn.total_progress;
+  const int before = world->self_hp;
+  result.revived = try_complete_respawn(world, max_hp);
+  result.healed = world->self_hp - before;
+  return result;
+}
+
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
   Occupancy occupancy;
   occupancy.supply = zones.supply.contains(x, y);
@@ -471,6 +549,8 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
   if (world == nullptr) {
     return reject(1, "世界为空");
   }
+  // 先把复活状态与死活同步（含 info1.bit19），保证下面的前置校验读到最新状态。
+  sync_respawn(world);
   const sentry_decision::EventCode event =
       sentry_decision::decode_event_code(static_cast<std::uint32_t>(world->event_code));
   const sentry_decision::SentryInfo1 info1 =
@@ -506,14 +586,24 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
       return outcome;
     }
     case K::kFreeResurrect: {
-      if (!info1.can_free_resurrect) {
-        return reject(2, "当前不可确认免费复活");
+      if (world->self_hp > 0 || !world->respawn.pending) {
+        return reject(2, "当前未处于待复活状态");
       }
+      // 协议 0x0120 bit 0「确认复活」是电平位：可重复确认；读条完成即复活。
+      world->respawn.confirmed = true;
       outcome.accepted = true;
-      outcome.detail = "确认免费复活";
+      if (try_complete_respawn(world, max_hp)) {
+        outcome.detail = "确认复活：读条完成，血量恢复至 " + std::to_string(world->self_hp);
+      } else {
+        outcome.detail = "确认复活（读条 " + std::to_string(world->respawn.current_progress) + "/" +
+                         std::to_string(world->respawn.total_progress) + "）";
+      }
       return outcome;
     }
     case K::kInstantResurrect: {
+      if (world->self_hp > 0 || !world->respawn.pending) {
+        return reject(2, "当前未处于待复活状态");
+      }
       if (!info1.can_instant_resurrect) {
         return reject(2, "当前不可兑换立即复活");
       }
@@ -523,6 +613,13 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
       }
       world->coins -= cost;
       world->self_hp = max_hp;
+      world->current_heat = 0;
+      // 规则 5.2.2：累计兑换立即复活次数计入之后免费复活的读条长度。
+      ++world->respawn.instant_count;
+      world->respawn.pending = false;
+      world->respawn.confirmed = false;
+      world->respawn.current_progress = 0;
+      set_can_free_resurrect(world, false);
       outcome.accepted = true;
       outcome.detail = "立即复活：血量回满，金币 -" + std::to_string(cost);
       return outcome;

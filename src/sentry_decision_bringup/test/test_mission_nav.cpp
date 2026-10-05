@@ -28,13 +28,16 @@ PolicyConfig make_config() {
   PolicyConfig config;
   config.points["home"] = Point2D{-6.0, 4.0, 0.0};
   config.points["fort"] = Point2D{-5.0, 3.0, 0.0};
-  config.points["central_highland"] = Point2D{-1.1, -1.1, 0.0};
   config.points["enemy_outpost"] = Point2D{1.1, 1.1, 0.0};
+  config.points["highland_a"] = Point2D{-1.1, -1.1, 0.0};
+  config.points["highland_b"] = Point2D{-1.2, -1.2, 0.0};
+  config.points["highland_c"] = Point2D{-1.3, -1.3, 0.0};
   config.points["patrol_a"] = Point2D{0.0, 1.1, 0.0};
+  config.points["patrol_b"] = Point2D{0.0, 2.2, 0.0};
   config.numbers["nav.retreat_hp"] = 50.0;
   config.numbers["nav.low_ammo"] = 50.0;
-  config.numbers["strategic.attack_window_min_remaining"] = 0.0;
-  config.numbers["strategic.attack_window_max_remaining"] = 420.0;
+  config.numbers["strategic.fort_after_remaining_s"] = 180.0;
+  config.numbers["nav.patrol_dwell_s"] = 5.0;
   return config;
 }
 
@@ -65,7 +68,7 @@ std::optional<Point2D> run_goal(const std::string& tree_path, const PolicyConfig
 
   const RuleBasedStrategicPolicy policy = RuleBasedStrategicPolicy::from_config(config);
   context.clear_intents();
-  context.apply_strategy(policy.decide(context.world));
+  context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
   tree.tickOnce();
 
   IntentArbiter arbiter;
@@ -111,6 +114,7 @@ int main(int argc, char** argv) {
   const std::string tree_path = argv[1];
   const PolicyConfig config = make_config();
 
+  // 规则 1：敌方前哨存活 -> 进攻。
   WorldState world = make_world();
   expect_goal(tree_path, config, world, 1.1, 1.1, "双方前哨存活 -> 进攻敌方前哨");
 
@@ -122,17 +126,29 @@ int main(int argc, char** argv) {
   world.referee.self_ammo = 10;
   expect_goal(tree_path, config, world, -6.0, 4.0, "低弹 -> 回补给");
 
+  // 规则 1：我方前哨阵亡但敌方前哨存活时仍进攻（不再回堡垒）。
   world = make_world();
   world.referee.our_outpost_hp = 0;
-  expect_goal(tree_path, config, world, -5.0, 3.0, "我方前哨阵亡 -> 守堡垒");
+  expect_goal(tree_path, config, world, 1.1, 1.1, "我方前哨阵亡/敌方存活 -> 仍进攻");
 
+  // 规则 2：敌方前哨被毁、我方前哨存活 -> 高地循环首点。
   world = make_world();
   world.referee.enemy_outpost_hp = 0;
-  expect_goal(tree_path, config, world, -1.1, -1.1, "敌方前哨被毁 -> 中央高地");
+  expect_goal(tree_path, config, world, -1.1, -1.1, "敌方前哨被毁 -> 高地巡逻");
 
+  // 规则 3：双方前哨皆毁，剩余 > 180s -> 后方巡逻首点。
   world = make_world();
-  world.referee.game_time_remaining = 500;  // 超出进攻窗口
-  expect_goal(tree_path, config, world, 0.0, 1.1, "超出进攻窗口 -> 巡逻");
+  world.referee.enemy_outpost_hp = 0;
+  world.referee.our_outpost_hp = 0;
+  world.referee.game_time_remaining = 420;
+  expect_goal(tree_path, config, world, 0.0, 1.1, "双方前哨皆毁/时间早 -> 后方巡逻");
+
+  // 规则 3：双方前哨皆毁，剩余 <= 180s -> 回堡垒防守。
+  world = make_world();
+  world.referee.enemy_outpost_hp = 0;
+  world.referee.our_outpost_hp = 0;
+  world.referee.game_time_remaining = 100;
+  expect_goal(tree_path, config, world, -5.0, 3.0, "双方前哨皆毁/时间晚 -> 守堡垒");
 
   world = make_world();
   world.referee.self_hp = 0;  // 阵亡 -> 不发导航目标，复活交给 ResourceRoot

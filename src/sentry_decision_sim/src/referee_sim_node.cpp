@@ -171,6 +171,7 @@ class RefereeSimNode : public rclcpp::Node {
     last_stage_tick_ = SteadyClock::now();
     last_supply_tick_ = last_stage_tick_;
     last_remote_tick_ = last_stage_tick_;
+    last_respawn_tick_ = last_stage_tick_;
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -230,6 +231,9 @@ class RefereeSimNode : public rclcpp::Node {
     fort_buff_center_x_ = declare_number_param("fort_buff_center_x", sim_.fort_x);
     fort_buff_center_y_ = declare_number_param("fort_buff_center_y", sim_.fort_y);
     fort_buff_radius_ = declare_number_param("fort_buff_radius", sim_.fort_radius);
+    // 双仓库重置：回起点导航目标坐标（独立模式不用）。
+    start_x_ = declare_number_param("start_x", sim_.start_x);
+    start_y_ = declare_number_param("start_y", sim_.start_y);
 
     const auto game_info_topic =
         declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
@@ -322,7 +326,39 @@ class RefereeSimNode : public rclcpp::Node {
             sim_pose_.y = msg->pos_y;
             sim_pose_.yaw = msg->yaw;
           });
+      // 双仓库下仿真不能瞬移真实机器人：重置时改为下发一个回起点的导航目标。
+      nav_reset_client_ = rclcpp_action::create_client<NavigateToPose>(this, navigate_action);
     }
+  }
+
+  // 双仓库：请求下发「回起点」导航目标（坐标来自 config/sim.yaml 的 nav_start）。
+  // 若 Nav2 尚未就绪，置 pending 由 tick 每拍重试，避免重置请求丢失。
+  void request_reset_nav_goal() {
+    reset_goal_pending_ = true;
+    reset_goal_warned_ = false;
+    try_send_reset_nav_goal();
+  }
+
+  void try_send_reset_nav_goal() {
+    if (!reset_goal_pending_ || !nav_reset_client_) {
+      return;
+    }
+    if (!nav_reset_client_->action_server_is_ready()) {
+      if (!reset_goal_warned_) {
+        SD_LOG_WARN("sim", "重置：导航 action server 未就绪，稍后重试回起点目标");
+        reset_goal_warned_ = true;
+      }
+      return;
+    }
+    NavigateToPose::Goal goal;
+    goal.pose.header.frame_id = map_frame_;
+    goal.pose.header.stamp = now();
+    goal.pose.pose.position.x = start_x_;
+    goal.pose.pose.position.y = start_y_;
+    goal.pose.pose.orientation.w = 1.0;
+    nav_reset_client_->async_send_goal(goal);
+    reset_goal_pending_ = false;
+    SD_LOG_ACT("sim", "重置：下发回起点导航目标 (%.2f, %.2f)", start_x_, start_y_);
   }
 
   rclcpp_action::GoalResponse handle_goal(const NavigateToPose::Goal& goal) {
@@ -341,8 +377,11 @@ class RefereeSimNode : public rclcpp::Node {
   void handle_accepted(const std::shared_ptr<GoalHandle>& handle) {
     // 新目标抢占旧目标：先 abort 旧 handle，避免其悬挂、永远收不到结果。
     if (goal_handle_) {
-      auto previous = std::make_shared<NavigateToPose::Result>();
-      goal_handle_->abort(previous);
+      if (goal_handle_->is_active()) {
+        auto previous = std::make_shared<NavigateToPose::Result>();
+        goal_handle_->abort(previous);
+      }
+      goal_handle_.reset();
     }
     goal_handle_ = handle;
     sentry_decision::Point2D goal;
@@ -388,13 +427,20 @@ class RefereeSimNode : public rclcpp::Node {
     if (reset_requested) {
       world_ = initial_world_;
       if (provide_nav_) {
+        // 独立仿真：直接瞬移伪导航到起点。
         nav_.set_pose(start_pose_);
         nav_.cancel_goal();
+        sim_pose_ = start_pose_;
+      } else {
+        // 双仓库：仿真不能瞬移真实机器人，改为下发回起点导航目标。
+        // 不修改 sim_pose_：仍以 /decision/world_state 的真实位姿判定占领 / 回血，
+        // 直到 Nav2 真正把机器人开回起点。
+        request_reset_nav_goal();
       }
-      sim_pose_ = start_pose_;
       actuator_.reset();
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
+      last_respawn_tick_ = last_supply_tick_;
       in_supply_ = false;
       supply_seconds_in_zone_ = 0;
     }
@@ -550,6 +596,30 @@ class RefereeSimNode : public rclcpp::Node {
     }
   }
 
+  // 按真实秒推进复活读条（规则 5.2.2）；读条完成且已确认复活时以 10% 上限血复活。
+  void step_respawn() {
+    const TimePoint now = SteadyClock::now();
+    while (now - last_respawn_tick_ >= Duration{1000}) {
+      last_respawn_tick_ += Duration{1000};
+      // 非比赛中（未开始 / 准备 / 结算）不推进读条；同时推进时间基线，
+      // 否则恢复比赛后会把停表期间一次性补进读条。
+      if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
+        continue;
+      }
+      if (world_.self_hp > 0) {
+        continue;
+      }
+      // 规则 5.2.2：位于补给区或己方基地血量 <2000 时读条加速（每秒 +4）。
+      const bool speed_up = in_supply_zone() || world_.base_hp < 2000;
+      const sentry_decision_sim::RespawnStepResult step =
+          sentry_decision_sim::step_respawn(&world_, max_hp_, speed_up);
+      if (step.revived) {
+        SD_LOG_ACT("sim", "复活读条完成（%d/%d）：血量恢复至 %d/%d", step.progress, step.total,
+                   world_.self_hp, max_hp_);
+      }
+    }
+  }
+
   // 按机器人位置生成「占领增益点」状态并写回世界事件位（供上行消息与裁判校验）。
   void update_occupancy() {
     sentry_decision_sim::GainZones zones;
@@ -564,6 +634,10 @@ class RefereeSimNode : public rclcpp::Node {
   }
 
   void tick() {
+    // 先同步复活状态：战亡即开始读条并导出 info1.can_free_resurrect（供本拍动作校验与上行）。
+    sentry_decision_sim::sync_respawn(&world_);
+    // 双仓库重置目标：Nav2 未就绪时每拍重试。
+    try_send_reset_nav_goal();
     if (provide_nav_) {
       nav_.update(SteadyClock::now());
       finish_goal_if_done();
@@ -576,6 +650,8 @@ class RefereeSimNode : public rclcpp::Node {
     step_remote_exchanges();
     step_game_stage();
     step_supply();
+    step_respawn();
+    sentry_decision_sim::sync_respawn(&world_);
     publish_uplinks();
     if (provide_nav_) {
       publish_odom();
@@ -751,6 +827,18 @@ class RefereeSimNode : public rclcpp::Node {
     exit_code_ = 1;
   }
 
+  // 结束前终止仍在运行的目标：否则 shutdown 后 action server 析构会对已失效 goal 发 result。
+  void abort_active_goal() {
+    if (!goal_handle_) {
+      return;
+    }
+    if (goal_handle_->is_active()) {
+      auto result = std::make_shared<NavigateToPose::Result>();
+      goal_handle_->abort(result);
+    }
+    goal_handle_.reset();
+  }
+
   void finish() {
     finished_ = true;
     if (failures_.empty()) {
@@ -759,6 +847,7 @@ class RefereeSimNode : public rclcpp::Node {
     } else {
       SD_LOG_ERROR("sim", "场景 %s 失败（%zu 项）", scenario_.name.c_str(), failures_.size());
     }
+    abort_active_goal();
     rclcpp::shutdown();
   }
 
@@ -772,6 +861,7 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_stage_tick_{};
   TimePoint last_supply_tick_{};
   TimePoint last_remote_tick_{};
+  TimePoint last_respawn_tick_{};
   bool in_supply_ = false;
   // 连续在补给区内的整秒数（进入当拍为 0），用于回血进入延时。
   int supply_seconds_in_zone_ = 0;
@@ -794,6 +884,11 @@ class RefereeSimNode : public rclcpp::Node {
   double fort_buff_center_x_ = 0.0;
   double fort_buff_center_y_ = 0.0;
   double fort_buff_radius_ = 0.0;
+  // 双仓库重置：回起点坐标，以及待发送 / 已告警状态。
+  double start_x_ = 0.0;
+  double start_y_ = 0.0;
+  bool reset_goal_pending_ = false;
+  bool reset_goal_warned_ = false;
   Scenario scenario_;
   bool has_scenario_ = false;
   bool hold_ = false;
@@ -827,6 +922,8 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Service<sentry_decision_msgs::srv::SetWorld>::SharedPtr set_world_server_;
   rclcpp::Service<sentry_decision_msgs::srv::ApplyEffect>::SharedPtr apply_effect_server_;
   rclcpp_action::Server<NavigateToPose>::SharedPtr action_server_;
+  // 双仓库：仅用于重置时下发回起点目标。
+  rclcpp_action::Client<NavigateToPose>::SharedPtr nav_reset_client_;
   std::shared_ptr<GoalHandle> goal_handle_;
   rclcpp::TimerBase::SharedPtr timer_;
 };

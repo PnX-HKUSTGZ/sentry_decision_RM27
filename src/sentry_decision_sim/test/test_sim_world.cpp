@@ -206,13 +206,20 @@ void test_execute_action_preconditions() {
     CHECK(world.self_hp == 150);
     CHECK(world.coins == 150);
   }
-  // 免费复活：未授权 -> 拒绝；授权 -> 成功。
+  // 免费复活：存活 -> 拒绝；待复活 -> 接受并确认（读条未完成时不改血量）。
   {
     SimWorld world;
+    world.self_hp = 100;  // 存活
     CHECK(
         !execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
-    world.sentry_info_1 = (1u << 19);
-    CHECK(execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
+    world.self_hp = 0;  // 战亡 -> 裁判推导待复活
+    world.game_time_remaining = 420;
+    const ActionOutcome confirm =
+        execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400);
+    CHECK(confirm.accepted);
+    CHECK(world.respawn.pending);
+    CHECK(world.respawn.confirmed);
+    CHECK(world.self_hp == 0);  // 读条未完成，不复活
   }
   // 立即复活：金币不足 -> 拒绝；足够 -> 成功。
   {
@@ -230,6 +237,8 @@ void test_execute_action_preconditions() {
     CHECK(out.accepted);
     CHECK(world.self_hp == 400);
     CHECK(world.coins == 80);
+    CHECK(world.respawn.instant_count == 1);
+    CHECK(!world.respawn.pending);
   }
   // 远程兑换发弹量：未脱战 -> 拒绝；脱战 + 金币足 -> 确认成功但 6s 后才生效。
   {
@@ -320,6 +329,101 @@ void test_remote_hp_void_on_death() {
   CHECK(world.self_hp == 0);
 }
 
+// 复活读条总长度（规则 5.2.2）：10 + round((420-剩余)/10) + 20*累计立即复活次数。
+void test_respawn_bar_total() {
+  CHECK(respawn_bar_total(420, 0) == 10);
+  CHECK(respawn_bar_total(300, 0) == 22);  // 10 + 12
+  CHECK(respawn_bar_total(120, 2) == 80);  // 规则示例
+  CHECK(respawn_bar_total(500, 0) == 10);  // 赛前剩余 >420 按 0 处理
+}
+
+// 战亡后同步：can_free_resurrect 置位、读条总长锁定、热量清零；复活后清位。
+void test_sync_respawn_starts_bar() {
+  SimWorld world;
+  world.self_hp = 0;
+  world.game_time_remaining = 300;
+  world.current_heat = 200;
+  world.sentry_info_1 = 0;
+  sync_respawn(&world);
+  CHECK(world.respawn.pending);
+  CHECK(world.respawn.total_progress == 22);
+  CHECK(world.respawn.current_progress == 0);
+  CHECK(!world.respawn.confirmed);
+  CHECK(world.current_heat == 0);
+  CHECK(decode_sentry_info1(world.sentry_info_1).can_free_resurrect);
+
+  world.self_hp = 40;  // 复活后
+  sync_respawn(&world);
+  CHECK(!world.respawn.pending);
+  CHECK(!decode_sentry_info1(world.sentry_info_1).can_free_resurrect);
+}
+
+// 确认后读条完成 -> 10% 上限血复活；补给区 / 基地 <2000 时每秒 +4；未确认不复活。
+void test_step_respawn_revives_at_ten_percent() {
+  SimWorld world;
+  world.self_hp = 0;
+  world.sentry_info_2 = 1;
+  world.game_time_remaining = 420;  // 读条 10s
+  CHECK(execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
+
+  for (int i = 0; i < 9; ++i) {
+    CHECK(!step_respawn(&world, 400, false).revived);
+  }
+  CHECK(world.self_hp == 0);
+  CHECK(world.respawn.current_progress == 9);
+  const RespawnStepResult final_step = step_respawn(&world, 400, false);
+  CHECK(final_step.revived);
+  CHECK(world.self_hp == 40);  // 10% * 400
+  CHECK(final_step.healed == 40);
+  CHECK(!world.respawn.pending);
+
+  // 未确认：读条完成也不复活；完成后再确认立即复活。
+  SimWorld unconfirmed;
+  unconfirmed.self_hp = 0;
+  unconfirmed.game_time_remaining = 420;
+  sync_respawn(&unconfirmed);
+  for (int i = 0; i < 10; ++i) {
+    step_respawn(&unconfirmed, 400, false);
+  }
+  CHECK(unconfirmed.self_hp == 0);
+  CHECK(unconfirmed.respawn.pending);
+  const ActionOutcome late =
+      execute_action(&unconfirmed, make_action(DecisionActionKind::kFreeResurrect, 0), 400);
+  CHECK(late.accepted);
+  CHECK(unconfirmed.self_hp == 40);
+
+  // 加速：每秒 +4，三次读数即完成。
+  SimWorld fast;
+  fast.self_hp = 0;
+  fast.game_time_remaining = 420;
+  sync_respawn(&fast);
+  fast.respawn.confirmed = true;
+  CHECK(!step_respawn(&fast, 400, true).revived);  // 4
+  CHECK(!step_respawn(&fast, 400, true).revived);  // 8
+  CHECK(step_respawn(&fast, 400, true).revived);   // 12 -> 夹到 10
+  CHECK(fast.self_hp == 40);
+}
+
+// 立即复活：本局累计次数 +1，并计入后续免费复活读条。
+void test_instant_resurrect_counts() {
+  SimWorld world;
+  world.coins = 200;
+  world.self_hp = 0;
+  world.game_time_remaining = 420;
+  world.sentry_info_1 = (1u << 20) | (120u << 21);
+  const ActionOutcome out =
+      execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 0), 400);
+  CHECK(out.accepted);
+  CHECK(world.self_hp == 400);
+  CHECK(world.coins == 80);
+  CHECK(world.respawn.instant_count == 1);
+  CHECK(!world.respawn.pending);
+
+  world.self_hp = 0;
+  sync_respawn(&world);
+  CHECK(world.respawn.total_progress == 30);  // 420 剩余 -> 10 + 20*1
+}
+
 }  // namespace
 
 int main() {
@@ -333,6 +437,10 @@ int main() {
   test_remote_hp_delay();
   test_remote_hp_void_on_death();
   test_execute_action_preconditions();
+  test_respawn_bar_total();
+  test_sync_respawn_starts_bar();
+  test_step_respawn_revives_at_ten_percent();
+  test_instant_resurrect_counts();
   if (g_failures == 0) {
     std::printf("all sim world tests passed\n");
     return 0;

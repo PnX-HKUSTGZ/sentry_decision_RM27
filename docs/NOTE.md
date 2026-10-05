@@ -3,7 +3,35 @@
 > 短期临时文档：只记录当前进度、TODO 与注意事项，不保留历史。历史变更见 `docs/CHANGELOG.md`。
 > 仅作为开发草稿纸，不是永久文档，也不属于项目正式文档。
 
-## 当前 sprint（v0.4.0 双仓库联调）
+## 当前 sprint（v0.4.1 功能修复与初版决策树）
+
+### 已锁定决策
+
+- 复活完整建模（方案 B，规则 5.2.2）：战亡即开始读条，读条完成且已确认才复活，血量为 10% 上限血；
+  读条在补给区 / 己方基地 <2000 血时每秒 +4。仿真裁判按死活推导 `info1.can_free_resurrect`，
+  不再依赖场景手动置位。
+- 协议电平：确认免费复活 / 兑换立即复活（`0x0120` bit 0 / 1）是电平位，决策侧从 OneShot 改为
+  Polled，间隔 `action.revive_poll_interval_ms`（默认 200ms）。停止提交即停止置位；MCU 侧需保证
+  不复活时 bit0 归零（正式接板时确认，P2.3b）。
+
+### 已完成
+
+- 复活完整修复（规则 5.2.2）：`sim_world` / `referee_sim_node` 读条与 10% 血量复活，复活动作改 kPolled；
+  `full_match` 覆盖阵亡→确认→复活。已提交 f3d54f4。
+- 初版主决策树（还原上一赛季）：战略层三条规则 + 任务树重排（进攻 > 高地循环 > 后方巡逻 > 守堡垒）；
+  新增 PatrolLoop 技能节点（到点停留 nav.patrol_dwell_s 秒）与 tree/skill/patrol_loop.xml；
+  游标存 DecisionContext.patrol。移除进攻时间窗。
+- 撤退迟滞：低于 retreat_hp 进入撤退后保持到 recovery_hp 才离开补给区；迟滞状态放
+  DecisionContext.strategy_memory，StrategicPolicy::decide 增 memory 参数。
+- 双仓库「重置」回起点：`referee_sim_node` 在 `provide_nav=false` 下建 `NavigateToPose` 客户端，
+  重置时发回起点目标（map 新增 `start`，sim.yaml 新增 `nav_start`）；独立模式仍瞬移。
+- 文档：ARCHITECTURE §14.4 / USAGE / CHANGELOG / NOTE 同步。
+
+### 待办
+
+- 初版决策树其余修复项（待补）。
+
+## 历史 sprint（v0.4.0 双仓库联调）
 
 ### 已完成
 

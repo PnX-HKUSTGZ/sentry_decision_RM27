@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!--
+  技能：按命名点列表循环巡逻（到点后停留 dwell_key 秒再去下一点）。
+  进入条件：调用方通过 points / dwell_key / loop_id 端口给出巡逻线。
+  退出条件：节点持续 RUNNING；被父任务 halt 时游标复位。
+  抢占关系：无内部抢占；被父任务 halt 时不再发 Intent。
+-->
+<root BTCPP_format="4" main_tree_to_execute="PatrolPoints">
+  <BehaviorTree ID="PatrolPoints">
+    <PatrolLoop points="{points}" dwell_key="{dwell_key}" loop_id="{loop_id}"/>
+  </BehaviorTree>
+</root>

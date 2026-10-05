@@ -26,8 +26,14 @@ void ActionDispatcher::on_ack(const ActionAck& ack) {
       slot.timeout_warned = false;
     }
     if (ack.accepted) {
-      SD_LOG_ACT("action", "动作 %d 已确认 request_id=%u", static_cast<int>(entry.first),
-                 ack.request_id);
+      // 轮询动作每 interval 一条回执，按 DEBUG 记录，避免刷屏（首次 / 关键动作仍走 ACT）。
+      if (slot.desired.mode == ActionMode::kPolled) {
+        SD_LOG_DEBUG("action", "轮询动作 %d 已确认 request_id=%u", static_cast<int>(entry.first),
+                     ack.request_id);
+      } else {
+        SD_LOG_ACT("action", "动作 %d 已确认 request_id=%u", static_cast<int>(entry.first),
+                   ack.request_id);
+      }
     } else {
       SD_LOG_WARN("action", "动作 %d 被拒绝 request_id=%u code=%u %s",
                   static_cast<int>(entry.first), ack.request_id, static_cast<unsigned>(ack.code),
@@ -120,10 +126,13 @@ void ActionDispatcher::reset() {
 }
 
 void submit_resource_requests(ActionDispatcher& dispatcher, const ResourceRequest& resource) {
-  const auto submit = [&dispatcher](DecisionActionKind kind, int value) {
+  const auto submit = [&dispatcher](DecisionActionKind kind, int value,
+                                    ActionMode mode = ActionMode::kOneShot,
+                                    Duration interval = Duration{0}) {
     DecisionAction action;
     action.kind = kind;
-    action.mode = ActionMode::kOneShot;
+    action.mode = mode;
+    action.interval = interval;
     action.value = value;
     dispatcher.submit(action);
   };
@@ -142,11 +151,13 @@ void submit_resource_requests(ActionDispatcher& dispatcher, const ResourceReques
   if (resource.remote_hp > 0) {
     submit(DecisionActionKind::kRemoteHpExchange, resource.remote_hp);
   }
-  // 复活：立即复活优先于确认免费复活。
+  // 复活：立即复活优先于确认免费复活。协议 0x0120 bit 0 / bit 1 是电平位，
+  // 用轮询在待复活期间持续置位（停止提交即停止置位），避免单帧丢失导致不复活。
+  const Duration revive_interval = dispatcher.revive_poll_interval();
   if (resource.instant_revive) {
-    submit(DecisionActionKind::kInstantResurrect, 0);
+    submit(DecisionActionKind::kInstantResurrect, 0, ActionMode::kPolled, revive_interval);
   } else if (resource.revive) {
-    submit(DecisionActionKind::kFreeResurrect, 0);
+    submit(DecisionActionKind::kFreeResurrect, 0, ActionMode::kPolled, revive_interval);
   }
 }
 

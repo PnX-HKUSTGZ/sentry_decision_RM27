@@ -1,11 +1,11 @@
-# 完整对局场景：巡逻 -> 进攻 -> 撤退 -> 复活。
+# 完整对局场景：进攻 -> 高地巡逻 -> 后方巡逻 -> 守堡垒 -> 撤退 -> 复活。
 # 由 referee_sim_node --scenario 执行：按时间轴 set_world，并在 expect 时刻断言 /decision/state。
 name: full_match
 
 # 初始世界（时间轴之前应用）。
 world:
   game_status: 4
-  game_time_remaining: 500
+  game_time_remaining: 420
   coins: 0
   self_hp: 400
   self_ammo: 100
@@ -15,43 +15,71 @@ world:
   can_rebuild_outpost: false
 
 timeline:
-  # 敌方前哨存活 + 超出进攻时间窗 -> 巡逻（1），目标 patrol_a (-3.82, 5.93)。
+  # 规则 1：敌方前哨存活 -> 进攻敌方前哨 (1.39, 6.08)，进攻姿态。
   - at: 2.0
-    expect:
-      tactical_mode: patrol
-      stance: move
-      has_nav_goal: true
-      nav_goal_x: -3.82
-      nav_goal_y: 5.93
-
-  # 进入进攻时间窗 -> 进攻（2），目标 enemy_outpost (1.39, 6.08)。
-  - at: 3.0
-    set_world:
-      game_time_remaining: 300
-  - at: 4.5
     expect:
       tactical_mode: attack
       stance: attack
+      has_nav_goal: true
       nav_goal_x: 1.39
       nav_goal_y: 6.08
 
-  # 血量低于撤退阈值 -> 撤退（4），目标 home（与 config/maps/RMUC26.yaml 的 home 同步）。
+  # 规则 2：敌方前哨被毁、我方前哨存活 -> 中央高地 3 点循环，首点 highland_a。
+  - at: 3.0
+    set_world:
+      enemy_outpost_hp: 0
+  - at: 4.5
+    expect:
+      tactical_mode: patrol
+      stance: move
+      nav_goal_x: 2.49
+      nav_goal_y: 4.05
+
+  # 规则 3：双方前哨皆毁且剩余 420s（> 180s）-> 后方巡逻，首点 patrol_a。
   - at: 6.0
     set_world:
-      self_hp: 40
+      our_outpost_hp: 0
   - at: 7.5
+    expect:
+      tactical_mode: patrol
+      nav_goal_x: -3.82
+      nav_goal_y: 5.93
+
+  # 规则 3：双方前哨皆毁且剩余 100s（<= 180s）-> 回堡垒防守。
+  - at: 9.0
+    set_world:
+      game_time_remaining: 100
+  - at: 10.5
+    expect:
+      tactical_mode: defend
+      stance: defense
+      nav_goal_x: -7.37
+      nav_goal_y: 1.60
+
+  # 低血撤退优先于主任务：目标 home（与 config/maps/RMUC26.yaml 的 home 同步）。
+  - at: 12.0
+    set_world:
+      self_hp: 40
+  - at: 13.5
     expect:
       tactical_mode: retreat
       stance: move
       nav_goal_x: -11.71
       nav_goal_y: -3.22
 
-  # 阵亡 -> 复活（6），不发导航目标。
-  - at: 9.0
+  # 阵亡 -> 确认免费复活（读条 10s）-> 以 10% 上限血复活 -> 低血继续撤退。
+  # 战亡时剩余 420s -> 读条 = 10 + (420-420)/10 = 10s（可能在补给区加速，不影响断言）。
+  - at: 15.0
     set_world:
       self_hp: 0
-  - at: 10.5
+      game_time_remaining: 420
+  - at: 16.5
     expect:
       tactical_mode: respawn
-      stance: move
       has_nav_goal: false
+      resource_revive: true
+  - at: 26.0
+    expect:
+      tactical_mode: retreat      # 10% 血量（40）< retreat_hp（50）
+      has_nav_goal: true
+      resource_revive: false

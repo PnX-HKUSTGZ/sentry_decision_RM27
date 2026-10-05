@@ -225,7 +225,20 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
 > 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
 > 演示世界从「未开始」起，比赛阶段由网页面板按钮或 `/sentry_sim/set_game_stage` 服务推进。
 
-场景 YAML 结构（`full_match.yaml` 跑通巡逻→进攻→撤退→复活）：
+主策略（`RuleBasedStrategicPolicy`，还原上一赛季打法）：
+
+1. **敌方前哨存活** → 进攻敌方前哨（`kAttack`）；
+2. **敌方前哨被毁、我方前哨存活** → 中央高地 3 点循环巡逻（`kPatrol`，任务树按前哨条件区分高地 / 后方）；
+3. **双方前哨皆毁** → 剩余时间 > `strategic.fort_after_remaining_s`（默认 180s，即前 4 分钟）后方巡逻，
+   否则回堡垒防守（`kDefend`）。
+
+低血撤退 / 低弹补给 / 阵亡复活的优先级高于主策略。巡逻 = 对当前命名点持续发目标，到点后停留
+`nav.patrol_dwell_s` 秒再去下一点（循环）。
+
+撤退带**迟滞**：血量低于 `nav.retreat_hp` 进入撤退并在补给区回血，保持到恢复到 `nav.recovery_hp`
+才离开（把 `nav.recovery_hp` 设为哨兵上限血量即「回满才走」），避免刚过进入阈值就切回主任务。
+
+场景 YAML 结构（`full_match.yaml` 跑通「进攻→高地→后方巡逻→守堡垒→撤退→复活」）：
 
 ```yaml
 name: full_match
@@ -236,13 +249,15 @@ world:                          # 初始世界（时间轴之前应用）
   enemy_outpost_hp: 1500
 timeline:
   - at: 2.0
-    expect:    { tactical_mode: patrol, has_nav_goal: true }
+    expect:    { tactical_mode: attack, has_nav_goal: true }   # 敌前哨存活 -> 进攻
   - at: 3.0
-    set_world: { game_time_remaining: 300 }
-  - at: 6.0
-    set_world: { self_hp: 40 }
-  - at: 7.5
-    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
+    set_world: { enemy_outpost_hp: 0 }
+  - at: 4.5
+    expect:    { tactical_mode: patrol, nav_goal_x: 2.49, nav_goal_y: 4.05 }  # -> 高地巡逻
+  - at: 9.0
+    set_world: { game_time_remaining: 100 }        # 双方前哨皆毁且剩余 <= 180s
+  - at: 10.5
+    expect:    { tactical_mode: defend, nav_goal_x: -7.37, nav_goal_y: 1.60 }  # -> 守堡垒
 ```
 
 `set_world` 字段见 `sentry_decision_sim/sim_world.hpp`；`expect` 支持 `tactical_mode`（名称或数字）、`stance`（名称或数字）、`has_nav_goal`、`nav_goal_x` / `nav_goal_y`、`has_cmd_vel`、`resource_ammo` / `resource_hp` / `resource_revive`。
@@ -288,7 +303,8 @@ ros2 launch sentry_decision_viz viz.launch.py   # rosbridge :9090 + 静态页 :8
   叠加己方位姿、导航目标、敌方位置），上方状态栏显示当前比赛阶段与 `MM:SS` 倒计时；
 - 右侧 `WorldState` 与资源请求 / 最近动作 / 动作回执（每秒轮询 `list_state`）；
 - 比赛阶段按钮：准备（3 分钟）/ 15s自检 / 5s倒计时 / 开始比赛（只可前进，当前及更早阶段自动禁用）；
-  「重置」回未开始，并清除战术层覆盖；
+  「重置」回未开始，并清除战术层覆盖；双仓库（`--with-nav`）下会额外下发一个「回起点」导航目标
+  （真实机器人开回 spawn，坐标见 `config/sim.yaml` 的 `nav_start` / map 的 `start`），独立模式仍是直接瞬移；
 - 仿真控制：「仿真世界」直接改裁判仿真的真实世界；「仿真效果」三行按钮
   （自身：扣血 / 扣弹 / 死亡；我方 / 敌方：前哨站扣血 / 摧毁、基地扣血）模拟赛场事件，
   步长来自 `config/sim.yaml` 的 `effects`；
@@ -333,7 +349,9 @@ ros2 service call /sentry_sim/set_game_stage sentry_decision_msgs/srv/SetGameSta
 > - **血量兑换按规则只走远程**（`IfDisengaged` + 金币 + `RequestRemoteHpExchange`）；
 > - **本地兑换发弹量**需占领增益点（`IfOccupyingGainPoint`）；不在增益点且脱战时改走
 >   **远程兑换发弹量**（`IfNotOccupyingGainPoint`）；
-> - **立即复活**需 `can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则确认免费复活。
+> - **立即复活**需待复活、`can_instant_resurrect` 且金币 ≥ 裁判给出的成本；否则在待复活期间
+>   **确认免费复活**：战亡后裁判立即开始复活读条（总长 = `10 + round((420-战亡时剩余)/10) + 20*累计立即复活次数`，
+>   在补给区或己方基地血量 <2000 时每秒 +4）；读条完成且已确认时以 **10% 上限血量**复活。
 >
 > 金币不足 / 未脱战 / 不在增益点都会被裁判拒绝（`动作回执` 行显示 `rejected` 与原因）。
 > 补给区自动回血：机器人处于补给区（默认 `sim_home` 点附近）且比赛中时，按上限血量的

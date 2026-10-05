@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
 
     context.world = model.snapshot(now);
     context.clear_intents();
-    context.apply_strategy(policy.decide(context.world));
+    context.apply_strategy(policy.decide(context.world, &context.strategy_memory));
     tree.tickOnce();
 
     arbiter.clear_source(sentry_decision::SourceId::kStrategic);

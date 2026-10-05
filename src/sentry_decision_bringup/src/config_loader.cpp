@@ -36,8 +36,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"resource.remote_hp_times", {true, true}},
       {"resource.remote_ammo_times", {true, true}},
       {"resource.remote_ammo_min_coins", {true, true}},
-      {"strategic.attack_window_min_remaining", {true, true}},
-      {"strategic.attack_window_max_remaining", {true, true}},
+      {"strategic.fort_after_remaining_s", {true, true}},
       {"safety.max_vx", {false, true}},
       {"safety.max_vy", {false, true}},
       {"safety.max_wz", {false, true}},
@@ -45,6 +44,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
       {"action.one_shot_timeout_ms", {true, true}},
+      {"action.revive_poll_interval_ms", {true, true}},
   };
   return rules;
 }

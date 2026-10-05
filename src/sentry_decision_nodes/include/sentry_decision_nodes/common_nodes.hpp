@@ -55,6 +55,21 @@ class IfEnemyOutpostDead : public BT::SyncActionNode {
   BT::NodeStatus tick() override;
 };
 
+// Node:         IfOurOutpostAlive
+// Category:     Condition (synchronous, no side effects)
+// Purpose:      判断我方前哨是否仍存活（用于区分「高地循环」与「双方前哨皆毁」）。
+// Inputs:       -
+// Blackboard:   read: context(world.referee.valid, our_outpost_hp)  write: (none)
+// Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
+// Side Effects: none
+// See:          tree/mission/nav/highland.xml
+class IfOurOutpostAlive : public BT::SyncActionNode {
+ public:
+  IfOurOutpostAlive(const std::string& name, const BT::NodeConfig& config);
+  static BT::PortsList providedPorts();
+  BT::NodeStatus tick() override;
+};
+
 // Node:         EmitTacticalMode
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求切换战术模式（调试 / 手动用；常规由 StrategicPolicy 产出）。

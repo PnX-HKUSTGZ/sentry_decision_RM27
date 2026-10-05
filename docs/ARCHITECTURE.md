@@ -518,12 +518,14 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 - 发布 `sentry_interfaces` 的五条上行消息，驱动 `decision_node`；
 - `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
   在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
-- `provide_nav=false` 时不自建导航 action、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
-  补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；
+- `provide_nav=false` 时不自建导航 action server、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
+  补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；此时重置无法瞬移真实机器人，改为用
+  `NavigateToPose` **客户端**下发一个回起点目标（坐标来自 `config/sim.yaml` 的 `nav_start` 命名点）；
 - **动作前置校验**：执行端 `execute_action()` 是动作合法性的权威，校验通过才会改世界；非法动作
   返回 `accepted=false` + `code`/`detail`，节点在 `publish_ack` 打印「裁判拒绝动作 ...」。
   规则依据：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点（表 5-8）；兑换血量与远程兑换
-  要求脱战（5.2.1 / 表 5-6）；复活要求对应 `info1` 标志与金币。合法时按 10 金币/10 发等结算；
+  要求脱战（5.2.1 / 表 5-6）；复活要求处于待复活且 `info1` 给出对应标志（免费 / 立即）与金币。
+  合法时按 10 金币/10 发等结算；
 - 节点每拍按机器人位姿对可配置的增益点区域（补给区 / 基地 / 前哨站 / 堡垒）判定占领状态，
   写回 `event_code` 位段（`supply_zone_occupied` / `supply_zone_occupied_rmul` 等），供决策端
   `IfOccupyingGainPoint` 门控；区域圆心与半径来自地图点（半径 = 点第 4 位），四个区域默认启用
@@ -536,6 +538,12 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
   机器人进入补给区的整秒一次性领取全部累积值（示例：剩余 30s 时才进补给区，一次 +600）；
 - **远程兑换延迟**（规则 5.3.2 / 5.2.1）：确认时立即扣金币并进入延迟队列，6 秒后发弹量 / 血量
   才生效；远程兑换血量在 6 秒内战亡则作废且金币不返还（`step_pending_remote` 纯逻辑结算）；
+- **复活读条**（规则 5.2.2）：机器人战亡（`self_hp<=0`）时裁判立即开始复活读条，总长
+  `10 + round((420-战亡时剩余秒数)/10) + 20*本局累计兑换立即复活次数`，战亡瞬间锁定；
+  每秒 +1，在己方补给区或己方基地血量 <2000 时每秒 +4。待复活期间 `info1.can_free_resurrect`
+  （bit 19）置 1；哨兵「确认免费复活」后读条完成即以 **10% 上限血量**复活并清零射击热量，
+  未确认则读条完成后保持待复活。`kInstantResurrect` 需待复活且金币足够，回满血、本局累计立即复活
+  次数 +1。读条状态是仿真专属（`SimWorld::respawn`），不进入上行消息；
 - `srv/SetWorld`（`/sentry_sim/set_world`）直接改仿真世界真实值；`srv/ApplyEffect`
   （`/sentry_sim/apply_effect`）按 `config/sim.yaml` 的 `effects` 施加具名效果
   （自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁），供面板做闭环测试；
@@ -546,17 +554,25 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 world:   { self_hp: 400, self_ammo: 100, enemy_outpost_hp: 1500 }
 timeline:
   - at: 2.0
-    expect:    { tactical_mode: patrol, has_nav_goal: true }
+    expect:    { tactical_mode: attack, has_nav_goal: true }   # 敌前哨存活 -> 进攻
   - at: 3.0
-    set_world: { game_time_remaining: 300 }
-  - at: 6.0
-    set_world: { self_hp: 40 }
-  - at: 7.5
-    expect:    { tactical_mode: retreat, nav_goal_x: -5.0, nav_goal_y: 3.0 }
+    set_world: { enemy_outpost_hp: 0 }
+  - at: 4.5
+    expect:    { tactical_mode: patrol, nav_goal_x: 2.49, nav_goal_y: 4.05 }  # -> 高地巡逻
+  - at: 9.0
+    set_world: { game_time_remaining: 100 }
+  - at: 10.5
+    expect:    { tactical_mode: defend, nav_goal_x: -7.37, nav_goal_y: 1.60 }  # -> 守堡垒
 ```
 
 场景支持 `set_world` / `expect`：在事件时刻改世界或断言决策输出，因此场景脚本可直接把测试用例写成时间轴。
 场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
+
+主策略 `RuleBasedStrategicPolicy` 按上一赛季还原为三条规则：**敌前哨存活 → 进攻；敌前哨毁且我前哨存活 →
+中央高地 3 点循环；双方前哨皆毁 → 剩余 > `strategic.fort_after_remaining_s` 后方巡逻，否则守堡垒**；
+撤退 / 补给 / 复活优先级高于主策略。巡逻由技能 `tree/skill/patrol_loop.xml` + `nav` 模块的 `PatrolLoop` 节点实现：
+每 tick 对当前命名点发导航意图，`world.nav.reached` 后停留 `nav.patrol_dwell_s` 秒再切下一点，
+游标（index / 停留起点）显式存在 `DecisionContext.patrol`，按 `loop_id` 区分高地与后方两条巡逻线。
 
 比赛阶段由 ROS 无关的 `MatchStageController` 管理，并通过 `/sentry_sim/set_game_stage`
 （`srv/SetGameStage`）暴露给网页面板：`stage` 除 0（重置）外只允许前进，自检 / 倒计时按真实秒

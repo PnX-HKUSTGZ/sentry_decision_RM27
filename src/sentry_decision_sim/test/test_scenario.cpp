@@ -87,12 +87,12 @@ void test_load_scenario(const std::string& path) {
   }
   CHECK(loaded.ok());
   CHECK(loaded.scenario.name == "full_match");
-  CHECK(loaded.scenario.events.size() == 7);
-  CHECK(loaded.scenario.end == sentry_decision::Duration{10500});
+  CHECK(loaded.scenario.events.size() == 12);
+  CHECK(loaded.scenario.end == sentry_decision::Duration{26000});
   CHECK(loaded.scenario.initial_world.count("self_hp") == 1);
   if (!loaded.scenario.events.empty()) {
     CHECK(loaded.scenario.events.front().at == sentry_decision::Duration{2000});
-    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{10500});
+    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{26000});
   }
 }
 

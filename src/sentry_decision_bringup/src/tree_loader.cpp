@@ -169,6 +169,29 @@ void validate_tree_config(const std::string& tree_dir, const sentry_decision::Po
         errors->push_back(file + ": 配置缺少命名点 [" + name + "]");
       }
     }
+
+    // points="a,b,c"：逗号分隔的命名点列表（巡逻技能），逐个校验。
+    const std::regex points_re("points\\s*=\\s*\"([^\"]*)\"");
+    for (auto it = std::sregex_iterator(text.begin(), text.end(), points_re);
+         it != std::sregex_iterator(); ++it) {
+      const std::string list = (*it)[1].str();
+      if (is_expression(list)) {
+        continue;
+      }
+      std::stringstream stream(list);
+      std::string name;
+      while (std::getline(stream, name, ',')) {
+        const auto begin = name.find_first_not_of(" \t");
+        if (begin == std::string::npos) {
+          continue;
+        }
+        const auto end = name.find_last_not_of(" \t");
+        const std::string trimmed = name.substr(begin, end - begin + 1);
+        if (config.find_point(trimmed) == nullptr) {
+          errors->push_back(file + ": 配置缺少命名点 [" + trimmed + "]");
+        }
+      }
+    }
   }
 }
 

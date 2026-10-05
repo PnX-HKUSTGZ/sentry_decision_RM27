@@ -1,20 +1,20 @@
 # rmuc26 策略阈值 / 时间窗（由 profiles.yaml 的 strategy_profile 选择）。
 nav:
-  retreat_hp: 50
-  recovery_hp: 90
+  retreat_hp: 100              # 低于该血量 -> 回补给区
+  recovery_hp: 400             # 撤退退出阈值：恢复到该血量才离开补给区；设为哨兵上限血量即回满才走
   low_ammo: 50
   supply_ammo: 150
   patrol_dwell_s: 5.0
 resource:
   exchange_ammo_step: 50        # 本地兑换发弹量：每请求发数
-  hp_exchange_threshold: 50     # 低于该血量才请求兑换
-  min_coins: 100                # 本地兑换 / 远程血量兑换的最低金币
-  remote_hp_times: 1            # 每次远程血量兑换的次数（1 次 = +60% 上限血）
+  min_coins: 300                # 本地兑换 / 远程血量兑换的最低金币
   remote_ammo_times: 1          # 每次远程发弹量兑换的次数（1 次 = 100 发）
   remote_ammo_min_coins: 150    # 远程兑换发弹量一次所需金币（150 金币/100 发）
+  hp_exchange_threshold: 100    # 低于该血量才请求兑换血量
+  remote_hp_times: 1            # 每次远程血量兑换的次数（1 次 = +60% 上限血）
 strategic:
-  attack_window_min_remaining: 0
-  attack_window_max_remaining: 420
+  # 双方前哨皆毁且剩余时间 <= 该值 -> 回堡垒防守；否则后方巡逻。
+  fort_after_remaining_s: 180
 safety:
   max_vx: 3.0                   # 速度限幅（m/s）
   max_vy: 3.0
@@ -27,3 +27,4 @@ timeouts:
   navigation_ms: 500            # 导航状态有效期
 action:
   one_shot_timeout_ms: 500      # one-shot 动作超时未 ack 记 WARN
+  revive_poll_interval_ms: 200  # 电平类复活动作（确认免费/立即复活）的重发间隔
