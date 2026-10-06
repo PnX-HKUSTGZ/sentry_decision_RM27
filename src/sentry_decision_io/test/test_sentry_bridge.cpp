@@ -33,7 +33,7 @@ void test_apply_game_info() {
   msg.enemy_outpost_hp = 1200;
   msg.enemy_base_hp = 5000;
 
-  RefereeState state;
+  UpstreamState state;
   merge(msg, &state);
   CHECK(state.game_status == GameStatus::kRunning);
   CHECK(state.game_time_remaining == 200);
@@ -62,7 +62,7 @@ void test_apply_online_decodes_bitfields() {
       static_cast<std::uint16_t>(1u | (0x7FFu << 1) | (2u << 12) | (1u << 14) | (1u << 15));
   msg.sentry_info_3 = 5ull | (6ull << 16) | (7ull << 32);
 
-  RefereeState state;
+  UpstreamState state;
   merge(msg, &state);
   CHECK(state.self_hp == 400);
   CHECK(state.self_ammo == 100);
@@ -83,39 +83,20 @@ void test_apply_online_decodes_bitfields() {
   CHECK(state.info3.attack_enhanced_remaining_s == 7);
 }
 
-void test_apply_offline_team_radar() {
+void test_apply_offline_team() {
   SentryInfoOfflineMsg offline;
-  offline.lifter_current_pos = 2;
-  offline.is_transformable = true;
-  offline.transform_state = 0.5f;
   offline.capacitor_capacity = 80;
-  offline.tunnel_yaw_aligned = true;
-  offline.yaw_camerainit_to_gimbal = 1.25f;
 
   TeamInfoMsg team;
   team.base_hp = 5000;
   team.outpost_hp = 1500;
 
-  RadarInfoMsg radar;
-  radar.enemy_coin_left = 30;
-  radar.enemy_coin_accumulated = 120;
-  radar.is_enemy_outpost_sensed = true;
-
-  RefereeState state;
+  UpstreamState state;
   merge(offline, &state);
   merge(team, &state);
-  merge(radar, &state);
-  CHECK(state.lifter_pos == 2);
-  CHECK(state.is_transformable);
-  CHECK(state.transform_state == 0.5);
   CHECK(state.capacitor_capacity == 80);
-  CHECK(state.tunnel_yaw_aligned);
-  CHECK(state.yaw_camera_to_gimbal == 1.25);
   CHECK(state.base_hp == 5000);
   CHECK(state.our_outpost_hp == 1500);
-  CHECK(state.enemy_coins == 30);
-  CHECK(state.enemy_coins_accumulated == 120);
-  CHECK(state.enemy_outpost_sensed);
 }
 
 // 裁判来源就绪判定：缺 GameInfo 或 SentryInfoOnline 都视为未就绪。
@@ -152,7 +133,7 @@ void test_decision_command_mapping() {
 int main() {
   test_apply_game_info();
   test_apply_online_decodes_bitfields();
-  test_apply_offline_team_radar();
+  test_apply_offline_team();
   test_referee_sources_ready();
   test_decision_command_mapping();
   if (g_failures == 0) {

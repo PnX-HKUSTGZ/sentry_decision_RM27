@@ -82,7 +82,6 @@ export function worldStateToView(msg) {
     hasEnemy: msg.has_enemy_position,
     enemyX: msg.enemy_x,
     enemyY: msg.enemy_y,
-    enemyCount: msg.enemy_count,
     allyCount: msg.ally_count,
   };
 }

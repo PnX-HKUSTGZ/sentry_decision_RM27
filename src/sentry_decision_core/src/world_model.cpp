@@ -19,7 +19,7 @@ WorldState WorldModel::snapshot(TimePoint now) {
   WorldState state;
   state.stamp = now;
 
-  RefereeState referee;
+  UpstreamState referee;
   const bool has_referee = referee_.referee(&referee);
   referee.valid = has_referee && referee.valid && fresh(referee.stamp, now, timeouts_.referee);
   state.referee = referee;

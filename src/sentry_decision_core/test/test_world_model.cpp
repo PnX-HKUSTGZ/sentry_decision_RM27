@@ -19,9 +19,9 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 class FakeReferee : public RefereeSource {
  public:
-  RefereeState state;
+  UpstreamState state;
   bool available = true;
-  bool referee(RefereeState* out) const override {
+  bool referee(UpstreamState* out) const override {
     if (!available) {
       return false;
     }

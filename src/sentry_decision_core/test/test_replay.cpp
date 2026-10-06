@@ -22,15 +22,15 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 ReplayData make_referee_series() {
   ReplayData data;
-  RefereeState first;
+  UpstreamState first;
   first.valid = true;
   first.self_hp = 400;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{0}, first});
+  data.referee.push_back(ReplayRecord<UpstreamState>{Duration{0}, first});
 
-  RefereeState second;
+  UpstreamState second;
   second.valid = true;
   second.self_hp = 50;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{200}, second});
+  data.referee.push_back(ReplayRecord<UpstreamState>{Duration{200}, second});
 
   SelfState self;
   self.valid = true;
@@ -47,7 +47,7 @@ void test_latest_by_time() {
   CHECK(replay.tick() == 0);
   CHECK(!replay.finished());
 
-  RefereeState state;
+  UpstreamState state;
   CHECK(replay.referee(&state));  // now = 0 时应取到 at = 0 的记录
   CHECK(state.self_hp == 400);
 
@@ -64,10 +64,10 @@ void test_latest_by_time() {
 void test_epoch_stamp_and_freshness() {
   const TimePoint epoch = TimePoint{} + Duration{1000};
   ReplayData data;
-  RefereeState referee;
+  UpstreamState referee;
   referee.valid = true;
   referee.self_hp = 400;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{0}, referee});
+  data.referee.push_back(ReplayRecord<UpstreamState>{Duration{0}, referee});
   SelfState self;
   self.valid = true;
   data.odometry.push_back(ReplayRecord<SelfState>{Duration{0}, self});
@@ -98,7 +98,7 @@ void test_finished_and_empty() {
   CHECK(replay.finished());
 
   ReplaySource empty{ReplayData{}};
-  RefereeState state;
+  UpstreamState state;
   SelfState self;
   CHECK(!empty.referee(&state));
   CHECK(!empty.odometry(&self));

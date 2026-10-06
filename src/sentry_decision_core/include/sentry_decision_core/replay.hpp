@@ -19,7 +19,7 @@ struct ReplayRecord {
 // 离线回放数据：每个输入通道按 at 升序排列。
 // rosbag 读取由 io 适配器负责，core 只消费这份与 ROS 解耦的数据。
 struct ReplayData {
-  std::vector<ReplayRecord<RefereeState>> referee;
+  std::vector<ReplayRecord<UpstreamState>> referee;
   std::vector<ReplayRecord<SelfState>> odometry;
   std::vector<ReplayRecord<NavState>> navigation;
 };
@@ -49,7 +49,7 @@ class ReplaySource : public RefereeSource, public OdometrySource, public Navigat
     return now_ >= last_at_;
   }
 
-  bool referee(RefereeState* out) const override;
+  bool referee(UpstreamState* out) const override;
   bool odometry(SelfState* out) const override;
   NavState status() const override;
 

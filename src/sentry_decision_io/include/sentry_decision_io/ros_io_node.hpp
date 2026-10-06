@@ -19,7 +19,6 @@
 #include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
-#include "sentry_interfaces/msg/radar_info.hpp"
 #include "sentry_interfaces/msg/sentry_info_offline.hpp"
 #include "sentry_interfaces/msg/sentry_info_online.hpp"
 #include "sentry_interfaces/msg/team_info.hpp"
@@ -43,7 +42,7 @@ class RosIoNode : public rclcpp::Node,
 
   explicit RosIoNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-  bool referee(sentry_decision::RefereeState* out) const override;
+  bool referee(sentry_decision::UpstreamState* out) const override;
   bool odometry(sentry_decision::SelfState* out) const override;
 
   void send_goal(const sentry_decision::Point2D& goal) override;
@@ -71,7 +70,7 @@ class RosIoNode : public rclcpp::Node,
   bool tf_warned_ = false;
 
   mutable std::mutex referee_mutex_;
-  sentry_decision::RefereeState referee_;
+  sentry_decision::UpstreamState referee_;
   // 必需上行来源是否出现过：GameInfo（阶段/经济）与 SentryInfoOnline（自身）。
   // 两者都到之前 referee() 返回未就绪，避免缺失字段被当作 0 参与决策。
   bool has_game_info_ = false;
@@ -92,7 +91,6 @@ class RosIoNode : public rclcpp::Node,
   rclcpp::Subscription<sentry_interfaces::msg::SentryInfoOnline>::SharedPtr online_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::SentryInfoOffline>::SharedPtr offline_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::TeamInfo>::SharedPtr team_info_sub_;
-  rclcpp::Subscription<sentry_interfaces::msg::RadarInfo>::SharedPtr radar_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::DecisionAck>::SharedPtr decision_ack_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 

@@ -31,8 +31,6 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
       declare_parameter<std::string>("offline_info_topic", "/sentry/offline_info");
   const auto team_info_topic =
       declare_parameter<std::string>("team_info_topic", "/sentry/team_info");
-  const auto radar_info_topic =
-      declare_parameter<std::string>("radar_info_topic", "/sentry/radar_info");
   const auto decision_ack_topic =
       declare_parameter<std::string>("decision_ack_topic", "/sentry/decision_ack");
   const auto decision_command_topic =
@@ -70,14 +68,6 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
 
   team_info_sub_ = create_subscription<sentry_interfaces::msg::TeamInfo>(
       team_info_topic, 10, [this](sentry_interfaces::msg::TeamInfo::SharedPtr msg) {
-        std::lock_guard<std::mutex> lock(referee_mutex_);
-        merge(*msg, &referee_);
-        referee_.stamp = sentry_decision::SteadyClock::now();
-        referee_.valid = true;
-      });
-
-  radar_info_sub_ = create_subscription<sentry_interfaces::msg::RadarInfo>(
-      radar_info_topic, 10, [this](sentry_interfaces::msg::RadarInfo::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(referee_mutex_);
         merge(*msg, &referee_);
         referee_.stamp = sentry_decision::SteadyClock::now();
@@ -140,7 +130,7 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
   }
 }
 
-bool RosIoNode::referee(sentry_decision::RefereeState* out) const {
+bool RosIoNode::referee(sentry_decision::UpstreamState* out) const {
   std::lock_guard<std::mutex> lock(referee_mutex_);
   *out = referee_;
   // 只到其中一条裁判消息时，缺失字段会以默认 0 参与决策（例如被误判为「0 血 / 阵亡」），

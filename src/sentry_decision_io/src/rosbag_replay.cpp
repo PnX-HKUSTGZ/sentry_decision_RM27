@@ -47,7 +47,7 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
   reader.open(bag_uri);
 
   sentry_decision::ReplayData data;
-  sentry_decision::RefereeState referee;
+  sentry_decision::UpstreamState referee;
   std::int64_t start_ns = -1;
 
   while (reader.has_next()) {
@@ -66,7 +66,7 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
       continue;
     }
 
-    // 新格式上行：逐条 merge 进 RefereeState 后压入快照，语义与实时节点一致。
+    // 新格式上行：逐条 merge 进 UpstreamState 后压入快照，语义与实时节点一致。
     if (topic == topics.game_info) {
       merge(deserialize<sentry_interfaces::msg::GameInfo>(*bag_msg), &referee);
       referee.valid = true;
@@ -91,13 +91,6 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
       data.referee.push_back({at, referee});
       continue;
     }
-    if (topic == topics.radar_info) {
-      merge(deserialize<sentry_interfaces::msg::RadarInfo>(*bag_msg), &referee);
-      referee.valid = true;
-      data.referee.push_back({at, referee});
-      continue;
-    }
-
     if (topic == topics.can_rebuild_outpost) {
       referee.can_rebuild_outpost = deserialize<std_msgs::msg::Bool>(*bag_msg).data;
     } else if (topic == topics.self_hp) {

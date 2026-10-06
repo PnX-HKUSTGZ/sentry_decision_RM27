@@ -22,7 +22,6 @@ struct ReplayTopics {
   std::string online_info = "/sentry/online_info";
   std::string offline_info = "/sentry/offline_info";
   std::string team_info = "/sentry/team_info";
-  std::string radar_info = "/sentry/radar_info";
   std::string odometry = "/odom";
 };
 

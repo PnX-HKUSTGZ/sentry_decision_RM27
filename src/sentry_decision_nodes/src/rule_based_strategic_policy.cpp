@@ -47,7 +47,7 @@ RuleBasedStrategicPolicy RuleBasedStrategicPolicy::from_config(const PolicyConfi
 
 StrategicDecision RuleBasedStrategicPolicy::decide(const WorldState& world,
                                                    StrategicMemory* memory) const {
-  const RefereeState& referee = world.referee;
+  const UpstreamState& referee = world.referee;
   if (!referee.valid) {
     return make_decision(TacticalMode::kUnknown);
   }

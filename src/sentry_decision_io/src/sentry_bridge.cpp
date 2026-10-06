@@ -4,7 +4,7 @@
 
 namespace sentry_decision_io {
 
-void merge(const GameInfoMsg& msg, sentry_decision::RefereeState* out) {
+void merge(const GameInfoMsg& msg, sentry_decision::UpstreamState* out) {
   out->game_status = sentry_decision::decode_game_status(msg.game_status);
   out->game_time_remaining = msg.game_time_remaining;
   out->coins = msg.coin_remaining;
@@ -18,7 +18,7 @@ void merge(const GameInfoMsg& msg, sentry_decision::RefereeState* out) {
   out->enemy_base_hp = msg.enemy_base_hp;
 }
 
-void merge(const SentryInfoOnlineMsg& msg, sentry_decision::RefereeState* out) {
+void merge(const SentryInfoOnlineMsg& msg, sentry_decision::UpstreamState* out) {
   out->self_hp = msg.self_health;
   out->self_ammo = msg.bullets_remaining;
   out->cooling_value = msg.cooling_value;
@@ -31,24 +31,13 @@ void merge(const SentryInfoOnlineMsg& msg, sentry_decision::RefereeState* out) {
   out->info3 = sentry_decision::decode_sentry_info3(msg.sentry_info_3);
 }
 
-void merge(const SentryInfoOfflineMsg& msg, sentry_decision::RefereeState* out) {
-  out->lifter_pos = msg.lifter_current_pos;
-  out->is_transformable = msg.is_transformable;
-  out->transform_state = msg.transform_state;
+void merge(const SentryInfoOfflineMsg& msg, sentry_decision::UpstreamState* out) {
   out->capacitor_capacity = msg.capacitor_capacity;
-  out->tunnel_yaw_aligned = msg.tunnel_yaw_aligned;
-  out->yaw_camera_to_gimbal = msg.yaw_camerainit_to_gimbal;
 }
 
-void merge(const TeamInfoMsg& msg, sentry_decision::RefereeState* out) {
+void merge(const TeamInfoMsg& msg, sentry_decision::UpstreamState* out) {
   out->base_hp = msg.base_hp;
   out->our_outpost_hp = msg.outpost_hp;
-}
-
-void merge(const RadarInfoMsg& msg, sentry_decision::RefereeState* out) {
-  out->enemy_coins = msg.enemy_coin_left;
-  out->enemy_coins_accumulated = msg.enemy_coin_accumulated;
-  out->enemy_outpost_sensed = msg.is_enemy_outpost_sensed;
 }
 
 namespace {

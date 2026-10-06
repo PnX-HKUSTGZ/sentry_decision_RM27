@@ -12,7 +12,7 @@ namespace sentry_decision {
 class RefereeSource {
  public:
   virtual ~RefereeSource() = default;
-  virtual bool referee(RefereeState* out) const = 0;
+  virtual bool referee(UpstreamState* out) const = 0;
 };
 
 class OdometrySource {

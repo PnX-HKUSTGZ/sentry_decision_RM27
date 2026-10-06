@@ -56,7 +56,7 @@ struct StepResult {
 ReplayData make_data() {
   ReplayData data;
 
-  RefereeState referee;
+  UpstreamState referee;
   referee.valid = true;
   referee.self_hp = 400;
   referee.self_ammo = 100;
@@ -66,7 +66,7 @@ ReplayData make_data() {
   referee.game_status = GameStatus::kRunning;
   data.referee.push_back({Duration{0}, referee});
 
-  RefereeState hurt = referee;
+  UpstreamState hurt = referee;
   hurt.self_hp = 50;
   data.referee.push_back({Duration{1000}, hurt});
 

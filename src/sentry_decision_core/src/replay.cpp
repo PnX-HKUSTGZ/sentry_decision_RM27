@@ -22,8 +22,8 @@ Duration ReplaySource::step(Duration period) {
   return now_;
 }
 
-bool ReplaySource::referee(RefereeState* out) const {
-  const ReplayRecord<RefereeState>* record = latest(data_.referee, now_);
+bool ReplaySource::referee(UpstreamState* out) const {
+  const ReplayRecord<UpstreamState>* record = latest(data_.referee, now_);
   if (record == nullptr) {
     return false;
   }

@@ -65,7 +65,6 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
     msg.enemy_x = world.enemy.position->x;
     msg.enemy_y = world.enemy.position->y;
   }
-  msg.enemy_count = static_cast<std::uint8_t>(world.enemy.enemies.size());
   msg.ally_count = static_cast<std::uint8_t>(world.allies.size());
   return msg;
 }

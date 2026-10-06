@@ -164,12 +164,6 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {
     world->our_outpost_hp = as_int;
-  } else if (field == "enemy_coin_left") {
-    world->enemy_coin_left = as_int;
-  } else if (field == "enemy_coin_accumulated") {
-    world->enemy_coin_accumulated = as_int;
-  } else if (field == "is_enemy_outpost_sensed") {
-    world->is_enemy_outpost_sensed = number != 0.0;
   } else {
     *error = "未知 set_world 字段: " + field;
     return false;

@@ -152,7 +152,7 @@ BT::NodeStatus IfCanInstantResurrect::tick() {
   if (context == nullptr || !context->world.referee.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  const RefereeState& referee = context->world.referee;
+  const UpstreamState& referee = context->world.referee;
   const bool affordable = referee.coins >= static_cast<int>(referee.info1.instant_resurrect_cost);
   return (referee.info1.can_instant_resurrect && affordable) ? BT::NodeStatus::SUCCESS
                                                              : BT::NodeStatus::FAILURE;

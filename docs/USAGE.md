@@ -391,7 +391,7 @@ node src/sentry_decision_viz/web/test/format.test.mjs
 
 ```bash
 ros2 bag record -o match_bag \
-  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info \
+  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info \
   /aft_mapped_to_init
 
 ros2 run sentry_decision_bringup replay_main --bag match_bag
@@ -442,7 +442,6 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | `online_info_topic` | `/sentry/online_info` | 自身在线状态（SentryInfoOnline） |
 | `offline_info_topic` | `/sentry/offline_info` | 自身视觉 / 形态（SentryInfoOffline） |
 | `team_info_topic` | `/sentry/team_info` | 队伍信息（TeamInfo） |
-| `radar_info_topic` | `/sentry/radar_info` | 雷达 / 敌方信息（RadarInfo） |
 | `decision_ack_topic` | `/sentry/decision_ack` | 动作回执（DecisionAck） |
 | `decision_command_topic` | `/sentry/decision_command` | 决策下行（DecisionCommand） |
 | `odom_topic` | `/aft_mapped_to_init` | 里程计（Odometry） |

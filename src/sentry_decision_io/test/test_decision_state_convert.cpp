@@ -78,7 +78,6 @@ void test_world_state_conversion() {
   world.enemy.valid = true;
   world.enemy.target_valid = true;
   world.enemy.position = Point2D{7.0, 6.0, 0.0};
-  world.enemy.enemies.push_back(EnemyRobot{});
   world.allies.push_back(AllyRobot{});
 
   const WorldStateMsg msg = to_msg(world);
@@ -111,7 +110,6 @@ void test_world_state_conversion() {
   CHECK(msg.has_enemy_position);
   CHECK(msg.enemy_x == 7.0);
   CHECK(msg.enemy_y == 6.0);
-  CHECK(msg.enemy_count == 1);
   CHECK(msg.ally_count == 1);
 }
 
