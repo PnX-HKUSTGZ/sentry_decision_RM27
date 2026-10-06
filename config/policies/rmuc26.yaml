@@ -19,10 +19,10 @@ safety:
   max_vx: 3.0                   # 速度限幅（m/s）
   max_vy: 3.0
   max_wz: 6.0                   # 角速度限幅（rad/s）
-  require_referee: true         # 裁判数据无效时急停
+  require_upstream: true         # 裁判数据无效时急停
   require_odometry: true        # 里程计数据无效时急停
 timeouts:
-  referee_ms: 500               # 裁判上行有效期
+  upstream_ms: 500               # 裁判上行有效期
   odometry_ms: 500              # 里程计有效期：/odometry 由点云回调驱动、约 10Hz，过短会偶发判失效导致急停抖动
   navigation_ms: 500            # 导航状态有效期
 action:

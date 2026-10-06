@@ -19,13 +19,13 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 WorldState make_world() {
   WorldState world;
-  world.referee.valid = true;
-  world.referee.self_hp = 400;
-  world.referee.self_ammo = 100;
-  world.referee.our_outpost_hp = 1500;
-  world.referee.enemy_outpost_hp = 1500;
-  world.referee.game_time_remaining = 420;
-  world.referee.game_status = GameStatus::kRunning;
+  world.upstream.valid = true;
+  world.upstream.self_hp = 400;
+  world.upstream.self_ammo = 100;
+  world.upstream.our_outpost_hp = 1500;
+  world.upstream.enemy_outpost_hp = 1500;
+  world.upstream.game_time_remaining = 420;
+  world.upstream.game_status = GameStatus::kRunning;
   return world;
 }
 
@@ -42,46 +42,46 @@ void test_priority() {
   CHECK(decide(world).mode == TacticalMode::kAttack);
   CHECK(decide(world).stance == SentryStance::kAttack);
 
-  world.referee.self_hp = 50;
+  world.upstream.self_hp = 50;
   CHECK(decide(world).mode == TacticalMode::kRetreat);
   CHECK(decide(world).stance == SentryStance::kMove);
 
-  world.referee.self_hp = 0;
+  world.upstream.self_hp = 0;
   CHECK(decide(world).mode == TacticalMode::kRespawn);
   CHECK(decide(world).stance == SentryStance::kMove);
 
   world = make_world();
-  world.referee.self_ammo = 10;
+  world.upstream.self_ammo = 10;
   CHECK(decide(world).mode == TacticalMode::kHeal);
 
   // 我方前哨阵亡但敌方前哨存活：仍进攻（不再回堡垒）。
   world = make_world();
-  world.referee.our_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
   CHECK(decide(world).mode == TacticalMode::kAttack);
 
   // 规则 2：敌方前哨被毁、我方前哨存活 -> 巡逻（高地循环由任务树区分）。
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
+  world.upstream.enemy_outpost_hp = 0;
   CHECK(decide(world).mode == TacticalMode::kPatrol);
 
   // 规则 3：双方前哨皆毁，剩余 > 180s -> 后方巡逻。
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
-  world.referee.our_outpost_hp = 0;
-  world.referee.game_time_remaining = 420;
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.game_time_remaining = 420;
   CHECK(decide(world).mode == TacticalMode::kPatrol);
 
   // 规则 3：双方前哨皆毁，剩余 <= 180s -> 回堡垒防守。
-  world.referee.game_time_remaining = 100;
+  world.upstream.game_time_remaining = 100;
   CHECK(decide(world).mode == TacticalMode::kDefend);
   CHECK(decide(world).stance == SentryStance::kDefense);
 
   world = make_world();
-  world.referee.game_status = GameStatus::kPreparation;  // 未进入比赛中 -> 待机
+  world.upstream.game_status = GameStatus::kPreparation;  // 未进入比赛中 -> 待机
   CHECK(decide(world).mode == TacticalMode::kIdle);
 
   world = make_world();
-  world.referee.valid = false;
+  world.upstream.valid = false;
   CHECK(decide(world).mode == TacticalMode::kUnknown);
   CHECK(decide(world).stance == SentryStance::kUnknown);
 }
@@ -95,21 +95,21 @@ void test_retreat_hysteresis() {
   StrategicMemory memory;
 
   WorldState world = make_world();
-  world.referee.self_hp = 40;
+  world.upstream.self_hp = 40;
   CHECK(policy.decide(world, &memory).mode == TacticalMode::kRetreat);
   CHECK(memory.retreat_latched);
 
-  world.referee.self_hp = 120;  // 高于进入阈值但未到恢复线 -> 保持撤退
+  world.upstream.self_hp = 120;  // 高于进入阈值但未到恢复线 -> 保持撤退
   CHECK(policy.decide(world, &memory).mode == TacticalMode::kRetreat);
 
-  world.referee.self_hp = 200;  // 到达恢复线 -> 退出撤退
+  world.upstream.self_hp = 200;  // 到达恢复线 -> 退出撤退
   CHECK(policy.decide(world, &memory).mode == TacticalMode::kAttack);
   CHECK(!memory.retreat_latched);
 
-  world.referee.self_hp = 40;  // 再次低于进入阈值 -> 重新进入
+  world.upstream.self_hp = 40;  // 再次低于进入阈值 -> 重新进入
   CHECK(policy.decide(world, &memory).mode == TacticalMode::kRetreat);
   // 阵亡清迟滞。
-  world.referee.self_hp = 0;
+  world.upstream.self_hp = 0;
   CHECK(policy.decide(world, &memory).mode == TacticalMode::kRespawn);
   CHECK(!memory.retreat_latched);
 }
@@ -127,19 +127,19 @@ void test_from_config() {
   };
 
   WorldState world = make_world();
-  world.referee.self_hp = 100;  // <= 120 -> 撤退
+  world.upstream.self_hp = 100;  // <= 120 -> 撤退
   CHECK(decide(world).mode == TacticalMode::kRetreat);
 
   world = make_world();
-  world.referee.self_ammo = 20;  // <= 30 -> 补给
+  world.upstream.self_ammo = 20;  // <= 30 -> 补给
   CHECK(decide(world).mode == TacticalMode::kHeal);
 
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
-  world.referee.our_outpost_hp = 0;
-  world.referee.game_time_remaining = 250;  // > 200 -> 后方巡逻
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.game_time_remaining = 250;  // > 200 -> 后方巡逻
   CHECK(decide(world).mode == TacticalMode::kPatrol);
-  world.referee.game_time_remaining = 150;  // <= 200 -> 防守
+  world.upstream.game_time_remaining = 150;  // <= 200 -> 防守
   CHECK(decide(world).mode == TacticalMode::kDefend);
 }
 

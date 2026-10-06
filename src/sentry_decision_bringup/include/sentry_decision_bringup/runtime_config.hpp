@@ -44,7 +44,7 @@ inline sentry_decision::Duration ms_from_config(const sentry_decision::PolicyCon
 inline sentry_decision::WorldTimeouts timeouts_from_config(
     const sentry_decision::PolicyConfig* config) {
   sentry_decision::WorldTimeouts timeouts;
-  timeouts.referee = ms_from_config(config, "timeouts.referee_ms");
+  timeouts.upstream = ms_from_config(config, "timeouts.upstream_ms");
   timeouts.odometry = ms_from_config(config, "timeouts.odometry_ms");
   timeouts.navigation = ms_from_config(config, "timeouts.navigation_ms");
   return timeouts;
@@ -56,7 +56,7 @@ inline sentry_decision::SafetyLimits safety_limits_from_config(
   limits.max_vx = config_number(config, "safety.max_vx");
   limits.max_vy = config_number(config, "safety.max_vy");
   limits.max_wz = config_number(config, "safety.max_wz");
-  limits.require_referee = config_flag(config, "safety.require_referee");
+  limits.require_upstream = config_flag(config, "safety.require_upstream");
   limits.require_odometry = config_flag(config, "safety.require_odometry");
   return limits;
 }

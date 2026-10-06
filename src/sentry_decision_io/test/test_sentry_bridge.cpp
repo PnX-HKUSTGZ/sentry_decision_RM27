@@ -101,10 +101,10 @@ void test_apply_offline_team() {
 
 // 裁判来源就绪判定：缺 GameInfo 或 SentryInfoOnline 都视为未就绪。
 void test_referee_sources_ready() {
-  CHECK(!referee_sources_ready(false, false));
-  CHECK(!referee_sources_ready(true, false));
-  CHECK(!referee_sources_ready(false, true));
-  CHECK(referee_sources_ready(true, true));
+  CHECK(!upstream_sources_ready(false, false));
+  CHECK(!upstream_sources_ready(true, false));
+  CHECK(!upstream_sources_ready(false, true));
+  CHECK(upstream_sources_ready(true, true));
 }
 
 void test_decision_command_mapping() {

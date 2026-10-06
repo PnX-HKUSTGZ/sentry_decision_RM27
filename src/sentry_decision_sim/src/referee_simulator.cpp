@@ -37,7 +37,7 @@ void RefereeSimulator::update(sentry_decision::TimePoint now) {
   state_.valid = true;
 }
 
-bool RefereeSimulator::referee(sentry_decision::UpstreamState* out) const {
+bool RefereeSimulator::upstream(sentry_decision::UpstreamState* out) const {
   if (!state_.valid) {
     return false;
   }

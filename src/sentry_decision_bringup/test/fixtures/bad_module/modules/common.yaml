@@ -2,5 +2,5 @@ name: common
 provides:
   - intent.tactical_mode
 consumes:
-  - world.referee
+  - world.upstream
   - missing.field

@@ -43,13 +43,13 @@ PolicyConfig make_config() {
 
 WorldState make_world() {
   WorldState world;
-  world.referee.valid = true;
-  world.referee.self_hp = 400;
-  world.referee.self_ammo = 100;
-  world.referee.our_outpost_hp = 1500;
-  world.referee.enemy_outpost_hp = 1500;
-  world.referee.game_time_remaining = 420;
-  world.referee.game_status = GameStatus::kRunning;
+  world.upstream.valid = true;
+  world.upstream.self_hp = 400;
+  world.upstream.self_ammo = 100;
+  world.upstream.our_outpost_hp = 1500;
+  world.upstream.enemy_outpost_hp = 1500;
+  world.upstream.game_time_remaining = 420;
+  world.upstream.game_status = GameStatus::kRunning;
   world.stamp = TimePoint{} + Duration{1000};
   return world;
 }
@@ -119,39 +119,39 @@ int main(int argc, char** argv) {
   expect_goal(tree_path, config, world, 1.1, 1.1, "双方前哨存活 -> 进攻敌方前哨");
 
   world = make_world();
-  world.referee.self_hp = 50;
+  world.upstream.self_hp = 50;
   expect_goal(tree_path, config, world, -6.0, 4.0, "低血 -> 撤退回家");
 
   world = make_world();
-  world.referee.self_ammo = 10;
+  world.upstream.self_ammo = 10;
   expect_goal(tree_path, config, world, -6.0, 4.0, "低弹 -> 回补给");
 
   // 规则 1：我方前哨阵亡但敌方前哨存活时仍进攻（不再回堡垒）。
   world = make_world();
-  world.referee.our_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
   expect_goal(tree_path, config, world, 1.1, 1.1, "我方前哨阵亡/敌方存活 -> 仍进攻");
 
   // 规则 2：敌方前哨被毁、我方前哨存活 -> 高地循环首点。
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
+  world.upstream.enemy_outpost_hp = 0;
   expect_goal(tree_path, config, world, -1.1, -1.1, "敌方前哨被毁 -> 高地巡逻");
 
   // 规则 3：双方前哨皆毁，剩余 > 180s -> 后方巡逻首点。
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
-  world.referee.our_outpost_hp = 0;
-  world.referee.game_time_remaining = 420;
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.game_time_remaining = 420;
   expect_goal(tree_path, config, world, 0.0, 1.1, "双方前哨皆毁/时间早 -> 后方巡逻");
 
   // 规则 3：双方前哨皆毁，剩余 <= 180s -> 回堡垒防守。
   world = make_world();
-  world.referee.enemy_outpost_hp = 0;
-  world.referee.our_outpost_hp = 0;
-  world.referee.game_time_remaining = 100;
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.game_time_remaining = 100;
   expect_goal(tree_path, config, world, -5.0, 3.0, "双方前哨皆毁/时间晚 -> 守堡垒");
 
   world = make_world();
-  world.referee.self_hp = 0;  // 阵亡 -> 不发导航目标，复活交给 ResourceRoot
+  world.upstream.self_hp = 0;  // 阵亡 -> 不发导航目标，复活交给 ResourceRoot
   expect_no_goal(tree_path, config, world, "阵亡 -> 无导航目标");
 
   if (g_failures == 0) {

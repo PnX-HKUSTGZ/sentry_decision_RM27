@@ -11,25 +11,25 @@ bool fresh(TimePoint stamp, TimePoint now, Duration timeout) {
 
 }  // namespace
 
-WorldModel::WorldModel(RefereeSource& referee, OdometrySource& odometry, NavigationSink& navigation,
+WorldModel::WorldModel(UpstreamSource& upstream, OdometrySource& odometry, NavigationSink& navigation,
                        WorldTimeouts timeouts)
-    : referee_(referee), odometry_(odometry), navigation_(navigation), timeouts_(timeouts) {}
+    : upstream_(upstream), odometry_(odometry), navigation_(navigation), timeouts_(timeouts) {}
 
 WorldState WorldModel::snapshot(TimePoint now) {
   WorldState state;
   state.stamp = now;
 
-  UpstreamState referee;
-  const bool has_referee = referee_.referee(&referee);
-  referee.valid = has_referee && referee.valid && fresh(referee.stamp, now, timeouts_.referee);
-  state.referee = referee;
-  if (referee_was_valid_ != referee.valid) {
-    if (referee.valid) {
-      SD_LOG_ACT("world_model", "referee data recovered");
+  UpstreamState upstream;
+  const bool has_upstream = upstream_.upstream(&upstream);
+  upstream.valid = has_upstream && upstream.valid && fresh(upstream.stamp, now, timeouts_.upstream);
+  state.upstream = upstream;
+  if (upstream_was_valid_ != upstream.valid) {
+    if (upstream.valid) {
+      SD_LOG_ACT("world_model", "upstream data recovered");
     } else {
-      SD_LOG_WARN("world_model", "referee data stale");
+      SD_LOG_WARN("world_model", "upstream data stale");
     }
-    referee_was_valid_ = referee.valid;
+    upstream_was_valid_ = upstream.valid;
   }
 
   SelfState self;

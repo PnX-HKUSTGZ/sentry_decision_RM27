@@ -7,7 +7,7 @@
 ## 1. 定位与数据流
 
 - 决策（战略 / 任务 / 技能 / BT 节点）**只读信念层** `WorldState`，不直接接触 ROS。
-- 信念层 `WorldModel::snapshot(now)` 从三个输入端口取数据并判新鲜度：`RefereeSource` /
+- 信念层 `WorldModel::snapshot(now)` 从三个输入端口取数据并判新鲜度：`UpstreamSource` /
   `OdometrySource` / `NavigationSink`（`sentry_decision_core/include/sentry_decision_core/io.hpp`）。
 - 输入端口有实机 / 仿真 / 回放三种实现，`WorldModel` 本身不感知差异。
 
@@ -47,12 +47,12 @@ flowchart LR
 
 ## 3. 有效性判定
 
-- `WorldModel` 分别对 referee / odom / nav 按超时判定：默认 referee 500ms、odom 500ms、nav 500ms
+- `WorldModel` 分别对 upstream / odom / nav 按超时判定：默认 upstream 500ms、odom 500ms、nav 500ms
   （odom 可放宽以适配由点云回调驱动、约 10Hz 的 `/odometry`）。
 - `RosIoNode` 额外要求 **`GameInfo` 与 `SentryInfoOnline` 都出现过**才返回就绪
   （`referee_sources_ready`）：只到其中一条时缺失字段会以默认 0 参与决策，可能被误判为「0 血 / 阵亡」。
-- `referee.valid=false` 时 `SafetySupervisor` 触发急停（撤销导航目标 + 速度清零）。
-- 状态变化只打印一次（`referee data stale / recovered` 等）。
+- `upstream.valid=false` 时 `SafetySupervisor` 触发急停（撤销导航目标 + 速度清零）。
+- 状态变化只打印一次（`upstream data stale / recovered` 等）。
 
 ## 4. UpstreamState 字段字典
 

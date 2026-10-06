@@ -65,7 +65,7 @@ v1 的完整字节布局（裁判上行字段、动作 `kind`、电平语义、�
 决策侧对每条上行字段的接收、单位与有效性判定见 `docs/BELIEF.md`。当前 `SentryInfoOffline` 的视觉锁定字段
 （`is_get` / `armor_pos` / `armor_num`）与 `TeamInfo.allies[4]` 尚未接入
 `EnemyState` / `WorldState.allies`，属于已知缺口；决策侧要求 `GameInfo` + `SentryInfoOnline`
-都出现过才判 `referee.valid`。雷达 / 变形相关字段当前未启用，已从消息与代码移除。
+都出现过才判 `upstream.valid`。雷达 / 变形相关字段当前未启用，已从消息与代码移除。
 
 ## 5. 下行 ROS 消息（决策发布）
 

@@ -3,4 +3,4 @@ name: strategic
 provides:
   - context.strategy
 consumes:
-  - world.referee
+  - world.upstream

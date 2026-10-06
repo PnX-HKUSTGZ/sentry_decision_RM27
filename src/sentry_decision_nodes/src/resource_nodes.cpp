@@ -28,10 +28,10 @@ BT::PortsList IfCanFreeResurrect::providedPorts() {
 
 BT::NodeStatus IfCanFreeResurrect::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.info1.can_free_resurrect ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.info1.can_free_resurrect ? BT::NodeStatus::SUCCESS
                                                          : BT::NodeStatus::FAILURE;
 }
 
@@ -49,7 +49,7 @@ BT::NodeStatus IfLowAmmo::tick() {
     return BT::NodeStatus::FAILURE;
   }
   DecisionContext* context = context_from(config());
-  if (context == nullptr || context->config == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || context->config == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
   const auto threshold = context->config->number(key.value());
@@ -57,7 +57,7 @@ BT::NodeStatus IfLowAmmo::tick() {
     SD_LOG_WARN("resource", "IfLowAmmo 缺少配置 key: %s", key.value().c_str());
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.self_ammo <= threshold.value() ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.self_ammo <= threshold.value() ? BT::NodeStatus::SUCCESS
                                                                : BT::NodeStatus::FAILURE;
 }
 
@@ -75,7 +75,7 @@ BT::NodeStatus IfCoinsAtLeast::tick() {
     return BT::NodeStatus::FAILURE;
   }
   DecisionContext* context = context_from(config());
-  if (context == nullptr || context->config == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || context->config == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
   const auto threshold = context->config->number(key.value());
@@ -83,7 +83,7 @@ BT::NodeStatus IfCoinsAtLeast::tick() {
     SD_LOG_WARN("resource", "IfCoinsAtLeast 缺少配置 key: %s", key.value().c_str());
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.coins >= threshold.value() ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.coins >= threshold.value() ? BT::NodeStatus::SUCCESS
                                                            : BT::NodeStatus::FAILURE;
 }
 
@@ -97,10 +97,10 @@ BT::PortsList IfOccupyingGainPoint::providedPorts() {
 
 BT::NodeStatus IfOccupyingGainPoint::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.event.local_ammo_exchange_point() ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.event.local_ammo_exchange_point() ? BT::NodeStatus::SUCCESS
                                                                   : BT::NodeStatus::FAILURE;
 }
 
@@ -114,10 +114,10 @@ BT::PortsList IfDisengaged::providedPorts() {
 
 BT::NodeStatus IfDisengaged::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.info2.disengaged ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.info2.disengaged ? BT::NodeStatus::SUCCESS
                                                  : BT::NodeStatus::FAILURE;
 }
 
@@ -132,10 +132,10 @@ BT::PortsList IfNotOccupyingGainPoint::providedPorts() {
 
 BT::NodeStatus IfNotOccupyingGainPoint::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.event.local_ammo_exchange_point() ? BT::NodeStatus::FAILURE
+  return context->world.upstream.event.local_ammo_exchange_point() ? BT::NodeStatus::FAILURE
                                                                   : BT::NodeStatus::SUCCESS;
 }
 
@@ -149,12 +149,12 @@ BT::PortsList IfCanInstantResurrect::providedPorts() {
 
 BT::NodeStatus IfCanInstantResurrect::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  const UpstreamState& referee = context->world.referee;
-  const bool affordable = referee.coins >= static_cast<int>(referee.info1.instant_resurrect_cost);
-  return (referee.info1.can_instant_resurrect && affordable) ? BT::NodeStatus::SUCCESS
+  const UpstreamState& upstream = context->world.upstream;
+  const bool affordable = upstream.coins >= static_cast<int>(upstream.info1.instant_resurrect_cost);
+  return (upstream.info1.can_instant_resurrect && affordable) ? BT::NodeStatus::SUCCESS
                                                              : BT::NodeStatus::FAILURE;
 }
 

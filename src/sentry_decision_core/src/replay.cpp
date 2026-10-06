@@ -13,7 +13,7 @@ ReplaySource::ReplaySource(ReplayData data, TimePoint epoch)
     }
     return last;
   };
-  last_at_ = std::max({max_of(data_.referee), max_of(data_.odometry), max_of(data_.navigation)});
+  last_at_ = std::max({max_of(data_.upstream), max_of(data_.odometry), max_of(data_.navigation)});
 }
 
 Duration ReplaySource::step(Duration period) {
@@ -22,8 +22,8 @@ Duration ReplaySource::step(Duration period) {
   return now_;
 }
 
-bool ReplaySource::referee(UpstreamState* out) const {
-  const ReplayRecord<UpstreamState>* record = latest(data_.referee, now_);
+bool ReplaySource::upstream(UpstreamState* out) const {
+  const ReplayRecord<UpstreamState>* record = latest(data_.upstream, now_);
   if (record == nullptr) {
     return false;
   }

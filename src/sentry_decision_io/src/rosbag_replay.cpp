@@ -47,7 +47,7 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
   reader.open(bag_uri);
 
   sentry_decision::ReplayData data;
-  sentry_decision::UpstreamState referee;
+  sentry_decision::UpstreamState upstream;
   std::int64_t start_ns = -1;
 
   while (reader.has_next()) {
@@ -68,48 +68,48 @@ sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,
 
     // 新格式上行：逐条 merge 进 UpstreamState 后压入快照，语义与实时节点一致。
     if (topic == topics.game_info) {
-      merge(deserialize<sentry_interfaces::msg::GameInfo>(*bag_msg), &referee);
-      referee.valid = true;
-      data.referee.push_back({at, referee});
+      merge(deserialize<sentry_interfaces::msg::GameInfo>(*bag_msg), &upstream);
+      upstream.valid = true;
+      data.upstream.push_back({at, upstream});
       continue;
     }
     if (topic == topics.online_info) {
-      merge(deserialize<sentry_interfaces::msg::SentryInfoOnline>(*bag_msg), &referee);
-      referee.valid = true;
-      data.referee.push_back({at, referee});
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOnline>(*bag_msg), &upstream);
+      upstream.valid = true;
+      data.upstream.push_back({at, upstream});
       continue;
     }
     if (topic == topics.offline_info) {
-      merge(deserialize<sentry_interfaces::msg::SentryInfoOffline>(*bag_msg), &referee);
-      referee.valid = true;
-      data.referee.push_back({at, referee});
+      merge(deserialize<sentry_interfaces::msg::SentryInfoOffline>(*bag_msg), &upstream);
+      upstream.valid = true;
+      data.upstream.push_back({at, upstream});
       continue;
     }
     if (topic == topics.team_info) {
-      merge(deserialize<sentry_interfaces::msg::TeamInfo>(*bag_msg), &referee);
-      referee.valid = true;
-      data.referee.push_back({at, referee});
+      merge(deserialize<sentry_interfaces::msg::TeamInfo>(*bag_msg), &upstream);
+      upstream.valid = true;
+      data.upstream.push_back({at, upstream});
       continue;
     }
     if (topic == topics.can_rebuild_outpost) {
-      referee.can_rebuild_outpost = deserialize<std_msgs::msg::Bool>(*bag_msg).data;
+      upstream.can_rebuild_outpost = deserialize<std_msgs::msg::Bool>(*bag_msg).data;
     } else if (topic == topics.self_hp) {
-      referee.self_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
+      upstream.self_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
     } else if (topic == topics.self_ammo) {
-      referee.self_ammo = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
+      upstream.self_ammo = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
     } else if (topic == topics.base_hp) {
-      referee.base_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
+      upstream.base_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
     } else if (topic == topics.our_outpost_hp) {
-      referee.our_outpost_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
+      upstream.our_outpost_hp = static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
     } else if (topic == topics.enemy_outpost_hp) {
-      referee.enemy_outpost_hp =
+      upstream.enemy_outpost_hp =
           static_cast<int>(deserialize<std_msgs::msg::UInt16>(*bag_msg).data);
     } else {
       continue;  // 未知话题跳过
     }
 
-    referee.valid = true;
-    data.referee.push_back({at, referee});
+    upstream.valid = true;
+    data.upstream.push_back({at, upstream});
   }
 
   return data;

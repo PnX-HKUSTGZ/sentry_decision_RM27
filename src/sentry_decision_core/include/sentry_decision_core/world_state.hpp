@@ -87,7 +87,7 @@ struct AllyRobot {
 };
 
 struct WorldState {
-  UpstreamState referee;
+  UpstreamState upstream;
   SelfState self;
   NavState nav;
   EnemyState enemy;

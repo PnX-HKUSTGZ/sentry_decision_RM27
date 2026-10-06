@@ -13,7 +13,7 @@ int32 our_outpost_hp
 int32 enemy_outpost_hp
 int32 enemy_base_hp
 bool can_rebuild_outpost
-bool referee_valid
+bool upstream_valid
 
 # 当前物理姿态 SentryStance: 0 unknown / 1 attack / 2 defense / 3 move（SentryInfoOnline.info2）
 uint8 stance

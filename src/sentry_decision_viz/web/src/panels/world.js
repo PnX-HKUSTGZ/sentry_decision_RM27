@@ -29,7 +29,7 @@ export function createWorldPanel(el) {
       };
       html += row('位姿', fmt(w.posX) + ', ' + fmt(w.posY) + ' @ ' + fmt(w.yaw));
       html += row('导航目标', w.hasNavGoal ? fmt(w.navGoalX) + ', ' + fmt(w.navGoalY) : '无');
-      html += row('有效', (w.refereeValid ? 'referee ' : '') + (w.selfValid ? 'odom ' : '') + (w.enemyValid ? 'enemy' : ''));
+      html += row('有效', (w.upstreamValid ? 'upstream ' : '') + (w.selfValid ? 'odom ' : '') + (w.enemyValid ? 'enemy' : ''));
       html += row('敌方', w.hasEnemy ? '锁定 ' + fmt(w.enemyX) + ', ' + fmt(w.enemyY) : '未锁定');
       html += '</table>';
       el.innerHTML = html;

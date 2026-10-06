@@ -221,7 +221,7 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
   "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml" --hold
 ```
 
-> 不带 `--scenario` 时裁判仿真发布的是全零世界（`referee_valid=true` 但所有数值为 0），
+> 不带 `--scenario` 时裁判仿真发布的是全零世界（`upstream_valid=true` 但所有数值为 0），
 > 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
 > 演示世界从「未开始」起，比赛阶段由网页面板按钮或 `/sentry_sim/set_game_stage` 服务推进。
 

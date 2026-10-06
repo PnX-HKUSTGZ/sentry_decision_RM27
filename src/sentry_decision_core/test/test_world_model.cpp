@@ -17,11 +17,11 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
-class FakeReferee : public RefereeSource {
+class FakeUpstream : public UpstreamSource {
  public:
   UpstreamState state;
   bool available = true;
-  bool referee(UpstreamState* out) const override {
+  bool upstream(UpstreamState* out) const override {
     if (!available) {
       return false;
     }
@@ -63,10 +63,10 @@ class FakeNavigation : public NavigationSink {
 
 void test_fresh_inputs() {
   const TimePoint t0{};
-  FakeReferee referee;
-  referee.state.stamp = t0;
-  referee.state.valid = true;
-  referee.state.self_hp = 400;
+  FakeUpstream upstream;
+  upstream.state.stamp = t0;
+  upstream.state.valid = true;
+  upstream.state.self_hp = 400;
   FakeOdometry odometry;
   odometry.state.stamp = t0;
   odometry.state.valid = true;
@@ -74,20 +74,20 @@ void test_fresh_inputs() {
   navigation.state.stamp = t0;
   navigation.state.valid = true;
 
-  WorldModel model(referee, odometry, navigation,
+  WorldModel model(upstream, odometry, navigation,
                    WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const WorldState state = model.snapshot(t0);
-  CHECK(state.referee.valid);
-  CHECK(state.referee.self_hp == 400);
+  CHECK(state.upstream.valid);
+  CHECK(state.upstream.self_hp == 400);
   CHECK(state.self.valid);
   CHECK(state.nav.valid);
 }
 
 void test_timeout_marks_invalid() {
   const TimePoint t0{};
-  FakeReferee referee;
-  referee.state.stamp = t0;
-  referee.state.valid = true;
+  FakeUpstream upstream;
+  upstream.state.stamp = t0;
+  upstream.state.valid = true;
   FakeOdometry odometry;
   odometry.state.stamp = t0;
   odometry.state.valid = true;
@@ -96,45 +96,45 @@ void test_timeout_marks_invalid() {
   navigation.state.valid = true;
 
   WorldTimeouts timeouts;
-  timeouts.referee = Duration{100};
+  timeouts.upstream = Duration{100};
   timeouts.odometry = Duration{50};
   timeouts.navigation = Duration{100};
-  WorldModel model(referee, odometry, navigation, timeouts);
+  WorldModel model(upstream, odometry, navigation, timeouts);
 
   const WorldState fresh_state = model.snapshot(t0);
-  CHECK(fresh_state.referee.valid);
+  CHECK(fresh_state.upstream.valid);
   CHECK(fresh_state.self.valid);
   CHECK(fresh_state.nav.valid);
 
   const WorldState stale_state = model.snapshot(t0 + Duration{101});
-  CHECK(!stale_state.referee.valid);
+  CHECK(!stale_state.upstream.valid);
   CHECK(!stale_state.self.valid);
   CHECK(!stale_state.nav.valid);
 }
 
 void test_unavailable_source() {
   const TimePoint t0{};
-  FakeReferee referee;
-  referee.available = false;
+  FakeUpstream upstream;
+  upstream.available = false;
   FakeOdometry odometry;
   odometry.available = false;
   FakeNavigation navigation;
 
-  WorldModel model(referee, odometry, navigation,
+  WorldModel model(upstream, odometry, navigation,
                    WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const WorldState state = model.snapshot(t0);
-  CHECK(!state.referee.valid);
+  CHECK(!state.upstream.valid);
   CHECK(!state.self.valid);
   CHECK(!state.nav.valid);
 }
 
 void test_navigation_sink() {
   const TimePoint t0{};
-  FakeReferee referee;
+  FakeUpstream upstream;
   FakeOdometry odometry;
   FakeNavigation navigation;
 
-  WorldModel model(referee, odometry, navigation,
+  WorldModel model(upstream, odometry, navigation,
                    WorldTimeouts{Duration{100}, Duration{50}, Duration{100}});
   const Point2D goal{1.5, 2.5, 0.0};
   navigation.send_goal(goal);

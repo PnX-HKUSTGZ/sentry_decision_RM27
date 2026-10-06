@@ -28,10 +28,10 @@ namespace sentry_decision_io {
 // 单一 ROS 节点，实现 core 的 IO 端口接口。
 //
 // 上行：订阅 sentry_interfaces 的 5 个裁判消息与 DecisionAck，回调只做解码/合并，
-// 决策线程通过 referee()/odometry() 取带时间戳的快照。
+// 决策线程通过 upstream()/odometry() 取带时间戳的快照。
 // 下行：发布 DecisionCommand，并保留 /cmd_vel 与 Nav2 action。
 class RosIoNode : public rclcpp::Node,
-                  public sentry_decision::RefereeSource,
+                  public sentry_decision::UpstreamSource,
                   public sentry_decision::OdometrySource,
                   public sentry_decision::NavigationSink,
                   public sentry_decision::ChassisSink,
@@ -42,7 +42,7 @@ class RosIoNode : public rclcpp::Node,
 
   explicit RosIoNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-  bool referee(sentry_decision::UpstreamState* out) const override;
+  bool upstream(sentry_decision::UpstreamState* out) const override;
   bool odometry(sentry_decision::SelfState* out) const override;
 
   void send_goal(const sentry_decision::Point2D& goal) override;
@@ -69,10 +69,10 @@ class RosIoNode : public rclcpp::Node,
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   bool tf_warned_ = false;
 
-  mutable std::mutex referee_mutex_;
-  sentry_decision::UpstreamState referee_;
+  mutable std::mutex upstream_mutex_;
+  sentry_decision::UpstreamState upstream_;
   // 必需上行来源是否出现过：GameInfo（阶段/经济）与 SentryInfoOnline（自身）。
-  // 两者都到之前 referee() 返回未就绪，避免缺失字段被当作 0 参与决策。
+  // 两者都到之前 upstream() 返回未就绪，避免缺失字段被当作 0 参与决策。
   bool has_game_info_ = false;
   bool has_online_info_ = false;
 

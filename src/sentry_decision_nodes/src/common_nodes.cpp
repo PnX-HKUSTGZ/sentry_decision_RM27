@@ -19,7 +19,7 @@ BT::NodeStatus IfLowHp::tick() {
     return BT::NodeStatus::FAILURE;
   }
   DecisionContext* context = context_from(config());
-  if (context == nullptr || context->config == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || context->config == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
   const auto threshold = context->config->number(key.value());
@@ -27,7 +27,7 @@ BT::NodeStatus IfLowHp::tick() {
     SD_LOG_WARN("nodes", "IfLowHp 缺少配置 key: %s", key.value().c_str());
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.self_hp <= threshold.value() ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.self_hp <= threshold.value() ? BT::NodeStatus::SUCCESS
                                                              : BT::NodeStatus::FAILURE;
 }
 
@@ -63,10 +63,10 @@ BT::PortsList IfEnemyOutpostDead::providedPorts() {
 
 BT::NodeStatus IfEnemyOutpostDead::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.enemy_outpost_hp <= 0 ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.enemy_outpost_hp <= 0 ? BT::NodeStatus::SUCCESS
                                                       : BT::NodeStatus::FAILURE;
 }
 
@@ -80,10 +80,10 @@ BT::PortsList IfOurOutpostAlive::providedPorts() {
 
 BT::NodeStatus IfOurOutpostAlive::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr || !context->world.referee.valid) {
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  return context->world.referee.our_outpost_hp > 0 ? BT::NodeStatus::SUCCESS
+  return context->world.upstream.our_outpost_hp > 0 ? BT::NodeStatus::SUCCESS
                                                    : BT::NodeStatus::FAILURE;
 }
 

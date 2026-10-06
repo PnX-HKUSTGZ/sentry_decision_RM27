@@ -85,8 +85,8 @@ void test_branch_switch() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
-  context.world.referee.valid = true;
-  context.world.referee.self_hp = 50;
+  context.world.upstream.valid = true;
+  context.world.upstream.self_hp = 50;
   BT::Tree tree = make_tree(&context);
 
   context.clear_intents();
@@ -95,7 +95,7 @@ void test_branch_switch() {
   CHECK(context.intents[0].field == IntentField::kNavGoal);
   CHECK(std::get<Point2D>(context.intents[0].value).x == -2.0);
 
-  context.world.referee.self_hp = 300;
+  context.world.upstream.self_hp = 300;
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
@@ -106,7 +106,7 @@ void test_invalid_referee_falls_back() {
   PolicyConfig config = make_config();
   DecisionContext context;
   context.config = &config;
-  context.world.referee.valid = false;
+  context.world.upstream.valid = false;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -120,8 +120,8 @@ void test_missing_config_key_falls_back() {
   config.numbers.clear();
   DecisionContext context;
   context.config = &config;
-  context.world.referee.valid = true;
-  context.world.referee.self_hp = 50;
+  context.world.upstream.valid = true;
+  context.world.upstream.self_hp = 50;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -134,7 +134,7 @@ void test_patrol_loop() {
   PolicyConfig config = make_patrol_config();
   DecisionContext context;
   context.config = &config;
-  context.world.referee.valid = true;
+  context.world.upstream.valid = true;
   BT::Tree tree = make_patrol_tree(&context);
   const TimePoint t0{};
 

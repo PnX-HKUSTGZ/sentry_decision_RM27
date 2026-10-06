@@ -40,7 +40,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"safety.max_vx", {false, true}},
       {"safety.max_vy", {false, true}},
       {"safety.max_wz", {false, true}},
-      {"timeouts.referee_ms", {true, true}},
+      {"timeouts.upstream_ms", {true, true}},
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
       {"action.one_shot_timeout_ms", {true, true}},

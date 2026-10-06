@@ -28,7 +28,7 @@
 交付物：
 
 - `sentry_decision_core`：数据契约、`IntentArbiter`、分级日志器、配置校验。
-- `sentry_decision_io`：接口抽象（`RefereeSource`、`OdometrySource`、`NavigationSink`、`ChassisSink`）与 ROS 实现骨架。
+- `sentry_decision_io`：接口抽象（`UpstreamSource`、`OdometrySource`、`NavigationSink`、`ChassisSink`）与 ROS 实现骨架。
 - `sentry_decision_bringup`：`main`、launch、最小编排树。
 - `docker/`：Jazzy 开发镜像与 Compose。
 - CI：格式检查 + 构建 + 测试。

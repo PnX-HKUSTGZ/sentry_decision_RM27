@@ -89,7 +89,7 @@ flowchart TD
 ```cpp
 // 信念：决策看到的世界
 struct WorldState {
-  UpstreamState referee;   // 比赛阶段、基地 / 前哨血量、经济、姿态、强化时间
+  UpstreamState upstream;   // 比赛阶段、基地 / 前哨血量、经济、姿态、强化时间
   SelfState    self;      // 血量、弹量、电容、脱战、当前姿态
   NavState     nav;       // 位姿、当前目标、到达 / 失败、是否在隧道
   EnemyState   enemy;     // 目标锁定、位置、可见性
@@ -245,9 +245,9 @@ flowchart TD
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断敌方前哨站血量是否低于阈值，用于前哨进攻分支。
 // Inputs:       threshold: int (端口)
-//               health:    int (端口, 通常来自 {referee.enemy_outpost_health})
+//               health:    int (端口, 通常来自 {upstream.enemy_outpost_health})
 // Outputs:      -
-// Blackboard:   read: referee.enemy_outpost_health  write: (none)
+// Blackboard:   read: upstream.enemy_outpost_health  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/nav/attack.xml -> Priority1AutoOutpostAttack
@@ -440,7 +440,7 @@ P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/
 （`use_sim_time`、固定 tick 顺序、固定随机种子）。
 
 核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
-（固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `RefereeSource` /
+（固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `UpstreamSource` /
 `OdometrySource` / `NavigationSink`，可直接驱动 `WorldModel`，并统计决策下发的目标数用于回归断言。
 rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 `ReplayData`，默认映射旧仓库
 的简单话题（`/ifhealth`、`/remain_ammo`、`/our_base_health`、`/our_outpost_health`、

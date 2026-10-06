@@ -13,7 +13,7 @@ namespace sentry_decision_sim {
 // 用法：先 mutable_state() 设置初始值，再 schedule() 注册相对时间轴的动作；
 // 每个 tick 调用 update(now) 执行到点脚本并刷新 stamp / valid，然后交给 WorldModel。
 // ROS 无关，可在宿主机直接单测。
-class RefereeSimulator : public sentry_decision::RefereeSource {
+class RefereeSimulator : public sentry_decision::UpstreamSource {
  public:
   using Action = std::function<void(sentry_decision::UpstreamState&)>;
 
@@ -28,7 +28,7 @@ class RefereeSimulator : public sentry_decision::RefereeSource {
   sentry_decision::UpstreamState& mutable_state() {
     return state_;
   }
-  bool referee(sentry_decision::UpstreamState* out) const override;
+  bool upstream(sentry_decision::UpstreamState* out) const override;
 
  private:
   sentry_decision::UpstreamState state_;
