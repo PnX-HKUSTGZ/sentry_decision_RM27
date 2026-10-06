@@ -106,8 +106,10 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 
 **实现现状**：决策侧的 one-shot / polled / ack 状态机已实现于 core `ActionDispatcher`，并可用
 `DecisionActuatorSim` 在本地离线跑通闭环；`DecisionAck` 经 `RosIoNode::take_acks` 进入该状态机。
-**待办（P2.3b）**：auto-aim 侧的串口字节帧、动作 `code` 表、`detect_color` 编码，
-待与电控 / MCU 确认后再实现，本阶段不落地。
+auto-aim 侧已把 `Publish2DecisionMaking` 迁到 5 条 `sentry_interfaces` 消息，并新增
+`Subscribe2Decision` 订阅 `/sentry/decision_command`（当前仅记录，未写串口）。
+**待办（P2.3b）**：auto-aim 侧的串口字节帧与 `DecisionAck` 回传、动作 `code` 表、`detect_color` 编码，
+待与电控 / MCU 确认后再实现。
 
 ## 8. 与 auto-aim 现状的映射（Phase 1）
 
@@ -128,7 +130,7 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 
 1. **接口定义**（本文档 + `sentry_interfaces` 消息）——本阶段。
 2. **决策侧**：`RosIoNode` 订阅 5 个上行消息、发布 `DecisionCommand`、订阅 `DecisionAck`；先填现有字段。
-3. **auto-aim 侧**：`Publish2DecisionMaking` 从 7 个标量迁到 5 个消息；新增下行订阅与串口打包。
+3. **auto-aim 侧**：`Publish2DecisionMaking` 已迁到 5 个消息、新增 `Subscribe2Decision`；串口打包待 P2.3b。
 4. **MCU 侧**：确定字节布局、动作集合、ack 编码；扩展固件。
 5. **策略接入**：决策用 `DecisionCommand` 下发兑换/复活等。
 

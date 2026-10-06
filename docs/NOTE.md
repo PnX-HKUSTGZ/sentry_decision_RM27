@@ -159,7 +159,7 @@
   - `submit_resource_requests` 把 `ResourceRequest` 转成动作；`RosIoNode::take_acks` 把 `DecisionAck` 转 ROS 无关 `ActionAck` 供决策线程消费。
   - `DecisionActuatorSim` 模拟执行端延迟回执，`decision_main` 离线跑通 ack 闭环。
   - 验证：宿主 + 容器 7 包 / 23 测试 0 失败。
-- **P2.3b 待办（不实现）**：auto-aim 侧 `DecisionCommand` → 串口字节帧、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。
+- **P2.3b 待办**：auto-aim 侧 `DecisionCommand` → 串口字节帧、`DecisionAck` 回传、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。auto-aim 侧 ROS 接口迁移（5 条上行消息 + `Subscribe2Decision`）已完成。
 - **P2.4 core 侧完成（本地）**：
   - core `SafetySupervisor`：仲裁后最终限幅 + 数据失效急停（撤销导航目标、速度清零）；在两个入口接入并按状态变化记日志。
   - core `InterventionController`：意图注入（统一 `kIntervention` 来源 / 优先级 + lease）、世界状态覆盖（类型化 `WorldField`）、模块开关；走同一仲裁，不能绕过安全。
@@ -194,8 +194,8 @@
 - 暂缓：真实下位机通信包 io 接线；旧 rosbag 字段一致性对比（暂无样本）。
 - 已移除：`sentry_info_3` 解码（疑似临时规则）。
 - 已确认：下位机动作分 `kOneShot` / `kPolled`，`kPolled` 带轮询间隔，见 `ARCHITECTURE.md` §4.1。
-- P2 上位机接口重构已合入 `main`：`sentry_interfaces` + `decision_node` 真实 IO 闭环。
-- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 串口帧——待与电控/MCU 确认协议。
+- P2 上位机接口重构已合入 `main`：`sentry_interfaces` + `decision_node` 真实 IO 闭环；auto-aim 侧 ROS 接口迁移在 auto-aim 分支 `sentry-decision-interface`。
+- 待办：Offline/Radar 上行、下行动作到 MCU 串口帧与 `DecisionAck` 回传——待与电控/MCU 确认协议。
 - 阶段与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
 ## P0 已完成

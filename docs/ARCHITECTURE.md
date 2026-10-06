@@ -644,8 +644,8 @@ config/
 
 ## 17. 开放问题
 
-- 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
-- 下位机通信包（上行 / 下行帧）的定义位置与字节协议；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
+- 决策 ↔ auto-aim 的 ROS 契约已冻结为 `sentry_interfaces`（见 `docs/INTERFACES.md`）；`/set_bool` 已弃用，`/change_follow_mark` 属 auto-aim ↔ 导航。
+- 下位机串口字节帧（上行 / 下行）的布局与动作 `code` 表；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
 - 可视化选型已定：`TreeStatePublisher` + 可选 Groot2 + rosbridge 静态页（见 §14），细节随 P3 落地调整。
 - 回放文件格式与录制范围。
 - BT.CPP 在 Jazzy 镜像中的具体版本锁定与语义复验。
