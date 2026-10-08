@@ -19,7 +19,7 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 WorldState make_world() {
   WorldState world;
-  world.referee.valid = true;
+  world.upstream.valid = true;
   world.self.valid = true;
   return world;
 }
@@ -48,7 +48,7 @@ void test_clamp_when_valid() {
 
 void test_emergency_on_stale_referee() {
   WorldState world = make_world();
-  world.referee.valid = false;
+  world.upstream.valid = false;
   const SafetySupervisor supervisor(default_limits());
   const SafetyResult result = supervisor.apply(world, make_output());
   CHECK(result.emergency);

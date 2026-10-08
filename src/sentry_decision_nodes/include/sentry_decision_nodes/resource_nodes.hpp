@@ -14,7 +14,7 @@ void register_resource_nodes(BT::BehaviorTreeFactory& factory);
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断是否可确认免费复活。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, info1.can_free_resurrect)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, info1.can_free_resurrect)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> Revive
 class IfCanFreeResurrect : public BT::SyncActionNode {
@@ -28,7 +28,7 @@ class IfCanFreeResurrect : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断剩余弹量是否低于配置阈值。
 // Inputs:       ammo_key: string (端口, 配置 key)
-// Blackboard:   read: context(world.referee.valid, self_ammo, config)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, self_ammo, config)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> AmmoExchange
 class IfLowAmmo : public BT::SyncActionNode {
@@ -42,7 +42,7 @@ class IfLowAmmo : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断己方金币是否不少于配置阈值。
 // Inputs:       coins_key: string (端口, 配置 key)
-// Blackboard:   read: context(world.referee.valid, coins, config)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, coins, config)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml
 class IfCoinsAtLeast : public BT::SyncActionNode {
@@ -56,7 +56,7 @@ class IfCoinsAtLeast : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断是否占领可本地兑换发弹量的增益点（补给区 / 基地 / 前哨站）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, event)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, event)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> AmmoExchange
 class IfOccupyingGainPoint : public BT::SyncActionNode {
@@ -70,7 +70,7 @@ class IfOccupyingGainPoint : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断是否脱战（远程兑换血量的前置条件）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, info2.disengaged)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, info2.disengaged)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> RemoteHpExchange / RemoteAmmoExchange
 class IfDisengaged : public BT::SyncActionNode {
@@ -84,7 +84,7 @@ class IfDisengaged : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断当前是否不在可本地兑换发弹量的增益点（远程兑换时的分流条件）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, event)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, event)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> RemoteAmmoExchange
 class IfNotOccupyingGainPoint : public BT::SyncActionNode {
@@ -98,7 +98,7 @@ class IfNotOccupyingGainPoint : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断是否可兑换立即复活且金币足够（数额来自裁判 info1）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, info1, coins)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, info1, coins)  write: (none)
 // Side Effects: none
 // See:          tree/resource/root.xml -> InstantRevive
 class IfCanInstantResurrect : public BT::SyncActionNode {

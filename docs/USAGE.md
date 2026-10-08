@@ -205,7 +205,7 @@ ros2 run sentry_decision_bringup decision_node     # 终端 1
 ros2 run sentry_decision_sim referee_sim_node      # 终端 2：持续发布世界状态
 ```
 
-它发布 `/sentry/*` 五条上行与 odom，提供 `NavigateToPose` action server，并把 `DecisionCommand` 按延迟回成 `DecisionAck`。
+它发布 `/sentry/*` 四条上行与 odom，提供 `NavigateToPose` action server，并把 `DecisionCommand` 按延迟回成 `DecisionAck`。
 
 带场景脚本时按时间轴改世界，并在指定时刻断言 `/decision/state`，结束以退出码表示成败：
 
@@ -221,7 +221,7 @@ ros2 run sentry_decision_sim referee_sim_node --scenario \
   "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/demo.yaml" --hold
 ```
 
-> 不带 `--scenario` 时裁判仿真发布的是全零世界（`referee_valid=true` 但所有数值为 0），
+> 不带 `--scenario` 时裁判仿真发布的是全零世界（`upstream_valid=true` 但所有数值为 0），
 > 面板会显示 0；这不是故障。`--hold` 让场景时间轴跑完后继续发布最后一个世界状态。
 > 演示世界从「未开始」起，比赛阶段由网页面板按钮或 `/sentry_sim/set_game_stage` 服务推进。
 
@@ -391,7 +391,7 @@ node src/sentry_decision_viz/web/test/format.test.mjs
 
 ```bash
 ros2 bag record -o match_bag \
-  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info \
+  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info \
   /aft_mapped_to_init
 
 ros2 run sentry_decision_bringup replay_main --bag match_bag
@@ -442,7 +442,6 @@ ros2 run sentry_decision_bringup decision_main --plugin /path/to/libsentry_decis
 | `online_info_topic` | `/sentry/online_info` | 自身在线状态（SentryInfoOnline） |
 | `offline_info_topic` | `/sentry/offline_info` | 自身视觉 / 形态（SentryInfoOffline） |
 | `team_info_topic` | `/sentry/team_info` | 队伍信息（TeamInfo） |
-| `radar_info_topic` | `/sentry/radar_info` | 雷达 / 敌方信息（RadarInfo） |
 | `decision_ack_topic` | `/sentry/decision_ack` | 动作回执（DecisionAck） |
 | `decision_command_topic` | `/sentry/decision_command` | 决策下行（DecisionCommand） |
 | `odom_topic` | `/aft_mapped_to_init` | 里程计（Odometry） |

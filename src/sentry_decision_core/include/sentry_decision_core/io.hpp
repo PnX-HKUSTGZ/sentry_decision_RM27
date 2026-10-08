@@ -9,10 +9,10 @@ namespace sentry_decision {
 // IO 端口接口：core 只依赖这些抽象，具体 real / sim / replay 实现在 io 包。
 
 // 输入源：返回是否取到数据；数据的新鲜度由信念层判定。
-class RefereeSource {
+class UpstreamSource {
  public:
-  virtual ~RefereeSource() = default;
-  virtual bool referee(RefereeState* out) const = 0;
+  virtual ~UpstreamSource() = default;
+  virtual bool upstream(UpstreamState* out) const = 0;
 };
 
 class OdometrySource {

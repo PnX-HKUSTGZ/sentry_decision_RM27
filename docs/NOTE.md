@@ -104,7 +104,7 @@
 - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（发 `/sentry/*` + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）、ROS 无关的场景解析与消息级 `SimWorld`、`scenario/full_match.yaml`；容器 8 包 / 37 测试通过，含端到端 `scenario_full_match`。
 - 已完成（本地）：P3.2 干预 ROS 接口——`sentry_decision_msgs` 新增 `ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`；io 新增 `InterventionServer`（action / service 只入队，tick 边界应用）与取值解析（yaml-cpp）；core `IntentArbiter` 新增逐字段 `winners`、`InterventionController` 支持按字段清除；`decision_node` 发布 `/decision/intervention` 并提供 `list_state` JSON；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
 - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core，实时与回放共用 `apply_intervention`；`ReplayData.interventions` + `ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；core / bringup / io 测试覆盖干预通道与含干预的回放确定性。
-- 已完成（本地）：裁判协议补全——`EventCode` 覆盖 0x0101 全字段；`SentryInfo2` 增加 `stance` / `stance_enhanced`，新增 `SentryInfo3`（姿态剩余时长）；`RefereeState.info3`、io 合并与 sim `sentry_info_3` 同步；单测覆盖。
+- 已完成（本地）：裁判协议补全——`EventCode` 覆盖 0x0101 全字段；`SentryInfo2` 增加 `stance` / `stance_enhanced`，新增 `SentryInfo3`（姿态剩余时长）；`UpstreamState.info3`、io 合并与 sim `sentry_info_3` 同步；单测覆盖。
 - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web` 纯静态页（vendored `roslib.min.js` 1.4.1、原生 ES modules、`web/package.json` 仅声明 `type: module`）；`bridge` / `store` / `format` / `panels/*` / `battlefield` 分层；`viz.launch.py` 起 rosbridge + 静态服务；`web/test/format.test.mjs` node 单测（CI `viz-js-tests`）与 `tools/viz_smoke_test.sh`；`docker/Dockerfile` 加 `ros-jazzy-rosbridge-suite`。
 
 ### 待办
@@ -159,7 +159,7 @@
   - `submit_resource_requests` 把 `ResourceRequest` 转成动作；`RosIoNode::take_acks` 把 `DecisionAck` 转 ROS 无关 `ActionAck` 供决策线程消费。
   - `DecisionActuatorSim` 模拟执行端延迟回执，`decision_main` 离线跑通 ack 闭环。
   - 验证：宿主 + 容器 7 包 / 23 测试 0 失败。
-- **P2.3b 待办（不实现）**：auto-aim 侧 `DecisionCommand` → 串口字节帧、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。
+- **P2.3b 待办**：auto-aim 侧 `DecisionCommand` → 串口字节帧、`DecisionAck` 回传、动作 `code` 取值表、`detect_color` 编码——待与电控 / MCU 确认协议后再做。auto-aim 侧 ROS 接口迁移（5 条上行消息 + `Subscribe2Decision`）已完成。
 - **P2.4 core 侧完成（本地）**：
   - core `SafetySupervisor`：仲裁后最终限幅 + 数据失效急停（撤销导航目标、速度清零）；在两个入口接入并按状态变化记日志。
   - core `InterventionController`：意图注入（统一 `kIntervention` 来源 / 优先级 + lease）、世界状态覆盖（类型化 `WorldField`）、模块开关；走同一仲裁，不能绕过安全。
@@ -179,7 +179,7 @@
   - `InterventionController::allows`：运行期模块开关按字段过滤意图，接入两个决策循环。
   - 验证：容器 7 包 / 31 测试 0 失败。
 - **Copilot review 第二轮修复（本地）**：
-  - 世界覆盖不再提升 `referee.valid`，避免绕过裁判失效急停。
+  - 世界覆盖不再提升 `upstream.valid`，避免绕过裁判失效急停。
   - `config_loader` 增加已知数值键的整数 / 非负校验（配负例）。
   - 两个决策循环每 tick 清 `kIntervention` 来源，模块关闭后旧干预意图不再残留。
   - `--plugin` 改为真覆盖：`TreeSetupOptions.load_modules=false`，不再叠加 manifest 模块。
@@ -194,8 +194,8 @@
 - 暂缓：真实下位机通信包 io 接线；旧 rosbag 字段一致性对比（暂无样本）。
 - 已移除：`sentry_info_3` 解码（疑似临时规则）。
 - 已确认：下位机动作分 `kOneShot` / `kPolled`，`kPolled` 带轮询间隔，见 `ARCHITECTURE.md` §4.1。
-- P2 上位机接口重构已合入 `main`：`sentry_interfaces` + `decision_node` 真实 IO 闭环。
-- 待办：Offline/Radar 上行、`DecisionAck` 回传、下行动作到 MCU 串口帧——待与电控/MCU 确认协议。
+- P2 上位机接口重构已合入 `main`：`sentry_interfaces` + `decision_node` 真实 IO 闭环；auto-aim 侧 ROS 接口迁移在 auto-aim 分支 `sentry-decision-interface`。
+- 待办：Offline 视觉字段上行、下行动作到 MCU 串口帧与 `DecisionAck` 回传——待与电控/MCU 确认协议。
 - 阶段与验收见 `docs/ROADMAP.md`；编码与文档规范见 `docs/CONVENTIONS.md`。
 
 ## P0 已完成

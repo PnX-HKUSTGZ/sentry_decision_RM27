@@ -80,12 +80,12 @@ BT::Tree make_tree(DecisionContext* context) {
 
 WorldState make_world() {
   WorldState world;
-  world.referee.valid = true;
-  world.referee.self_hp = 400;
-  world.referee.self_ammo = 100;
-  world.referee.coins = 200;
-  world.referee.event.supply_zone_occupied = true;  // 默认在可本地兑换的增益点
-  world.referee.info2.disengaged = true;            // 默认脱战
+  world.upstream.valid = true;
+  world.upstream.self_hp = 400;
+  world.upstream.self_ammo = 100;
+  world.upstream.coins = 200;
+  world.upstream.event.supply_zone_occupied = true;  // 默认在可本地兑换的增益点
+  world.upstream.info2.disengaged = true;            // 默认脱战
   return world;
 }
 
@@ -94,7 +94,7 @@ void test_free_revive() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.info1.can_free_resurrect = true;
+  context.world.upstream.info1.can_free_resurrect = true;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -109,7 +109,7 @@ void test_remote_hp_exchange() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_hp = 30;
+  context.world.upstream.self_hp = 30;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -126,10 +126,10 @@ void test_instant_revive() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_hp = 0;
-  context.world.referee.info1.can_instant_resurrect = true;
-  context.world.referee.info1.instant_resurrect_cost = 120;
-  context.world.referee.coins = 200;
+  context.world.upstream.self_hp = 0;
+  context.world.upstream.info1.can_instant_resurrect = true;
+  context.world.upstream.info1.instant_resurrect_cost = 120;
+  context.world.upstream.coins = 200;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -142,10 +142,10 @@ void test_instant_revive_blocked_without_coins() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_hp = 0;
-  context.world.referee.info1.can_instant_resurrect = true;
-  context.world.referee.info1.instant_resurrect_cost = 120;
-  context.world.referee.coins = 50;  // 不足以立即复活 / 远程血量 / 本地兑换
+  context.world.upstream.self_hp = 0;
+  context.world.upstream.info1.can_instant_resurrect = true;
+  context.world.upstream.info1.instant_resurrect_cost = 120;
+  context.world.upstream.coins = 50;  // 不足以立即复活 / 远程血量 / 本地兑换
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -157,7 +157,7 @@ void test_local_ammo_exchange() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_ammo = 10;
+  context.world.upstream.self_ammo = 10;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -173,8 +173,8 @@ void test_remote_ammo_exchange_without_gain_point() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_ammo = 10;
-  context.world.referee.event = {};
+  context.world.upstream.self_ammo = 10;
+  context.world.upstream.event = {};
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -190,9 +190,9 @@ void test_remote_ammo_blocked_when_coins_low() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_ammo = 10;
-  context.world.referee.event = {};
-  context.world.referee.coins = 100;
+  context.world.upstream.self_ammo = 10;
+  context.world.upstream.event = {};
+  context.world.upstream.coins = 100;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -204,8 +204,8 @@ void test_no_coins_no_exchange() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_hp = 30;
-  context.world.referee.coins = 10;  // 不足
+  context.world.upstream.self_hp = 30;
+  context.world.upstream.coins = 10;  // 不足
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -218,9 +218,9 @@ void test_ammo_exchange_accepts_supply_bit() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_ammo = 10;
-  context.world.referee.event = {};
-  context.world.referee.event.supply_zone_occupied = true;
+  context.world.upstream.self_ammo = 10;
+  context.world.upstream.event = {};
+  context.world.upstream.event.supply_zone_occupied = true;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();
@@ -234,8 +234,8 @@ void test_remote_exchange_blocked_when_engaged() {
   DecisionContext context;
   context.config = &config;
   context.world = make_world();
-  context.world.referee.self_hp = 30;
-  context.world.referee.info2.disengaged = false;
+  context.world.upstream.self_hp = 30;
+  context.world.upstream.info2.disengaged = false;
   BT::Tree tree = make_tree(&context);
   context.clear_intents();
   tree.tickOnce();

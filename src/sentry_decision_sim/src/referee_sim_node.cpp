@@ -33,7 +33,6 @@
 #include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
-#include "sentry_interfaces/msg/radar_info.hpp"
 #include "sentry_interfaces/msg/sentry_info_offline.hpp"
 #include "sentry_interfaces/msg/sentry_info_online.hpp"
 #include "sentry_interfaces/msg/team_info.hpp"
@@ -243,8 +242,6 @@ class RefereeSimNode : public rclcpp::Node {
         declare_parameter<std::string>("offline_info_topic", "/sentry/offline_info");
     const auto team_info_topic =
         declare_parameter<std::string>("team_info_topic", "/sentry/team_info");
-    const auto radar_info_topic =
-        declare_parameter<std::string>("radar_info_topic", "/sentry/radar_info");
     const auto decision_command_topic =
         declare_parameter<std::string>("decision_command_topic", "/sentry/decision_command");
     const auto decision_ack_topic =
@@ -262,7 +259,6 @@ class RefereeSimNode : public rclcpp::Node {
     offline_info_pub_ =
         create_publisher<sentry_interfaces::msg::SentryInfoOffline>(offline_info_topic, 10);
     team_info_pub_ = create_publisher<sentry_interfaces::msg::TeamInfo>(team_info_topic, 10);
-    radar_info_pub_ = create_publisher<sentry_interfaces::msg::RadarInfo>(radar_info_topic, 10);
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
     ack_pub_ = create_publisher<sentry_interfaces::msg::DecisionAck>(decision_ack_topic, 10);
 
@@ -733,13 +729,6 @@ class RefereeSimNode : public rclcpp::Node {
     team.outpost_hp = static_cast<std::uint16_t>(world_.our_outpost_hp);
     team.base_hp = static_cast<std::uint16_t>(world_.base_hp);
     team_info_pub_->publish(team);
-
-    sentry_interfaces::msg::RadarInfo radar;
-    radar.header.stamp = stamp;
-    radar.enemy_coin_left = static_cast<std::uint16_t>(world_.enemy_coin_left);
-    radar.enemy_coin_accumulated = static_cast<std::uint16_t>(world_.enemy_coin_accumulated);
-    radar.is_enemy_outpost_sensed = world_.is_enemy_outpost_sensed;
-    radar_info_pub_->publish(radar);
   }
 
   void publish_odom() {
@@ -913,7 +902,6 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Publisher<sentry_interfaces::msg::SentryInfoOnline>::SharedPtr online_info_pub_;
   rclcpp::Publisher<sentry_interfaces::msg::SentryInfoOffline>::SharedPtr offline_info_pub_;
   rclcpp::Publisher<sentry_interfaces::msg::TeamInfo>::SharedPtr team_info_pub_;
-  rclcpp::Publisher<sentry_interfaces::msg::RadarInfo>::SharedPtr radar_info_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<sentry_interfaces::msg::DecisionAck>::SharedPtr ack_pub_;
   rclcpp::Subscription<sentry_interfaces::msg::DecisionCommand>::SharedPtr decision_command_sub_;

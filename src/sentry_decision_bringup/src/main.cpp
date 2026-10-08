@@ -147,11 +147,11 @@ int main(int argc, char** argv) {
     }
   }
 
-  sentry_decision_sim::RefereeSimulator referee;
+  sentry_decision_sim::RefereeSimulator upstream;
   sentry_decision_sim::NavSimulator navigation(sim_config.nav_speed, sim_config.nav_tolerance);
-  referee.schedule(Duration{static_cast<std::int64_t>(options.hp_drop_sec * 1000.0)},
-                   [](sentry_decision::RefereeState& state) { state.self_hp = 50; });
-  sentry_decision::WorldModel world_model(referee, navigation, navigation, runtime_timeouts);
+  upstream.schedule(Duration{static_cast<std::int64_t>(options.hp_drop_sec * 1000.0)},
+                    [](sentry_decision::UpstreamState& state) { state.self_hp = 50; });
+  sentry_decision::WorldModel world_model(upstream, navigation, navigation, runtime_timeouts);
 
   BT::BehaviorTreeFactory factory;
   std::vector<std::string> errors;
@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
 
   for (int tick = 0; tick < options.ticks; ++tick) {
     const TimePoint now = epoch + period * tick;
-    referee.update(now);
+    upstream.update(now);
     navigation.update(now);
     context.world = world_model.snapshot(now);
     context.clear_intents();
@@ -246,11 +246,11 @@ int main(int argc, char** argv) {
 
     if (safe_result.output.nav_goal.has_value()) {
       SD_LOG_ACT("bringup", "tick %d hp=%d mode=%d goal=(%.2f, %.2f) pos=(%.2f, %.2f)", tick,
-                 context.world.referee.self_hp, static_cast<int>(safe_result.output.tactical_mode),
+                 context.world.upstream.self_hp, static_cast<int>(safe_result.output.tactical_mode),
                  safe_result.output.nav_goal->x, safe_result.output.nav_goal->y,
                  navigation.pose().x, navigation.pose().y);
     } else {
-      SD_LOG_ACT("bringup", "tick %d hp=%d 无导航目标", tick, context.world.referee.self_hp);
+      SD_LOG_ACT("bringup", "tick %d hp=%d 无导航目标", tick, context.world.upstream.self_hp);
     }
 
     std::this_thread::sleep_for(period);

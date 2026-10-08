@@ -17,8 +17,8 @@ SafetyResult SafetySupervisor::apply(const WorldState& world, const DecisionOutp
   SafetyResult result;
   result.output = input;
 
-  if (limits_.require_referee && !world.referee.valid) {
-    result.reasons.push_back("referee 数据无效");
+  if (limits_.require_upstream && !world.upstream.valid) {
+    result.reasons.push_back("upstream 数据无效");
   }
   if (limits_.require_odometry && !world.self.valid) {
     result.reasons.push_back("里程计数据无效");

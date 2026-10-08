@@ -1,4 +1,5 @@
-# 哨兵自身在线状态（上行）。
+# 哨兵自身在线状态（上行）
+# 由裁判系统获得，必须进入比赛状态才有效
 std_msgs/Header header
 
 uint16 self_health

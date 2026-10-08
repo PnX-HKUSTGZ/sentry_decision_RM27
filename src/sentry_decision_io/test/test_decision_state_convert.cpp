@@ -52,18 +52,18 @@ void test_decision_output_conversion() {
 
 void test_world_state_conversion() {
   WorldState world;
-  world.referee.valid = true;
-  world.referee.game_status = GameStatus::kRunning;
-  world.referee.game_time_remaining = 200;
-  world.referee.coins = 50;
-  world.referee.self_hp = 400;
-  world.referee.self_ammo = 100;
-  world.referee.base_hp = 5000;
-  world.referee.our_outpost_hp = 1500;
-  world.referee.enemy_outpost_hp = 1200;
-  world.referee.enemy_base_hp = 5000;
-  world.referee.can_rebuild_outpost = true;
-  world.referee.info2.stance = SentryStance::kMove;
+  world.upstream.valid = true;
+  world.upstream.game_status = GameStatus::kRunning;
+  world.upstream.game_time_remaining = 200;
+  world.upstream.coins = 50;
+  world.upstream.self_hp = 400;
+  world.upstream.self_ammo = 100;
+  world.upstream.base_hp = 5000;
+  world.upstream.our_outpost_hp = 1500;
+  world.upstream.enemy_outpost_hp = 1200;
+  world.upstream.enemy_base_hp = 5000;
+  world.upstream.can_rebuild_outpost = true;
+  world.upstream.info2.stance = SentryStance::kMove;
 
   world.self.valid = true;
   world.self.pose = Point2D{3.0, 4.0, 0.5};
@@ -78,11 +78,10 @@ void test_world_state_conversion() {
   world.enemy.valid = true;
   world.enemy.target_valid = true;
   world.enemy.position = Point2D{7.0, 6.0, 0.0};
-  world.enemy.enemies.push_back(EnemyRobot{});
   world.allies.push_back(AllyRobot{});
 
   const WorldStateMsg msg = to_msg(world);
-  CHECK(msg.referee_valid);
+  CHECK(msg.upstream_valid);
   CHECK(msg.game_status == static_cast<std::int32_t>(GameStatus::kRunning));
   CHECK(msg.game_time_remaining == 200);
   CHECK(msg.coins == 50);
@@ -111,13 +110,12 @@ void test_world_state_conversion() {
   CHECK(msg.has_enemy_position);
   CHECK(msg.enemy_x == 7.0);
   CHECK(msg.enemy_y == 6.0);
-  CHECK(msg.enemy_count == 1);
   CHECK(msg.ally_count == 1);
 }
 
 void test_fill_state() {
   WorldState world;
-  world.referee.valid = true;
+  world.upstream.valid = true;
   world.self.valid = true;
 
   ArbiterResult result;
@@ -134,7 +132,7 @@ void test_fill_state() {
   CHECK(msg.output.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kPatrol));
   CHECK(msg.conflict_count == 1);
   CHECK(msg.warnings.size() == 1);
-  CHECK(msg.referee_valid);
+  CHECK(msg.upstream_valid);
   CHECK(msg.self_valid);
   CHECK(!msg.nav_valid);
 }

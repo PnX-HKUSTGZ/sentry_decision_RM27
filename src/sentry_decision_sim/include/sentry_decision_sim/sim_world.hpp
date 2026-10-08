@@ -28,7 +28,7 @@ struct RespawnState {
 
 // 消息级仿真世界：字段与 sentry_interfaces 上行消息一一对应。
 //
-// 为什么不复用 core 的 RefereeState：那边存的是解码后的 event / info1 / info2 / info3，
+// 为什么不复用 core 的 UpstreamState：那边存的是解码后的 event / info1 / info2 / info3，
 // 反向编码回原始位段会丢失信息、也更容易写错；仿真只需要「发出正确的消息」，
 // 因此这里保存原始消息字段。
 struct SimWorld {
@@ -70,11 +70,6 @@ struct SimWorld {
   // TeamInfo
   int base_hp = 0;
   int our_outpost_hp = 0;
-
-  // RadarInfo
-  int enemy_coin_left = 0;
-  int enemy_coin_accumulated = 0;
-  bool is_enemy_outpost_sensed = false;
 };
 
 // 应用 set_world 的一个字段。未知字段返回 false 并写 error。

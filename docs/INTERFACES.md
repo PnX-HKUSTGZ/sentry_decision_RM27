@@ -6,7 +6,7 @@
 
 ## 1. 目标
 
-- 上行：把裁判与自身/队友/雷达信息，从 auto-aim 统一成结构化消息发给决策，取代原来「一个标量一个话题」。
+- 上行：把裁判与自身/队友信息，从 auto-aim 统一成结构化消息发给决策，取代原来「一个标量一个话题」。
 - 下行：把决策动作统一成结构化命令发给 auto-aim，由 auto-aim 经串口转给 MCU。
 - 回执：MCU 执行结果经 auto-aim 以 `DecisionAck` 回传决策。
 - 文档化：字段、单位、来源、版本、校验、语义集中在这里。
@@ -30,21 +30,20 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `magic` | uint8 | 帧头，待与 MCU 约定 |
-| `version` | uint8 | 协议版本，v1 = 0x01 |
-| `type` | uint8 | 1 = RefereeUplink，2 = DecisionCommand |
+| `magic` | uint8 | 固定 `0xAA` |
+| `version` | uint8 | 协议版本，v1 = `0x01` |
+| `type` | uint8 | 1 = RefereeUplink，2 = DecisionCommand，3 = DecisionAck |
 | `length` | uint16 | payload 字节数 |
 | `payload` | bytes | 版本化结构体 |
-| `crc16` | uint16 | CRC16-CCITT，覆盖 `version..payload`，与 auto-aim `tools::get_crc16` 一致 |
+| `crc16` | uint16 | CRC-16/MCRF4XX，覆盖 `version..payload`，与 auto-aim `tools::get_crc16` 一致 |
 
-**上行 payload `RefereeUplinkV1`**：裁判/自身/队友/雷达 + `DecisionAck`，频率建议 10~50 Hz。
-**下行 payload `DecisionCommandV1`**：`request_id` + 单个动作（`kind/mode/interval/value`）。
+v1 的完整字节布局（裁判上行字段、动作 `kind`、电平语义、频率、待确认项）见 auto-aim
+[`docs/serial_protocol.md` §2](https://github.com/PnX-HKUSTGZ/auto-aim-new/blob/sentry-decision-interface/docs/serial_protocol.md)。
 
-带宽：只承载裁判/决策的低频数据，IMU/云台/导航仍走原有高频帧，115200 足够。
+带宽：只承载裁判/决策的低频数据（裁判上行建议 10 Hz），IMU/云台/导航仍走原有高频帧，115200 足够。
 
-**当前已实现的串口协议**（`GimbalToVision` / `VisionToGimbal` / `NavToGimbalV2` / `DecisionToGimbal`）
-此前只隐式定义在 auto-aim 代码里，现已补文档：`auto-aim-new/docs/serial_protocol.md`。
-其校验为 **CRC-16/MCRF4XX**（poly 0x1021 反射、init 0xFFFF、小端），与本表 `crc16` 一致。
+**当前**高频控制帧（`GimbalToVision` / `VisionToGimbal` / `NavToGimbalV2` / 旧 `DecisionToGimbal`）保持不变；
+校验同为 CRC-16/MCRF4XX，文档见同一 `serial_protocol.md`。
 
 另有 minco 导航栈的分帧协议（`navi_minco_bit/src/navigation/communication/include/utils/protocol.hpp` +
 `custom_protocol.hpp`），其 `GameInfo` / `SentryInfoOnline` / ... 数据体与我们的 5 条消息一一对应，可作为新帧设计参考；
@@ -56,18 +55,17 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 | --- | --- | --- | --- |
 | `/sentry/game_info` | `GameInfo` | 阶段、时间、金币、`event_code`、`detect_color`、`can_rebuild_outpost`、手动点、敌基地/前哨 | 裁判 |
 | `/sentry/online_info` | `SentryInfoOnline` | 自身血量/弹量/热量/能量、`sentry_info_1/2/3` | 裁判 |
-| `/sentry/offline_info` | `SentryInfoOffline` | 视觉锁定、装甲板、升降、变形、电容、隧道对齐 | 视觉/MCU |
+| `/sentry/offline_info` | `SentryInfoOffline` | 视觉锁定、装甲板、电容 | auto-aim 视觉 / 本机 |
 | `/sentry/team_info` | `TeamInfo` | `allies[4]`、己方基地/前哨血量 | 裁判 |
-| `/sentry/radar_info` | `RadarInfo` | `enemies[6]`、敌方经济、前哨感知 | 雷达 |
 | `/sentry/decision_ack` | `DecisionAck` | `request_id`、`accepted`、`code`、`detail` | MCU 回执 |
 
 `sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用 `core/referee_protocol.hpp` 解码
 （已按 2026 规则 / 通信协议补齐：场地事件全字段、兑换与复活、姿态与姿态剩余时长）。
 `detect_color` 为视觉/MCU 字段，裁判与通信协议文档中未定义编码，仍待 auto-aim 确认，当前留空。
 决策侧对每条上行字段的接收、单位与有效性判定见 `docs/BELIEF.md`。当前 `SentryInfoOffline` 的视觉锁定字段
-（`is_get` / `armor_pos` / `armor_num`）与 `RadarInfo.enemies[6]` / `TeamInfo.allies[4]` 尚未接入
-`EnemyState` / `WorldState.allies`，属于已知缺口（P3 暂留空）；决策侧要求 `GameInfo` + `SentryInfoOnline`
-都出现过才判 `referee.valid`。
+（`is_get` / `armor_pos` / `armor_num`）与 `TeamInfo.allies[4]` 尚未接入
+`EnemyState` / `WorldState.allies`，属于已知缺口；决策侧要求 `GameInfo` + `SentryInfoOnline`
+都出现过才判 `upstream.valid`。雷达 / 变形相关字段当前未启用，已从消息与代码移除。
 
 ## 5. 下行 ROS 消息（决策发布）
 
@@ -106,8 +104,10 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 
 **实现现状**：决策侧的 one-shot / polled / ack 状态机已实现于 core `ActionDispatcher`，并可用
 `DecisionActuatorSim` 在本地离线跑通闭环；`DecisionAck` 经 `RosIoNode::take_acks` 进入该状态机。
-**待办（P2.3b）**：auto-aim 侧的串口字节帧、动作 `code` 表、`detect_color` 编码，
-待与电控 / MCU 确认后再实现，本阶段不落地。
+auto-aim 侧已把 `Publish2DecisionMaking` 迁到 5 条 `sentry_interfaces` 消息，并新增
+`Subscribe2Decision` 订阅 `/sentry/decision_command`（当前仅记录，未写串口）。
+**待办（P2.3b）**：auto-aim 侧的串口字节帧与 `DecisionAck` 回传、动作 `code` 表、`detect_color` 编码，
+待与电控 / MCU 确认后再实现。
 
 ## 8. 与 auto-aim 现状的映射（Phase 1）
 
@@ -119,7 +119,6 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 | `SentryInfoOnline` | `sentryHP`、`remain_ammo` | 部分 |
 | `TeamInfo` | `our_baseHP`、`our_outpostHP` | 部分 |
 | `SentryInfoOffline` | — | 全空 |
-| `RadarInfo` | — | 全空 |
 | `DecisionAck` | — | 待新增 |
 
 其余字段需要扩展 MCU 上行帧；决策侧先按「有则填、无则默认」处理，不阻塞。
@@ -128,7 +127,7 @@ MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
 
 1. **接口定义**（本文档 + `sentry_interfaces` 消息）——本阶段。
 2. **决策侧**：`RosIoNode` 订阅 5 个上行消息、发布 `DecisionCommand`、订阅 `DecisionAck`；先填现有字段。
-3. **auto-aim 侧**：`Publish2DecisionMaking` 从 7 个标量迁到 5 个消息；新增下行订阅与串口打包。
+3. **auto-aim 侧**：`Publish2DecisionMaking` 已迁到 5 个消息、新增 `Subscribe2Decision`；串口打包待 P2.3b。
 4. **MCU 侧**：确定字节布局、动作集合、ack 编码；扩展固件。
 5. **策略接入**：决策用 `DecisionCommand` 下发兑换/复活等。
 

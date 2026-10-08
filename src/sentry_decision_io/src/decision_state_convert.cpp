@@ -27,18 +27,18 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
 
 WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
   WorldStateMsg msg;
-  const auto& referee = world.referee;
-  msg.game_status = static_cast<std::int32_t>(referee.game_status);
-  msg.game_time_remaining = referee.game_time_remaining;
-  msg.coins = referee.coins;
-  msg.self_hp = referee.self_hp;
-  msg.self_ammo = referee.self_ammo;
-  msg.base_hp = referee.base_hp;
-  msg.our_outpost_hp = referee.our_outpost_hp;
-  msg.enemy_outpost_hp = referee.enemy_outpost_hp;
-  msg.enemy_base_hp = referee.enemy_base_hp;
-  msg.can_rebuild_outpost = referee.can_rebuild_outpost;
-  msg.referee_valid = referee.valid;
+  const auto& upstream = world.upstream;
+  msg.game_status = static_cast<std::int32_t>(upstream.game_status);
+  msg.game_time_remaining = upstream.game_time_remaining;
+  msg.coins = upstream.coins;
+  msg.self_hp = upstream.self_hp;
+  msg.self_ammo = upstream.self_ammo;
+  msg.base_hp = upstream.base_hp;
+  msg.our_outpost_hp = upstream.our_outpost_hp;
+  msg.enemy_outpost_hp = upstream.enemy_outpost_hp;
+  msg.enemy_base_hp = upstream.enemy_base_hp;
+  msg.can_rebuild_outpost = upstream.can_rebuild_outpost;
+  msg.upstream_valid = upstream.valid;
 
   msg.pos_x = world.self.pose.x;
   msg.pos_y = world.self.pose.y;
@@ -47,7 +47,7 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
   msg.vy = world.self.vy;
   msg.wz = world.self.wz;
   msg.self_valid = world.self.valid;
-  msg.stance = static_cast<std::uint8_t>(referee.info2.stance);
+  msg.stance = static_cast<std::uint8_t>(upstream.info2.stance);
 
   msg.nav_valid = world.nav.valid;
   if (world.nav.current_goal.has_value()) {
@@ -65,7 +65,6 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
     msg.enemy_x = world.enemy.position->x;
     msg.enemy_y = world.enemy.position->y;
   }
-  msg.enemy_count = static_cast<std::uint8_t>(world.enemy.enemies.size());
   msg.ally_count = static_cast<std::uint8_t>(world.allies.size());
   return msg;
 }
@@ -76,7 +75,7 @@ void fill_state(DecisionStateMsg* msg, const sentry_decision::WorldState& world,
   msg->output = to_msg(result.output);
   msg->conflict_count = static_cast<std::uint32_t>(result.conflicts.size());
   msg->warnings = result.warnings;
-  msg->referee_valid = world.referee.valid;
+  msg->upstream_valid = world.upstream.valid;
   msg->self_valid = world.self.valid;
   msg->nav_valid = world.nav.valid;
 }

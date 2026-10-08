@@ -119,11 +119,11 @@ int main(int argc, char** argv) {
     std::cerr << "读取 rosbag 失败: " << ex.what() << "\n";
     return 1;
   }
-  if (data.referee.empty()) {
+  if (data.upstream.empty()) {
     std::cerr << "bag 中没有裁判数据（检查上行话题是否录制）\n";
     return 1;
   }
-  SD_LOG_ACT("replay", "载入 bag: referee=%zu odometry=%zu navigation=%zu", data.referee.size(),
+  SD_LOG_ACT("replay", "载入 bag: upstream=%zu odometry=%zu navigation=%zu", data.upstream.size(),
              data.odometry.size(), data.navigation.size());
 
   sentry_decision::DecisionContext context;

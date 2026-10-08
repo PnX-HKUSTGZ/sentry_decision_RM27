@@ -20,17 +20,17 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
-ReplayData make_referee_series() {
+ReplayData make_upstream_series() {
   ReplayData data;
-  RefereeState first;
+  UpstreamState first;
   first.valid = true;
   first.self_hp = 400;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{0}, first});
+  data.upstream.push_back(ReplayRecord<UpstreamState>{Duration{0}, first});
 
-  RefereeState second;
+  UpstreamState second;
   second.valid = true;
   second.self_hp = 50;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{200}, second});
+  data.upstream.push_back(ReplayRecord<UpstreamState>{Duration{200}, second});
 
   SelfState self;
   self.valid = true;
@@ -43,31 +43,31 @@ ReplayData make_referee_series() {
 }
 
 void test_latest_by_time() {
-  ReplaySource replay(make_referee_series());
+  ReplaySource replay(make_upstream_series());
   CHECK(replay.tick() == 0);
   CHECK(!replay.finished());
 
-  RefereeState state;
-  CHECK(replay.referee(&state));  // now = 0 时应取到 at = 0 的记录
+  UpstreamState state;
+  CHECK(replay.upstream(&state));  // now = 0 时应取到 at = 0 的记录
   CHECK(state.self_hp == 400);
 
   replay.step(Duration{50});
   CHECK(replay.tick() == 1);
-  CHECK(replay.referee(&state));
+  CHECK(replay.upstream(&state));
   CHECK(state.self_hp == 400);
 
   replay.step(Duration{150});  // now = 200
-  CHECK(replay.referee(&state));
+  CHECK(replay.upstream(&state));
   CHECK(state.self_hp == 50);
 }
 
 void test_epoch_stamp_and_freshness() {
   const TimePoint epoch = TimePoint{} + Duration{1000};
   ReplayData data;
-  RefereeState referee;
-  referee.valid = true;
-  referee.self_hp = 400;
-  data.referee.push_back(ReplayRecord<RefereeState>{Duration{0}, referee});
+  UpstreamState upstream;
+  upstream.valid = true;
+  upstream.self_hp = 400;
+  data.upstream.push_back(ReplayRecord<UpstreamState>{Duration{0}, upstream});
   SelfState self;
   self.valid = true;
   data.odometry.push_back(ReplayRecord<SelfState>{Duration{0}, self});
@@ -81,26 +81,26 @@ void test_epoch_stamp_and_freshness() {
   CHECK(replay.stamp() == epoch);
 
   const WorldState fresh = model.snapshot(replay.stamp());
-  CHECK(fresh.referee.valid);
+  CHECK(fresh.upstream.valid);
   CHECK(fresh.self.valid);
   CHECK(fresh.nav.valid);
 
   replay.step(Duration{600});  // 超过 500ms 有效期
   const WorldState stale = model.snapshot(replay.stamp());
-  CHECK(!stale.referee.valid);
+  CHECK(!stale.upstream.valid);
   CHECK(!stale.nav.valid);
 }
 
 void test_finished_and_empty() {
-  ReplaySource replay(make_referee_series());
+  ReplaySource replay(make_upstream_series());
   CHECK(!replay.finished());
   replay.step(Duration{200});
   CHECK(replay.finished());
 
   ReplaySource empty{ReplayData{}};
-  RefereeState state;
+  UpstreamState state;
   SelfState self;
-  CHECK(!empty.referee(&state));
+  CHECK(!empty.upstream(&state));
   CHECK(!empty.odometry(&self));
   CHECK(!empty.status().valid);
 }
@@ -112,13 +112,13 @@ std::vector<int> run_sequence(const ReplayData& data) {
   std::vector<int> result;
   for (int i = 0; i < 5; ++i) {
     replay.step(Duration{100});
-    result.push_back(model.snapshot(replay.stamp()).referee.self_hp);
+    result.push_back(model.snapshot(replay.stamp()).upstream.self_hp);
   }
   return result;
 }
 
 void test_determinism() {
-  const ReplayData data = make_referee_series();
+  const ReplayData data = make_upstream_series();
   const std::vector<int> first = run_sequence(data);
   const std::vector<int> second = run_sequence(data);
   CHECK(first == second);
@@ -126,7 +126,7 @@ void test_determinism() {
 }
 
 void test_navigation_sink_counters() {
-  ReplaySource replay(make_referee_series());
+  ReplaySource replay(make_upstream_series());
   replay.send_goal(Point2D{1.0, 2.0, 0.0});
   replay.send_goal(Point2D{3.0, 4.0, 0.0});
   replay.cancel_goal();

@@ -13,7 +13,7 @@ int32 our_outpost_hp
 int32 enemy_outpost_hp
 int32 enemy_base_hp
 bool can_rebuild_outpost
-bool referee_valid
+bool upstream_valid
 
 # 当前物理姿态 SentryStance: 0 unknown / 1 attack / 2 defense / 3 move（SentryInfoOnline.info2）
 uint8 stance
@@ -35,13 +35,12 @@ float64 nav_goal_y
 bool nav_reached
 bool nav_failed
 
-# 敌方（RadarInfo / SentryInfoOffline）
+# 敌方（SentryInfoOffline）
 bool enemy_valid
 bool enemy_target_valid
 bool has_enemy_position
 float64 enemy_x
 float64 enemy_y
-uint8 enemy_count
 
 # 队友（TeamInformation）
 uint8 ally_count

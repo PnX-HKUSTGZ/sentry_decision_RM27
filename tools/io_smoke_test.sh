@@ -21,7 +21,7 @@ INFO="$(ros2 node info /sentry_decision_io)"
 echo "${INFO}"
 
 fail=0
-for topic in /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/radar_info /sentry/decision_ack /aft_mapped_to_init; do
+for topic in /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info /sentry/decision_ack /aft_mapped_to_init; do
   if ! grep -q "${topic}" <<<"${INFO}"; then
     echo "缺少订阅: ${topic}" >&2
     fail=1

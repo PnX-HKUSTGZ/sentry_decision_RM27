@@ -59,7 +59,7 @@ flowchart TD
 单一事实来源）。`RosIoNode` 额外要求 `GameInfo` 与 `SentryInfoOnline` 都出现过，缺失来源不以默认 0 参与决策；
 双仓库联调时 `RosIoNode` 订阅 odom 系位姿，并以 TF `map->odom` 转成 map 系（`odom_frame` 非空时启用，
 留空则话题本身即 map 系）；
-`EnemyState` / `WorldState.allies` 目前留空（待接入雷达 / 团队上行），详见该文档 §7。
+`EnemyState` / `WorldState.allies` 目前留空（待接入视觉 / 团队上行），详见该文档 §7。
 
 ### 3.2 意图层
 
@@ -89,7 +89,7 @@ flowchart TD
 ```cpp
 // 信念：决策看到的世界
 struct WorldState {
-  RefereeState referee;   // 比赛阶段、基地 / 前哨血量、经济、姿态、强化时间
+  UpstreamState upstream;   // 比赛阶段、基地 / 前哨血量、经济、姿态、强化时间
   SelfState    self;      // 血量、弹量、电容、脱战、当前姿态
   NavState     nav;       // 位姿、当前目标、到达 / 失败、是否在隧道
   EnemyState   enemy;     // 目标锁定、位置、可见性
@@ -100,26 +100,26 @@ struct WorldState {
 ```
 
 裁判消息中「未解码」的原始整数（`event_code`、`sentry_info_1/2/3`）不直接进决策，而是先经
-`core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2/3`），再写入 `RefereeState`。
+`core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2/3`），再写入 `UpstreamState`。
 位段依据 2026 比赛规则手册 V2.2.0 与通信协议 V2.0.0；姿态（`info2.stance` / `info3` 剩余时长）为规则
 5.6.4 的有效机制，决策当前不使用，仅做完整解码与观测。
 位段定义集中在这一处，协议变更只改这里，并配套 `test/test_referee_protocol.cpp` 单测；io 适配器只负责
 把消息字段喂给解码函数，不内联位运算。
 
-### 4.1 下位机通信（暂缓实现）
+### 4.1 下位机通信（P2.3b 待实现）
 
-裁判系统与下位机传感器信息由下位机（MCU）统一采集，决策侧不直接接触裁判串口或字节流。
-通信包（上行 / 下行帧）的定义位置尚未确定（不在本仓库与 navigation 仓库），确认前不在 `core` 落地
-`UplinkFrame` / `DownlinkFrame`，本仓库只维护「决策视图」的数据契约。`WorldState` 字段与参考消息
-`ros_interfaces` 的映射：
+裁判系统与下位机传感器信息由下位机（MCU）统一采集，决策侧不直接接触串口；auto-aim 独占串口并在
+ROS 图上收发。`sentry_interfaces` 是决策 ↔ auto-aim 的契约，auto-aim ↔ MCU 的字节帧 v1 见
+`auto-aim-new/docs/serial_protocol.md` §2。`WorldState` 字段与消息的映射：
 
-| 参考消息 | 对应子状态 | 备注 |
+| 消息 | 对应子状态 | 备注 |
 | --- | --- | --- |
-| `GameInfo` | `RefereeState` | 阶段 / 时间 / 金币 / 场地事件 / 手动点 / 建筑血量 |
-| `TeamInformation` | `RefereeState` + `WorldState.allies` | 己方建筑血量、队友状态 |
-| `RadarInfo` | `EnemyState.enemies` + `RefereeState` | 敌方列表、敌方经济、前哨感知 |
-| `SentryInfoOnline` | `RefereeState`（自身）+ `SentryInfo1/2/3` | 血量 / 弹量 / 热量 / 姿态 / 兑换 |
-| `SentryInfoOffline` | `EnemyState`（锁定）+ `RefereeState` | 目标锁定、升降、变形、电容、隧道对齐 |
+| `GameInfo` | `UpstreamState` | 阶段 / 时间 / 金币 / 场地事件 / 手动点 / 建筑血量 |
+| `TeamInfo` | `UpstreamState` + `WorldState.allies` | 己方建筑血量、队友状态（allies 未接入） |
+| `SentryInfoOnline` | `UpstreamState`（自身）+ `SentryInfo1/2/3` | 血量 / 弹量 / 热量 / 姿态 / 兑换 |
+| `SentryInfoOffline` | `EnemyState`（锁定）+ `UpstreamState` | 目标锁定（未接入）、电容 |
+
+雷达 / 变形 / 隧道相关字段当前未启用，已从协议与信念层移除，待需要时再补充。
 
 下行指令的语义（待通信包确定后落地）：
 
@@ -245,9 +245,9 @@ flowchart TD
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断敌方前哨站血量是否低于阈值，用于前哨进攻分支。
 // Inputs:       threshold: int (端口)
-//               health:    int (端口, 通常来自 {referee.enemy_outpost_health})
+//               health:    int (端口, 通常来自 {upstream.enemy_outpost_health})
 // Outputs:      -
-// Blackboard:   read: referee.enemy_outpost_health  write: (none)
+// Blackboard:   read: upstream.enemy_outpost_health  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/nav/attack.xml -> Priority1AutoOutpostAttack
@@ -440,7 +440,7 @@ P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/
 （`use_sim_time`、固定 tick 顺序、固定随机种子）。
 
 核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
-（固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `RefereeSource` /
+（固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `UpstreamSource` /
 `OdometrySource` / `NavigationSink`，可直接驱动 `WorldModel`，并统计决策下发的目标数用于回归断言。
 rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 `ReplayData`，默认映射旧仓库
 的简单话题（`/ifhealth`、`/remain_ammo`、`/our_base_health`、`/our_outpost_health`、
@@ -515,7 +515,7 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 
 `referee_sim_node` 复用 core 中 ROS 无关的仿真组件，把本地仿真接到真实 IO 路径上：
 
-- 发布 `sentry_interfaces` 的五条上行消息，驱动 `decision_node`；
+- 发布 `sentry_interfaces` 的四条上行消息，驱动 `decision_node`；
 - `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
   在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
 - `provide_nav=false` 时不自建导航 action server、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
@@ -644,8 +644,8 @@ config/
 
 ## 17. 开放问题
 
-- 对外接口冻结清单（`/sentry/behaivor_send`、`/set_bool`、`/change_follow_mark` 等）。
-- 下位机通信包（上行 / 下行帧）的定义位置与字节协议；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
+- 决策 ↔ auto-aim 的 ROS 契约已冻结为 `sentry_interfaces`（见 `docs/INTERFACES.md`）；`/set_bool` 已弃用，`/change_follow_mark` 属 auto-aim ↔ 导航。
+- 下位机串口字节帧（上行 / 下行）的布局与动作 `code` 表；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
 - 可视化选型已定：`TreeStatePublisher` + 可选 Groot2 + rosbridge 静态页（见 §14），细节随 P3 落地调整。
 - 回放文件格式与录制范围。
 - BT.CPP 在 Jazzy 镜像中的具体版本锁定与语义复验。

@@ -50,7 +50,7 @@ void test_clear() {
 
 void test_apply_overrides_context() {
   DecisionContext context;
-  context.world.referee.game_status = GameStatus::kRunning;
+  context.world.upstream.game_status = GameStatus::kRunning;
   StrategicDecision decision;
   decision.mode = TacticalMode::kPatrol;
   decision.stance = SentryStance::kMove;
@@ -76,7 +76,7 @@ void test_apply_overrides_context() {
 
 void test_apply_without_override_keeps_strategy() {
   DecisionContext context;
-  context.world.referee.game_status = GameStatus::kRunning;
+  context.world.upstream.game_status = GameStatus::kRunning;
   StrategicDecision decision;
   decision.mode = TacticalMode::kDefend;
   context.apply_strategy(decision);

@@ -60,16 +60,16 @@ void test_round_trip() {
   }
 
   const ReplayData data = load_replay_data(dir);
-  CHECK(data.referee.size() == 3);
-  if (data.referee.size() == 3) {
-    CHECK(data.referee[0].value.self_hp == 400);
-    CHECK(data.referee[1].value.self_ammo == 100);
-    CHECK(data.referee[2].value.can_rebuild_outpost);
-    CHECK(data.referee[2].value.self_hp == 400);
-    CHECK(data.referee[0].at == Duration{0});
-    CHECK(data.referee[1].at == Duration{100});
-    CHECK(data.referee[2].at == Duration{200});
-    CHECK(data.referee[2].value.valid);
+  CHECK(data.upstream.size() == 3);
+  if (data.upstream.size() == 3) {
+    CHECK(data.upstream[0].value.self_hp == 400);
+    CHECK(data.upstream[1].value.self_ammo == 100);
+    CHECK(data.upstream[2].value.can_rebuild_outpost);
+    CHECK(data.upstream[2].value.self_hp == 400);
+    CHECK(data.upstream[0].at == Duration{0});
+    CHECK(data.upstream[1].at == Duration{100});
+    CHECK(data.upstream[2].at == Duration{200});
+    CHECK(data.upstream[2].value.valid);
   }
   CHECK(data.odometry.empty());
   std::filesystem::remove_all(dir);

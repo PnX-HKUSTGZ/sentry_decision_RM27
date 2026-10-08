@@ -35,7 +35,7 @@ void apply_tactical_override(const TacticalOverride& override_value, TimePoint n
     return;
   }
   // 只在比赛中生效：避免在准备 / 结算阶段伪造战术模式，绕过任务树的比赛阶段门控。
-  if (context->world.referee.game_status != GameStatus::kRunning) {
+  if (context->world.upstream.game_status != GameStatus::kRunning) {
     return;
   }
   const std::optional<TacticalMode> mode = override_value.mode(now);

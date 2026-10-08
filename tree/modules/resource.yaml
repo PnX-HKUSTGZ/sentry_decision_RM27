@@ -3,5 +3,5 @@ name: resource
 provides:
   - intent.resource_request
 consumes:
-  - world.referee
+  - world.upstream
   - config.numbers

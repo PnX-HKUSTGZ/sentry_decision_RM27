@@ -22,13 +22,12 @@ struct ReplayTopics {
   std::string online_info = "/sentry/online_info";
   std::string offline_info = "/sentry/offline_info";
   std::string team_info = "/sentry/team_info";
-  std::string radar_info = "/sentry/radar_info";
   std::string odometry = "/odom";
 };
 
 // 读取 rosbag2，把已知话题的消息转成 core 的 ReplayData。
 //
-// 时间戳相对 bag 第一条消息，单位 ms；referee 通道每收到一条相关消息就写入一份
+// 时间戳相对 bag 第一条消息，单位 ms；upstream 通道每收到一条相关消息就写入一份
 // 当前完整快照（与实时节点逐字段合并再取快照的语义一致）。读取失败抛异常，
 // 由调用方捕获并记录 ERROR。
 sentry_decision::ReplayData load_replay_data(const std::string& bag_uri,

@@ -42,13 +42,13 @@ PolicyConfig make_config() {
 
 WorldState make_world() {
   WorldState world;
-  world.referee.valid = true;
-  world.referee.self_hp = 400;
-  world.referee.self_ammo = 100;
-  world.referee.our_outpost_hp = 1500;
-  world.referee.enemy_outpost_hp = 1500;
-  world.referee.game_time_remaining = 420;
-  world.referee.game_status = GameStatus::kRunning;
+  world.upstream.valid = true;
+  world.upstream.self_hp = 400;
+  world.upstream.self_ammo = 100;
+  world.upstream.our_outpost_hp = 1500;
+  world.upstream.enemy_outpost_hp = 1500;
+  world.upstream.game_time_remaining = 420;
+  world.upstream.game_status = GameStatus::kRunning;
   return world;
 }
 
@@ -112,7 +112,7 @@ void test_preemption_contract(const std::string& tree_path) {
 
   // 低血：抢占进攻，改派回家。
   WorldState retreat = make_world();
-  retreat.referee.self_hp = 50;
+  retreat.upstream.self_hp = 50;
   r = tick(tree, context, config, policy, tracker, retreat, t0 + Duration{100});
   CHECK(r.step.decision == NavGoalTracker::Decision::kSend);
   CHECK(r.step.goal.has_value());

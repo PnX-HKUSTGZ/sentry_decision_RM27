@@ -20,8 +20,8 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 void test_invalid_before_update() {
   RefereeSimulator sim;
-  RefereeState out;
-  CHECK(!sim.referee(&out));
+  UpstreamState out;
+  CHECK(!sim.upstream(&out));
 }
 
 void test_schedule_fires_once() {
@@ -29,28 +29,28 @@ void test_schedule_fires_once() {
   RefereeSimulator sim;
   sim.mutable_state().self_hp = 400;
   int calls = 0;
-  sim.schedule(Duration{100}, [&calls](RefereeState& state) {
+  sim.schedule(Duration{100}, [&calls](UpstreamState& state) {
     state.self_hp = 50;
     ++calls;
   });
 
-  RefereeState out;
+  UpstreamState out;
   sim.update(t0);
-  CHECK(sim.referee(&out));
+  CHECK(sim.upstream(&out));
   CHECK(out.self_hp == 400);
   CHECK(out.stamp == t0);
 
   sim.update(t0 + Duration{50});
-  CHECK(sim.referee(&out));
+  CHECK(sim.upstream(&out));
   CHECK(out.self_hp == 400);
 
   sim.update(t0 + Duration{100});
-  CHECK(sim.referee(&out));
+  CHECK(sim.upstream(&out));
   CHECK(out.self_hp == 50);
   CHECK(calls == 1);
 
   sim.update(t0 + Duration{200});
-  CHECK(sim.referee(&out));
+  CHECK(sim.upstream(&out));
   CHECK(out.self_hp == 50);
   CHECK(calls == 1);
   CHECK(out.stamp == t0 + Duration{200});

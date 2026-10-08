@@ -19,7 +19,7 @@ struct ReplayRecord {
 // 离线回放数据：每个输入通道按 at 升序排列。
 // rosbag 读取由 io 适配器负责，core 只消费这份与 ROS 解耦的数据。
 struct ReplayData {
-  std::vector<ReplayRecord<RefereeState>> referee;
+  std::vector<ReplayRecord<UpstreamState>> upstream;
   std::vector<ReplayRecord<SelfState>> odometry;
   std::vector<ReplayRecord<NavState>> navigation;
 };
@@ -29,7 +29,7 @@ struct ReplayData {
 // 时间语义：外部传入固定 epoch，记录时间戳为 epoch + at；
 // 调用方用 stamp() 作为 WorldModel::snapshot 的 now，保证新鲜度判定与回放一致。
 // 每次 step 的步长固定、遍历顺序固定，因此同一份数据两次回放输出完全一致。
-class ReplaySource : public RefereeSource, public OdometrySource, public NavigationSink {
+class ReplaySource : public UpstreamSource, public OdometrySource, public NavigationSink {
  public:
   explicit ReplaySource(ReplayData data, TimePoint epoch = TimePoint{});
 
@@ -49,7 +49,7 @@ class ReplaySource : public RefereeSource, public OdometrySource, public Navigat
     return now_ >= last_at_;
   }
 
-  bool referee(RefereeState* out) const override;
+  bool upstream(UpstreamState* out) const override;
   bool odometry(SelfState* out) const override;
   NavState status() const override;
 

@@ -56,19 +56,19 @@ struct StepResult {
 ReplayData make_data() {
   ReplayData data;
 
-  RefereeState referee;
-  referee.valid = true;
-  referee.self_hp = 400;
-  referee.self_ammo = 100;
-  referee.our_outpost_hp = 1500;
-  referee.enemy_outpost_hp = 1500;
-  referee.game_time_remaining = 420;
-  referee.game_status = GameStatus::kRunning;
-  data.referee.push_back({Duration{0}, referee});
+  UpstreamState upstream;
+  upstream.valid = true;
+  upstream.self_hp = 400;
+  upstream.self_ammo = 100;
+  upstream.our_outpost_hp = 1500;
+  upstream.enemy_outpost_hp = 1500;
+  upstream.game_time_remaining = 420;
+  upstream.game_status = GameStatus::kRunning;
+  data.upstream.push_back({Duration{0}, upstream});
 
-  RefereeState hurt = referee;
+  UpstreamState hurt = upstream;
   hurt.self_hp = 50;
-  data.referee.push_back({Duration{1000}, hurt});
+  data.upstream.push_back({Duration{1000}, hurt});
 
   SelfState self;
   self.valid = true;
@@ -114,7 +114,7 @@ std::vector<StepResult> run(const ReplayData& data, const std::string& tree_path
     const ArbiterResult result = arbiter.resolve(replay.stamp());
 
     StepResult step;
-    step.hp = context.world.referee.self_hp;
+    step.hp = context.world.upstream.self_hp;
     step.mode = result.output.tactical_mode;
     step.has_goal = result.output.nav_goal.has_value();
     if (result.output.nav_goal.has_value()) {

@@ -7,6 +7,6 @@ DecisionOutput output
 uint32 conflict_count
 string[] warnings
 
-bool referee_valid
+bool upstream_valid
 bool self_valid
 bool nav_valid

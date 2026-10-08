@@ -66,7 +66,7 @@ export function worldStateToView(msg) {
     enemyOutpostHp: msg.enemy_outpost_hp,
     enemyBaseHp: msg.enemy_base_hp,
     canRebuild: msg.can_rebuild_outpost,
-    refereeValid: msg.referee_valid,
+    upstreamValid: msg.upstream_valid,
     stance: msg.stance || 0,
     stanceName: stanceName(msg.stance || 0),
     posX: msg.pos_x,
@@ -82,7 +82,6 @@ export function worldStateToView(msg) {
     hasEnemy: msg.has_enemy_position,
     enemyX: msg.enemy_x,
     enemyY: msg.enemy_y,
-    enemyCount: msg.enemy_count,
     allyCount: msg.ally_count,
   };
 }

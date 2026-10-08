@@ -14,7 +14,7 @@ void register_common_nodes(BT::BehaviorTreeFactory& factory);
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断己方血量是否低于配置阈值，用于撤退分支。
 // Inputs:       hp_key: string (端口, 配置 key，如 "nav.retreat_hp")
-// Blackboard:   read: context(world.referee.self_hp, valid, config)  write: (none)
+// Blackboard:   read: context(world.upstream.self_hp, valid, config)  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/mission/nav/retreat.xml
@@ -44,7 +44,7 @@ class IfTacticalMode : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断敌方前哨是否已被击毁（用于转去中央高地）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, enemy_outpost_hp)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, enemy_outpost_hp)  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/mission/nav/highland.xml
@@ -59,7 +59,7 @@ class IfEnemyOutpostDead : public BT::SyncActionNode {
 // Category:     Condition (synchronous, no side effects)
 // Purpose:      判断我方前哨是否仍存活（用于区分「高地循环」与「双方前哨皆毁」）。
 // Inputs:       -
-// Blackboard:   read: context(world.referee.valid, our_outpost_hp)  write: (none)
+// Blackboard:   read: context(world.upstream.valid, our_outpost_hp)  write: (none)
 // Threading:    tick 在 BT 单线程调用；无阻塞、无 ROS 调用。
 // Side Effects: none
 // See:          tree/mission/nav/highland.xml
