@@ -203,7 +203,7 @@
 - **P3 已完成（本地范围）**：
   - 设计已对齐（本地）：新增 `sentry_decision_viz`、树状态消息与 `/decision/tree_status`、Groot2 可选、干预 action / service（线程安全队列、tick 边界应用）、`referee_sim_node` 与场景脚本、干预回放、无构建网页面板；见 `docs/ARCHITECTURE.md` §14。
   - 已完成（本地）：P3.0 观测底座——`TreeNodeStatus` / `TreeStatus` 消息、`sentry_decision_viz` 的 `TreeStatePublisher`（`/decision/tree_status`）、Groot2 可选 hook（`--groot2-port`）、`decision_node` 接线；容器 8 包 / 35 测试通过。
-  - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（五条上行 + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与场景 YAML（`set_world` / `expect`）；`scenario/full_match.yaml` 端到端跑通巡逻→进攻→撤退→复活（12/12 断言）；容器 8 包 / 37 测试通过。
+  - 已完成（本地）：P3.1 裁判仿真 + 场景脚本——`referee_sim_node`（四条上行 + odom、`NavigateToPose` action server、`DecisionCommand`→`DecisionAck`）与场景 YAML（`set_world` / `expect`）；`scenario/full_match.yaml` 端到端跑通巡逻→进攻→撤退→复活（12/12 断言）；容器 8 包 / 37 测试通过。
   - 已完成（本地）：P3.2 干预 ROS 接口——`ManualOverride.action` / `DebugCommand.srv` / `InterventionEvent.msg`、`InterventionServer`（线程安全队列、tick 边界应用、action 生命周期反馈）、仲裁逐字段 `winners`、`/decision/intervention` 记录；容器 8 包 / 39 测试通过，含 `intervention_smoke`。
   - 已完成（本地）：P3.3 干预回放——`InterventionCommand` 归入 core 并由实时 / 回放共用 `apply_intervention`；`ReplayData` 增干预通道、`ReplaySource::interventions()` 按时刻返回；`load_replay_data` 读取 `/decision/intervention`；回放确定性测试含人工接管。
   - 已完成（本地）：P3.4 网页面板——`sentry_decision_viz/web`（vendored `roslib.min.js`、原生 ES modules、无打包）× `viz.launch.py`（rosbridge + 静态服务）；树状态 / 战场 / 世界状态 / 模块与干预面板 + 干预按钮；纯逻辑 node 单测与 `viz_smoke`；镜像新增 `ros-jazzy-rosbridge-suite`。

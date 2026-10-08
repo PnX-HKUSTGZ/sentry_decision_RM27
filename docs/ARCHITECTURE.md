@@ -515,7 +515,7 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 
 `referee_sim_node` 复用 core 中 ROS 无关的仿真组件，把本地仿真接到真实 IO 路径上：
 
-- 发布 `sentry_interfaces` 的五条上行消息，驱动 `decision_node`；
+- 发布 `sentry_interfaces` 的四条上行消息，驱动 `decision_node`；
 - `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
   在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
 - `provide_nav=false` 时不自建导航 action server、不发 odom，改用 `/decision/world_state` 的 map 系位姿做

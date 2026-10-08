@@ -205,7 +205,7 @@ ros2 run sentry_decision_bringup decision_node     # 终端 1
 ros2 run sentry_decision_sim referee_sim_node      # 终端 2：持续发布世界状态
 ```
 
-它发布 `/sentry/*` 五条上行与 odom，提供 `NavigateToPose` action server，并把 `DecisionCommand` 按延迟回成 `DecisionAck`。
+它发布 `/sentry/*` 四条上行与 odom，提供 `NavigateToPose` action server，并把 `DecisionCommand` 按延迟回成 `DecisionAck`。
 
 带场景脚本时按时间轴改世界，并在指定时刻断言 `/decision/state`，结束以退出码表示成败：
 
