@@ -28,7 +28,7 @@ BT::NodeStatus IfLowHp::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.self_hp <= threshold.value() ? BT::NodeStatus::SUCCESS
-                                                             : BT::NodeStatus::FAILURE;
+                                                              : BT::NodeStatus::FAILURE;
 }
 
 // [IfTacticalMode]
@@ -67,7 +67,7 @@ BT::NodeStatus IfEnemyOutpostDead::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.enemy_outpost_hp <= 0 ? BT::NodeStatus::SUCCESS
-                                                      : BT::NodeStatus::FAILURE;
+                                                       : BT::NodeStatus::FAILURE;
 }
 
 // [IfOurOutpostAlive]
@@ -84,7 +84,7 @@ BT::NodeStatus IfOurOutpostAlive::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.our_outpost_hp > 0 ? BT::NodeStatus::SUCCESS
-                                                   : BT::NodeStatus::FAILURE;
+                                                    : BT::NodeStatus::FAILURE;
 }
 
 // [EmitTacticalMode]

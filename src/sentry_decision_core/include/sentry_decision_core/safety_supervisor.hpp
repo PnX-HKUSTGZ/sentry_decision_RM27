@@ -13,7 +13,7 @@ struct SafetyLimits {
   double max_vx;  // 速度限幅（m/s）
   double max_vy;
   double max_wz;          // 角速度限幅（rad/s）
-  bool require_upstream;   // 裁判数据无效时急停
+  bool require_upstream;  // 裁判数据无效时急停
   bool require_odometry;  // 里程计数据无效时急停
 };
 

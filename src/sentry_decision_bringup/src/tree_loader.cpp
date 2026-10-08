@@ -200,7 +200,7 @@ void validate_module_manifests(const std::string& tree_dir, const TreeManifest& 
   // 核心字段：由 IO / 信念层 / 战略层或上下文直接提供，不要求模块 provides。
   static const std::set<std::string> kCoreFields = {
       "world.upstream", "world.self",     "world.nav",    "world.enemy",     "world.allies",
-      "config.points", "config.numbers", "config.flags", "context.intents",
+      "config.points",  "config.numbers", "config.flags", "context.intents",
   };
 
   std::map<std::string, std::string> provider_of;  // field -> module

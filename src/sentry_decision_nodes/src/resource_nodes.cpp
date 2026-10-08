@@ -32,7 +32,7 @@ BT::NodeStatus IfCanFreeResurrect::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.info1.can_free_resurrect ? BT::NodeStatus::SUCCESS
-                                                         : BT::NodeStatus::FAILURE;
+                                                          : BT::NodeStatus::FAILURE;
 }
 
 // [IfLowAmmo]
@@ -58,7 +58,7 @@ BT::NodeStatus IfLowAmmo::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.self_ammo <= threshold.value() ? BT::NodeStatus::SUCCESS
-                                                               : BT::NodeStatus::FAILURE;
+                                                                : BT::NodeStatus::FAILURE;
 }
 
 // [IfCoinsAtLeast]
@@ -84,7 +84,7 @@ BT::NodeStatus IfCoinsAtLeast::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.coins >= threshold.value() ? BT::NodeStatus::SUCCESS
-                                                           : BT::NodeStatus::FAILURE;
+                                                            : BT::NodeStatus::FAILURE;
 }
 
 // [IfOccupyingGainPoint]
@@ -101,7 +101,7 @@ BT::NodeStatus IfOccupyingGainPoint::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.event.local_ammo_exchange_point() ? BT::NodeStatus::SUCCESS
-                                                                  : BT::NodeStatus::FAILURE;
+                                                                   : BT::NodeStatus::FAILURE;
 }
 
 // [IfDisengaged]
@@ -118,7 +118,7 @@ BT::NodeStatus IfDisengaged::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.info2.disengaged ? BT::NodeStatus::SUCCESS
-                                                 : BT::NodeStatus::FAILURE;
+                                                  : BT::NodeStatus::FAILURE;
 }
 
 // [IfNotOccupyingGainPoint]
@@ -136,7 +136,7 @@ BT::NodeStatus IfNotOccupyingGainPoint::tick() {
     return BT::NodeStatus::FAILURE;
   }
   return context->world.upstream.event.local_ammo_exchange_point() ? BT::NodeStatus::FAILURE
-                                                                  : BT::NodeStatus::SUCCESS;
+                                                                   : BT::NodeStatus::SUCCESS;
 }
 
 // [IfCanInstantResurrect]
@@ -155,7 +155,7 @@ BT::NodeStatus IfCanInstantResurrect::tick() {
   const UpstreamState& upstream = context->world.upstream;
   const bool affordable = upstream.coins >= static_cast<int>(upstream.info1.instant_resurrect_cost);
   return (upstream.info1.can_instant_resurrect && affordable) ? BT::NodeStatus::SUCCESS
-                                                             : BT::NodeStatus::FAILURE;
+                                                              : BT::NodeStatus::FAILURE;
 }
 
 // [RequestFreeRevive]

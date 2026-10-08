@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
   sentry_decision_sim::RefereeSimulator upstream;
   sentry_decision_sim::NavSimulator navigation(sim_config.nav_speed, sim_config.nav_tolerance);
   upstream.schedule(Duration{static_cast<std::int64_t>(options.hp_drop_sec * 1000.0)},
-                   [](sentry_decision::UpstreamState& state) { state.self_hp = 50; });
+                    [](sentry_decision::UpstreamState& state) { state.self_hp = 50; });
   sentry_decision::WorldModel world_model(upstream, navigation, navigation, runtime_timeouts);
 
   BT::BehaviorTreeFactory factory;

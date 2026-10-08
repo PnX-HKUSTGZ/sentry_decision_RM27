@@ -21,11 +21,11 @@ struct UpstreamState {
 
   // 比赛宏观状态（GameInfo）
   GameStatus game_status = GameStatus::kNotStarted;
-  int game_time_remaining = 0;      // 剩余时间，单位 s
-  int coins = 0;                    // 己方剩余金币
-  Point2D manual_point{};           // 手动指定目标点（minimap）
-  int manual_key = 0;               // 手动按键
-  int detect_color = 0;             // 红蓝方（编码待确认）
+  int game_time_remaining = 0;  // 剩余时间，单位 s
+  int coins = 0;                // 己方剩余金币
+  Point2D manual_point{};       // 手动指定目标点（minimap）
+  int manual_key = 0;           // 手动按键
+  int detect_color = 0;         // 红蓝方（编码待确认）
 
   // 建筑血量与经济（GameInfo + TeamInformation）
   int base_hp = 0;
@@ -42,7 +42,7 @@ struct UpstreamState {
   int current_heat = 0;
   int energy_ratio = 0;         // 底盘能量比例
   double gimbal_yaw_deg = 0.0;  // 测速模块朝向，deg，正北为 0
-  int capacitor_capacity = 0;    // 电容容量百分比
+  int capacitor_capacity = 0;   // 电容容量百分比
 
   // 裁判协议位段解码结果（详见 referee_protocol.hpp）
   EventCode event{};
