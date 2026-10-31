@@ -61,6 +61,14 @@ if [[ ! -f /.dockerenv ]]; then
       nav_use_rviz=false
     else
       nav_display=(-e "DISPLAY=${DISPLAY:-}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
+      # 只挂 socket 不够：X server 开启访问控制时，容器里的 root 没有 cookie，
+      # RViz/gimbal_panel 会因 "Authorization required" 退出；RViz 一死整套 launch 就关。
+      xauth_file="${XAUTHORITY:-${HOME}/.Xauthority}"
+      if [[ -f "${xauth_file}" ]]; then
+        nav_display+=(-e "XAUTHORITY=/tmp/.Xauthority" -v "${xauth_file}:/tmp/.Xauthority:ro")
+      else
+        echo "[demo] 未找到 Xauthority（${xauth_file}），RViz 可能因 X 授权失败；必要时 xhost +local:root 或加 --nav-silent"
+      fi
     fi
     docker run -d --name "${NAV_CONTAINER}" --network "${NETWORK}" "${nav_display[@]}" \
       -v "${NAV_REPO}/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \

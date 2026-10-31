@@ -40,11 +40,13 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentr
 docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27:jazzy \
   -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup decision_main"
 
+
 # 一键运行本地仿真（裁判 + 行为树 + 网页面板）
-tools/demo.sh
+tools/demo.sh [--build] # 首次运行需加 --build，后续可直接运行
 
 # 双仓库联合仿真（额外起真实导航）
 tools/demo.sh --with-nav [--nav-silent] # --nav-silent 关闭导航 RViz
+xhost +local:root # 若遇到 RViz 无法显示，执行此命令允许容器访问宿主 X11
 ```
 
 完整命令与参数见 [docs/USAGE.md](docs/USAGE.md)；仿真、场景与面板操作见 [docs/SIMULATION.md](docs/SIMULATION.md)。
