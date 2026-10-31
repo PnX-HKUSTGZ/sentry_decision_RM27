@@ -110,22 +110,17 @@ void test_referee_sources_ready() {
 void test_decision_command_mapping() {
   DecisionAction action;
   action.kind = DecisionActionKind::kInstantResurrect;
-  action.mode = ActionMode::kPolled;
-  action.interval = Duration{200};
-  action.value = 3;
+  action.value = 1;
   action.request_id = 42;
 
   const auto msg = to_msg(action);
   CHECK(msg.request_id == 42);
   CHECK(msg.action.kind == sentry_interfaces::msg::DecisionAction::KIND_INSTANT_RESURRECT);
-  CHECK(msg.action.mode == sentry_interfaces::msg::DecisionAction::MODE_POLLED);
-  CHECK(msg.action.interval_ms == 200);
-  CHECK(msg.action.value == 3);
+  CHECK(msg.action.value == 1);
 
   DecisionAction none;
   const auto none_msg = to_msg(none);
   CHECK(none_msg.action.kind == sentry_interfaces::msg::DecisionAction::KIND_NONE);
-  CHECK(none_msg.action.mode == sentry_interfaces::msg::DecisionAction::MODE_ONE_SHOT);
 }
 
 }  // namespace

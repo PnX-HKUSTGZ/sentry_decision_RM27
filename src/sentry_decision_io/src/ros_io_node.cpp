@@ -31,8 +31,6 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
       declare_parameter<std::string>("offline_info_topic", "/sentry/offline_info");
   const auto team_info_topic =
       declare_parameter<std::string>("team_info_topic", "/sentry/team_info");
-  const auto decision_ack_topic =
-      declare_parameter<std::string>("decision_ack_topic", "/sentry/decision_ack");
   const auto decision_command_topic =
       declare_parameter<std::string>("decision_command_topic", "/sentry/decision_command");
   const auto odom_topic = declare_parameter<std::string>("odom_topic", "/aft_mapped_to_init");
@@ -72,24 +70,6 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
         merge(*msg, &upstream_);
         upstream_.stamp = sentry_decision::SteadyClock::now();
         upstream_.valid = true;
-      });
-
-  decision_ack_sub_ = create_subscription<sentry_interfaces::msg::DecisionAck>(
-      decision_ack_topic, 10, [this](sentry_interfaces::msg::DecisionAck::SharedPtr msg) {
-        std::lock_guard<std::mutex> lock(decision_mutex_);
-        last_ack_ = *msg;
-        sentry_decision::ActionAck ack;
-        ack.request_id = msg->request_id;
-        ack.accepted = msg->accepted;
-        ack.code = msg->code;
-        ack.detail = msg->detail;
-        ack_queue_.push_back(std::move(ack));
-        if (msg->accepted) {
-          SD_LOG_ACT("io", "决策动作已执行 request_id=%u", msg->request_id);
-        } else {
-          SD_LOG_WARN("io", "决策动作被拒绝 request_id=%u code=%u", msg->request_id,
-                      static_cast<unsigned>(msg->code));
-        }
       });
 
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
@@ -162,18 +142,6 @@ bool RosIoNode::lookup_map_to_odom(MapToOdom* out) {
     }
     return false;
   }
-}
-
-std::optional<sentry_interfaces::msg::DecisionAck> RosIoNode::last_ack() const {
-  std::lock_guard<std::mutex> lock(decision_mutex_);
-  return last_ack_;
-}
-
-std::vector<sentry_decision::ActionAck> RosIoNode::take_acks() {
-  std::lock_guard<std::mutex> lock(decision_mutex_);
-  std::vector<sentry_decision::ActionAck> acks;
-  acks.swap(ack_queue_);
-  return acks;
 }
 
 void RosIoNode::send_goal(const sentry_decision::Point2D& goal) {

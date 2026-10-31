@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
       replay.cancel_goal();
     }
     sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
-    (void)dispatcher.poll(now);  // 回放不真实下发动作，只推进状态机
+    (void)dispatcher.poll(now, nullptr);  // 回放不真实下发动作，不校验生效
 
     if (safe_result.output.tactical_mode != last_mode) {
       SD_LOG_ACT("replay", "t=%.1fs mode %d -> %d", replay.now().count() / 1000.0,

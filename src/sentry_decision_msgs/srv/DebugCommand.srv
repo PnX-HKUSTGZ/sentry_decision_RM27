@@ -8,5 +8,5 @@ string args
 ---
 bool success
 string message
-# 仅 list_state 生效：命名点 / 资源 / 最近动作 / 动作回执 / 急停 / 战术层覆盖的 JSON 快照
+# 仅 list_state 生效：命名点 / 资源 / 最近动作 / 动作结果 / 急停 / 战术层覆盖的 JSON 快照
 string state_json

@@ -2,7 +2,6 @@
 
 #include "sentry_decision_core/types.hpp"
 #include "sentry_decision_core/world_state.hpp"
-#include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
 #include "sentry_interfaces/msg/sentry_info_offline.hpp"

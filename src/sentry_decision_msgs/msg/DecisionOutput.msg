@@ -15,5 +15,5 @@ uint8 stance
 
 # ResourceRequest
 uint16 resource_ammo
-uint16 resource_hp
 bool resource_revive
+bool resource_instant_revive

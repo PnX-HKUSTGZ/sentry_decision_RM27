@@ -31,8 +31,8 @@ void test_decision_output_conversion() {
   output.tactical_mode = TacticalMode::kRetreat;
   output.stance = SentryStance::kDefense;
   output.resource.ammo = 17;
-  output.resource.hp = 3;
   output.resource.revive = true;
+  output.resource.instant_revive = true;
 
   const DecisionOutputMsg msg = to_msg(output);
   CHECK(msg.has_nav_goal);
@@ -46,8 +46,8 @@ void test_decision_output_conversion() {
   CHECK(msg.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kRetreat));
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kDefense));
   CHECK(msg.resource_ammo == 17);
-  CHECK(msg.resource_hp == 3);
   CHECK(msg.resource_revive);
+  CHECK(msg.resource_instant_revive);
 }
 
 void test_world_state_conversion() {

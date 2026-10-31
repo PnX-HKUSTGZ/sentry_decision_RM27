@@ -247,16 +247,16 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
     }
     return true;
   }
-  if (field == "resource_hp") {
-    if (view.resource_hp != static_cast<int>(expected_number)) {
-      *error = "resource_hp 不匹配";
+  if (field == "resource_revive") {
+    if (view.resource_revive != expected_bool) {
+      *error = "resource_revive 不匹配";
       return false;
     }
     return true;
   }
-  if (field == "resource_revive") {
-    if (view.resource_revive != expected_bool) {
-      *error = "resource_revive 不匹配";
+  if (field == "resource_instant_revive") {
+    if (view.resource_instant_revive != expected_bool) {
+      *error = "resource_instant_revive 不匹配";
       return false;
     }
     return true;
@@ -483,7 +483,7 @@ RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up) {
   if (world == nullptr || !world->respawn.pending) {
     return result;
   }
-  // 规则 5.2.2：每秒 +1；位于补给区或己方基地血量 <2000 时每秒 +4。
+  // 规则 5.2.2：每秒 +1；位于补给区增益点或己方基地血量 <4000 时每秒 +4。
   const int step = speed_up ? 4 : 1;
   world->respawn.current_progress =
       std::min(world->respawn.total_progress, world->respawn.current_progress + step);
@@ -554,32 +554,39 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
 
   switch (action.kind) {
     case K::kAmmoExchange: {
-      if (action.value <= 0) {
-        return reject(1, "兑换数量必须为正");
+      // 协议 0x0120 bit 2-12：本场累计兑换发弹量，必须单调递增。
+      const int current = info1.ammo_exchanged_local;
+      if (action.value < current) {
+        return reject(4, "兑换总量必须单调递增");
+      }
+      const int delta = action.value - current;
+      if (delta == 0) {
+        outcome.accepted = true;
+        outcome.detail = "已是目标值（幂等）";
+        return outcome;
       }
       if (!event.local_ammo_exchange_point()) {
         return reject(2, "未占领可兑换增益点（补给区/基地/前哨站）");
       }
-      const ExchangeResult result = exchange_ammo(world, action.value);
+      const ExchangeResult result = exchange_ammo(world, delta);
       outcome.accepted = result.accepted;
       outcome.code = result.accepted ? 0 : 3;
       outcome.detail = result.detail;
-      return outcome;
-    }
-    case K::kHpExchange: {
-      if (action.value <= 0) {
-        return reject(1, "兑换数量必须为正");
+      if (result.accepted) {
+        set_bits(&world->sentry_info_1, 0, 11, action.value);
       }
-      if (!info2.disengaged) {
-        return reject(2, "未脱战，不能兑换血量");
-      }
-      const ExchangeResult result = exchange_hp(world, action.value, max_hp);
-      outcome.accepted = result.accepted;
-      outcome.code = result.accepted ? 0 : 3;
-      outcome.detail = result.detail;
       return outcome;
     }
     case K::kFreeResurrect: {
+      if (action.value < 0 || action.value > 1) {
+        return reject(1, "复活电平只能是 0 或 1");
+      }
+      if (action.value == 0) {
+        world->respawn.confirmed = false;
+        outcome.accepted = true;
+        outcome.detail = "清除确认复活";
+        return outcome;
+      }
       if (world->self_hp > 0 || !world->respawn.pending) {
         return reject(2, "当前未处于待复活状态");
       }
@@ -595,6 +602,14 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
       return outcome;
     }
     case K::kInstantResurrect: {
+      if (action.value < 0 || action.value > 1) {
+        return reject(1, "复活电平只能是 0 或 1");
+      }
+      if (action.value == 0) {
+        outcome.accepted = true;
+        outcome.detail = "清除立即复活";
+        return outcome;
+      }
       if (world->self_hp > 0 || !world->respawn.pending) {
         return reject(2, "当前未处于待复活状态");
       }
@@ -619,28 +634,50 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
       return outcome;
     }
     case K::kRemoteAmmoExchange: {
-      if (action.value <= 0) {
-        return reject(1, "兑换次数必须为正");
+      // 协议 0x0120 bit 13-16：本场累计远程兑换次数，单调递增且每次仅能 +1。
+      const int current = info1.remote_ammo_exchange_count;
+      if (action.value < current) {
+        return reject(4, "远程兑换次数必须单调递增");
+      }
+      const int delta = action.value - current;
+      if (delta == 0) {
+        outcome.accepted = true;
+        outcome.detail = "已是目标值（幂等）";
+        return outcome;
+      }
+      if (delta > 1) {
+        return reject(4, "远程兑换次数每次只能 +1");
       }
       if (!info2.disengaged) {
         return reject(2, "未脱战，不能远程兑换发弹量");
       }
-      const int cost = 150 * action.value;
+      const int cost = 150 * delta;
       if (world->coins < cost) {
         return reject(3, "金币不足（远程兑换需要 " + std::to_string(cost) + "）");
       }
       world->coins -= cost;
       // 规则 5.3.2：远程兑换成功后 6 秒生效，先入延迟队列。
-      world->pending_remote.push_back(
-          PendingRemoteExchange{K::kRemoteAmmoExchange, action.value, 6000});
+      world->pending_remote.push_back(PendingRemoteExchange{K::kRemoteAmmoExchange, delta, 6000});
+      set_bits(&world->sentry_info_1, 11, 4, action.value);
       outcome.accepted = true;
-      outcome.detail = "远程兑换发弹量 +" + std::to_string(100 * action.value) +
+      outcome.detail = "远程兑换发弹量 +" + std::to_string(100 * delta) +
                        " 将于 6s 后生效，金币 -" + std::to_string(cost);
       return outcome;
     }
     case K::kRemoteHpExchange: {
-      if (action.value <= 0) {
-        return reject(1, "兑换次数必须为正");
+      // 协议 0x0120 bit 17-20：本场累计远程兑换次数，单调递增且每次仅能 +1。
+      const int current = info1.remote_health_exchange_count;
+      if (action.value < current) {
+        return reject(4, "远程兑换次数必须单调递增");
+      }
+      const int delta = action.value - current;
+      if (delta == 0) {
+        outcome.accepted = true;
+        outcome.detail = "已是目标值（幂等）";
+        return outcome;
+      }
+      if (delta > 1) {
+        return reject(4, "远程兑换次数每次只能 +1");
       }
       if (!info2.disengaged) {
         return reject(2, "未脱战，不能远程兑换血量");
@@ -648,14 +685,14 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
       // 规则表 5-6：血量远程兑换 50 + ROUNDUP((420-剩余)/60 * 20) 金币/次。
       const int remaining = std::max(0, world->game_time_remaining);
       const int per_cost = static_cast<int>(std::ceil(50.0 + (420 - remaining) / 60.0 * 20.0));
-      const int cost = per_cost * action.value;
+      const int cost = per_cost * delta;
       if (world->coins < cost) {
         return reject(3, "金币不足（远程兑换血量需要 " + std::to_string(cost) + "）");
       }
       world->coins -= cost;
       // 规则 5.2.1：确定远程兑换血量 6 秒后 +60% 上限血量；期间战亡则作废。
-      world->pending_remote.push_back(
-          PendingRemoteExchange{K::kRemoteHpExchange, action.value, 6000});
+      world->pending_remote.push_back(PendingRemoteExchange{K::kRemoteHpExchange, delta, 6000});
+      set_bits(&world->sentry_info_1, 17, 4, action.value);
       outcome.accepted = true;
       outcome.detail = "远程兑换血量将于 6s 后生效，金币 -" + std::to_string(cost);
       return outcome;

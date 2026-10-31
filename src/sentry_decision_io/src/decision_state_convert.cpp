@@ -20,8 +20,8 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
   msg.tactical_mode = static_cast<std::uint8_t>(output.tactical_mode);
   msg.stance = static_cast<std::uint8_t>(output.stance);
   msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
-  msg.resource_hp = static_cast<std::uint16_t>(output.resource.hp);
   msg.resource_revive = output.resource.revive;
+  msg.resource_instant_revive = output.resource.instant_revive;
   return msg;
 }
 

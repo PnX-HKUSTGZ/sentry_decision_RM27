@@ -2,19 +2,20 @@
 
 > 本文档与 `src/sentry_interfaces/msg/` 是「auto-aim ↔ 决策」接口的单一事实来源。
 > 范围：只定义**裁判上行 / 决策下行**这一条链路，不改动 auto-aim 内部的云台控制帧（`VisionToGimbal`）
-> 与导航接口（`NavToGimbalV2` / `/cmd_vel`）。串口字节布局的最终版本需与 MCU/电控确认。
+> 与导航接口（`NavToGimbalV2` / `/cmd_vel`）。串口字节布局的最终版本需与 MCU / 电控确认。
 
 ## 1. 目标
 
-- 上行：把裁判与自身/队友信息，从 auto-aim 统一成结构化消息发给决策，取代原来「一个标量一个话题」。
-- 下行：把决策动作统一成结构化命令发给 auto-aim，由 auto-aim 经串口转给 MCU。
-- 回执：MCU 执行结果经 auto-aim 以 `DecisionAck` 回传决策。
-- 文档化：字段、单位、来源、版本、校验、语义集中在这里。
+- **上行**：把裁判与自身 / 队友信息，从 auto-aim 统一成结构化消息发给决策，取代原来「一个标量一个话题」。
+- **下行**：把决策动作统一成结构化命令发给 auto-aim，由 auto-aim 经串口转给 MCU。
+- **不做回执**：MCU 只把动作转成裁判 `0x0120` 指令，不判断成功、不回传；决策侧用裁判 `0x020D` 上行
+  校验是否生效，未生效则重发（有次数上限）。下发值是累计目标值，重发天然幂等。
+- **文档化**：字段、单位、来源、版本、校验、语义集中在这里。
 
 ## 2. 分层与依赖
 
 ```text
-MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
+MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
                                │
                      sentry_interfaces (ROS 消息)
                                │
@@ -22,50 +23,44 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧)
 ```
 
 - auto-aim 拥有串口与 MCU 网关；`sentry_interfaces` 是 ROS 合同；决策只依赖该合同。
-- 本阶段接口包放在决策仓库 `src/sentry_interfaces`，未来如需可独立成仓库。
+- 接口包放在决策仓库 `src/sentry_interfaces`，未来如需可独立成仓库。
 
-## 3. 串口帧（版本化 + CRC）
+## 3. 串口帧（auto-aim ↔ MCU）
 
-统一帧格式，仅用于裁判/决策链路（低频率，控制帧不变）：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `magic` | uint8 | 固定 `0xAA` |
-| `version` | uint8 | 协议版本，v1 = `0x01` |
-| `type` | uint8 | 1 = RefereeUplink，2 = DecisionCommand，3 = DecisionAck |
-| `length` | uint16 | payload 字节数 |
-| `payload` | bytes | 版本化结构体 |
-| `crc16` | uint16 | CRC-16/MCRF4XX，覆盖 `version..payload`，与 auto-aim `tools::get_crc16` 一致 |
-
-v1 的完整字节布局（裁判上行字段、动作 `kind`、电平语义、频率、待确认项）见 auto-aim
+串口帧 v1 的完整字节布局（上行裁判、下行决策、CRC、频率与待确认项）是 auto-aim 侧的
+单一事实来源，见 auto-aim
 [`docs/serial_protocol.md` §2](https://github.com/PnX-HKUSTGZ/auto-aim-new/blob/sentry-decision-interface/docs/serial_protocol.md)。
+本文只记录与决策接口相关的约定：
 
-带宽：只承载裁判/决策的低频数据（裁判上行建议 10 Hz），IMU/云台/导航仍走原有高频帧，115200 足够。
+| 帧 | 方向 | `type` | 对应 ROS 消息 |
+| --- | --- | --- | --- |
+| `RefereeUplink` | MCU → auto-aim | `0x01` | `GameInfo` / `SentryInfoOnline` / `TeamInfo` |
+| `DecisionCommand` | 决策 → auto-aim → MCU | `0x02` | `DecisionCommand` |
 
-**当前**高频控制帧（`GimbalToVision` / `VisionToGimbal` / `NavToGimbalV2` / 旧 `DecisionToGimbal`）保持不变；
-校验同为 CRC-16/MCRF4XX，文档见同一 `serial_protocol.md`。
-
-另有 minco 导航栈的分帧协议（`navi_minco_bit/src/navigation/communication/include/utils/protocol.hpp` +
-`custom_protocol.hpp`），其 `GameInfo` / `SentryInfoOnline` / ... 数据体与我们的 5 条消息一一对应，可作为新帧设计参考；
-但它的校验是逐 2 字节求和且 `check()` 尚未完成，不直接复用。
+- 统一帧：`[magic=0xAA][version=0x01][type][length uint16][payload][crc16]`，
+  CRC-16/MCRF4XX 覆盖 `version..payload`，与 auto-aim `tools::get_crc16` 一致。
+- 带宽：只承载裁判 / 决策的低频数据（裁判上行建议 10 Hz）；IMU / 云台 / 导航仍走原有高频帧，115200 足够。
+- **现有高频控制帧不变**：`0x5A`（MCU → 上位机，54 B，含 IMU / 云台与裁判基础字段）、
+  `0xA5` / `0xA6`（上位机 → MCU，云台 / 底盘）；旧 `0xA7`（`ifreload`）已移除。
+- minco 导航栈的分帧协议（`navi_minco_bit/.../protocol.hpp`）数据体与我们的消息一一对应，可作参考，
+  但其校验为逐 2 字节求和且 `check()` 未完成，不直接复用。
 
 ## 4. 上行 ROS 消息（auto-aim 发布）
 
 | 话题 | 消息 | 关键字段 | 来源 |
 | --- | --- | --- | --- |
-| `/sentry/game_info` | `GameInfo` | 阶段、时间、金币、`event_code`、`detect_color`、`can_rebuild_outpost`、手动点、敌基地/前哨 | 裁判 |
-| `/sentry/online_info` | `SentryInfoOnline` | 自身血量/弹量/热量/能量、`sentry_info_1/2/3` | 裁判 |
+| `/sentry/game_info` | `GameInfo` | 阶段、时间、金币、`event_code`、`detect_color`、`can_rebuild_outpost`、手动点、敌基地 / 前哨 | 裁判 |
+| `/sentry/online_info` | `SentryInfoOnline` | 自身血量 / 弹量 / 热量 / 能量、`sentry_info_1/2/3` | 裁判 |
 | `/sentry/offline_info` | `SentryInfoOffline` | 视觉锁定、装甲板、电容 | auto-aim 视觉 / 本机 |
-| `/sentry/team_info` | `TeamInfo` | `allies[4]`、己方基地/前哨血量 | 裁判 |
-| `/sentry/decision_ack` | `DecisionAck` | `request_id`、`accepted`、`code`、`detail` | MCU 回执 |
+| `/sentry/team_info` | `TeamInfo` | `allies[4]`、己方基地 / 前哨血量 | 裁判 |
 
-`sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用 `core/referee_protocol.hpp` 解码
-（已按 2026 规则 / 通信协议补齐：场地事件全字段、兑换与复活、姿态与姿态剩余时长）。
-`detect_color` 为视觉/MCU 字段，裁判与通信协议文档中未定义编码，仍待 auto-aim 确认，当前留空。
-决策侧对每条上行字段的接收、单位与有效性判定见 `docs/BELIEF.md`。当前 `SentryInfoOffline` 的视觉锁定字段
-（`is_get` / `armor_pos` / `armor_num`）与 `TeamInfo.allies[4]` 尚未接入
-`EnemyState` / `WorldState.allies`，属于已知缺口；决策侧要求 `GameInfo` + `SentryInfoOnline`
-都出现过才判 `upstream.valid`。雷达 / 变形相关字段当前未启用，已从消息与代码移除。
+- `sentry_info_1/2/3` 与 `event_code` 是原始位段，由决策层用
+  `core/referee_protocol.hpp` 解码（已按 2027 通信协议 V1.0.0 的 0x020D 补齐）。
+- `sentry_info_1` 的 bit 0-10 / 11-14 / 15-18 是**累计值**（本场累计兑换发弹量 / 远程兑换次数），
+  是决策侧判断动作是否生效的依据。
+- `detect_color` 为视觉 / MCU 字段，裁判与通信协议文档中未定义编码，仍待 auto-aim 确认，当前只存不判。
+- 决策侧对每条上行字段的接收、单位与有效性判定见 [BELIEF.md](BELIEF.md)。
+- 雷达 / 变形相关字段当前未启用，已从消息与代码移除。
 
 ## 5. 下行 ROS 消息（决策发布）
 
@@ -73,67 +68,64 @@ v1 的完整字节布局（裁判上行字段、动作 `kind`、电平语义、�
 | --- | --- | --- |
 | `/sentry/decision_command` | `DecisionCommand` | 决策 → auto-aim |
 
-`DecisionCommand`：`header` + `request_id` + `DecisionAction action`。
+`DecisionCommand` = `header` + `request_id` + `DecisionAction action`。
 
 `DecisionAction`：
 
 | 字段 | 说明 |
 | --- | --- |
-| `kind` | 动作类型，见常量（兑换发弹/血量、确认免费复活、立即复活、远程兑换） |
-| `mode` | `MODE_ONE_SHOT` 或 `MODE_POLLED`，**配置动作时必须显式选择** |
-| `interval_ms` | 仅 `MODE_POLLED` 使用，按此间隔重发，而非每帧重发 |
-| `value` | 数量 / 次数，含义随 `kind` |
+| `kind` | 动作类型，见常量（兑换发弹、确认免费复活、立即复活、远程兑换） |
+| `value` | **0x0120 的累计目标值 / 电平位**，不是本次增量（见 §6） |
+
+`request_id` 只用于日志关联；同一目标的重试复用同一个 id。
 
 ## 6. 动作语义
 
-- **OneShot（边沿）**：决策侧只在「请求由无到有」时发一条命令；MCU 执行一次即完成，不应重复。
-- **Polled（轮询）**：决策侧按 `interval_ms` 周期性发送当前期望值；MCU 以最新一条为准，停止发送即按超时失效。
-  协议里属于**电平位**的动作（确认免费复活 / 兑换立即复活，`0x0120` bit 0 / bit 1）配置为 Polled，
-  由 `action.revive_poll_interval_ms` 控制重发间隔；其余兑换类动作是边沿触发，配置为 OneShot。
-- 每个 `DecisionCommand` 带唯一 `request_id`，MCU 执行后以 `DecisionAck` 回传同一个 `request_id`。
+裁判协议本身按「总量」结算：0x0120 bit 2-12 是「哨兵将要兑换的发弹量值」，从 0 改到 X 消耗 X 金币；
+同一个 X 重复下发不会再扣一次。因此决策侧下发的是累计目标值：
 
-## 7. 回执（ack）链路
+| `kind` | 动作 | 决策层增量 | 下发 `value` | 生效判据（0x020D） |
+| --- | --- | --- | --- | --- |
+| 1 | 本地兑换发弹量 | 本次买 N 发 | `当前累计 + N`，上限 1000（2027 表 5-7） | bit 0-10 ≥ 目标值 |
+| 2 | 确认免费复活 | 待复活 | 1（完成后发 0） | 血量从 0 变正 |
+| 3 | 兑换立即复活 | 待复活且可兑换 | 1（完成后发 0） | 血量从 0 变正 |
+| 4 | 远程兑换发弹量 | 本次 1 次 | `当前次数 + 1` | bit 11-14 ≥ 目标值 |
+| 5 | 远程兑换血量 | 本次 1 次 | `当前次数 + 1` | bit 15-18 ≥ 目标值 |
+
+- 发弹量 / 远程次数必须**单调递增**；远程次数协议要求每次只能 +1。
+- 复活是**电平位**：待复活期间按 `action.revive_verify_delay_ms` 持续置 1；复活完成或放弃后补发 0。
+- 决策侧在 `action.verify_delay_ms` 后用上表判据检查；未生效则重发同一目标，最多 `action.max_attempts` 次。
+  复活动作在拿到有效裁判数据前不会开始，避免无基线乱发。
+- 放弃后，只要同一个请求还在持续，就不再重试；请求消失或 `value` 变化后重新开始。
+
+## 7. 生效校验链路
 
 ```text
-决策 --DecisionCommand(request_id=N)--> auto-aim --串口--> MCU
-MCU --串口--> auto-aim --DecisionAck(request_id=N, accepted)--> 决策
+决策 --DecisionCommand(request_id=N, value=目标累计值)--> auto-aim --0x02--> MCU
+MCU --0x0120--> 裁判
+决策 <--0x020D(sentry_info_1 / self_hp)-- 裁判
 ```
 
-- 决策侧维护未确认命令表，超时未收到 ack 记 WARN（重发策略待定）。
-- `DecisionAck.code` 的取值表待与 MCU 约定；0 为成功。
+- MCU 不需要回执，也不需要判断成功；它只维护 0x0120 的字段状态并按节拍转发。
+- 决策侧 `ActionDispatcher` 维护「发送 → 等待 → 校验 → 重试 / 放弃」状态机。
+- 累计目标在同一局内单调不减；离开「比赛中」视为新一局，重置下界。
 
-**实现现状**：决策侧的 one-shot / polled / ack 状态机已实现于 core `ActionDispatcher`，并可用
-`DecisionActuatorSim` 在本地离线跑通闭环；`DecisionAck` 经 `RosIoNode::take_acks` 进入该状态机。
-auto-aim 侧已把 `Publish2DecisionMaking` 迁到 5 条 `sentry_interfaces` 消息，并新增
-`Subscribe2Decision` 订阅 `/sentry/decision_command`（当前仅记录，未写串口）。
-**待办（P2.3b）**：auto-aim 侧的串口字节帧与 `DecisionAck` 回传、动作 `code` 表、`detect_color` 编码，
-待与电控 / MCU 确认后再实现。
+## 8. 实现现状
 
-## 8. 与 auto-aim 现状的映射（Phase 1）
+| 环节 | 状态 |
+| --- | --- |
+| 决策侧订阅 4 条上行、发布 `DecisionCommand` | ✅ `RosIoNode` |
+| 决策侧校验 / 重试状态机（`ActionDispatcher`） | ✅ core + `DecisionActuatorSim` 离线闭环 |
+| auto-aim 上行（`Publish2DecisionMaking` 发布 4 条消息） | ✅ 已迁到 `sentry_interfaces` |
+| auto-aim 下行（`Subscribe2Decision`） | ✅ 收到命令按 v1 组帧经串口下发 |
+| auto-aim 串口字节帧 v1 | ✅ 帧收发已实现（见 `serial_protocol.md`） |
+| MCU 侧实现 v1 帧 | ⛔ 待电控 / MCU（当前面向上位机联调） |
+| `SentryInfoOffline` 视觉锁定字段接入决策 | ⛔ 待 auto-aim 侧补齐 |
+| `TeamInfo.allies[4]` 接入 `WorldState.allies` | ⛔ 待接入（见 [BELIEF.md](BELIEF.md) §7） |
 
-现有 `GimbalToVision` 可填的最小集合：
-
-| 目标消息 | 现有字段 | 结果 |
-| --- | --- | --- |
-| `GameInfo` | `game_start`、`enemy_baseHP`、`enemy_outpostHP`、`can_rebuild_outpost`、`detect_color` | 部分 |
-| `SentryInfoOnline` | `sentryHP`、`remain_ammo` | 部分 |
-| `TeamInfo` | `our_baseHP`、`our_outpostHP` | 部分 |
-| `SentryInfoOffline` | — | 全空 |
-| `DecisionAck` | — | 待新增 |
-
-其余字段需要扩展 MCU 上行帧；决策侧先按「有则填、无则默认」处理，不阻塞。
-
-## 9. 迁移阶段
-
-1. **接口定义**（本文档 + `sentry_interfaces` 消息）——本阶段。
-2. **决策侧**：`RosIoNode` 订阅 5 个上行消息、发布 `DecisionCommand`、订阅 `DecisionAck`；先填现有字段。
-3. **auto-aim 侧**：`Publish2DecisionMaking` 已迁到 5 个消息、新增 `Subscribe2Decision`；串口打包待 P2.3b。
-4. **MCU 侧**：确定字节布局、动作集合、ack 编码；扩展固件。
-5. **策略接入**：决策用 `DecisionCommand` 下发兑换/复活等。
-
-## 10. 未决项
+## 9. 未决项
 
 - `detect_color` 编码含义。
-- 下行动作集合、`value` 语义、`code` 取值表（与电控/MCU 确认）。
-- 串口帧的 `magic` / 字节布局 / 频率。
-- 是否纳入更多上行字段（金币、能力机关等）。
+- MCU 合并 0x0120 状态时的姿态位（bit 21-23）由谁维护。
+- 串口帧的 `magic` / 发送节拍是否最终确认。
+- 是否纳入更多上行字段（金币、能力机关、`sentry_info_3` / 电容 / 热量等）。

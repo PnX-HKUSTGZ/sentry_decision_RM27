@@ -1,5 +1,6 @@
-# 决策下发给下位机的统一命令（下行）。Phase 1 每个命令携带一个动作。
+# 决策下发给下位机的统一命令（下行）。每条命令只携带一个动作。
+# request_id 用于日志关联；同一目标的重试复用同一个 id（下发值是幂等的累计目标值）。
 std_msgs/Header header
 
-uint32 request_id    # 唯一请求号，用于与 DecisionAck 对应
+uint32 request_id
 DecisionAction action

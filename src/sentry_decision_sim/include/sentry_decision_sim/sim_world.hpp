@@ -16,7 +16,7 @@ struct PendingRemoteExchange {
   int remaining_ms = 0;  // 距离生效还剩的毫秒
 };
 
-// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区或己方基地血量 <2000 时每秒
+// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区增益点或己方基地血量 <4000 时每秒
 // +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
 struct RespawnState {
   bool pending = false;      // 处于待复活（战亡且未复活）状态
@@ -85,15 +85,15 @@ struct DecisionView {
   double nav_goal_y = 0.0;
   bool has_cmd_vel = false;
   int resource_ammo = 0;
-  int resource_hp = 0;
   bool resource_revive = false;
+  bool resource_instant_revive = false;
 };
 
 // 校验一个 expect 字段：满足返回 true；不满足或字段未知返回 false 并写 error。
 bool check_expect(const DecisionView& view, const std::string& field, const ScenarioValue& expected,
                   double tolerance, std::string* error);
 
-// 一次兑换对世界的改动结果，同时供动作回执 detail 使用。
+// 一次兑换对世界的改动结果，同时供拒绝日志 / 结算说明使用。
 struct ExchangeResult {
   bool accepted = false;
   int amount = 0;      // 实际写入量（发弹量 / 血量）
@@ -157,7 +157,7 @@ struct RespawnStepResult {
   int healed = 0;         // 本次恢复的血量
 };
 
-// 推进 1 秒复活读条；读条完成且已确认时以 10% 上限血复活。speed_up 为「补给区或基地 <2000 血」。
+// 推进 1 秒复活读条；读条完成且已确认时以 10% 上限血复活。speed_up 为「补给区或基地 <4000 血」。
 RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up);
 
 // ---- 增益点占领判定（裁判侧）----
@@ -201,20 +201,20 @@ void apply_occupancy(SimWorld* world, const Occupancy& occupancy);
 
 // ---- 裁判侧动作前置校验与结算 ----
 
-// 动作结算结果：accepted=false 时世界不变，detail 为拒绝原因（回执 + 日志）。
+// 动作结算结果：accepted=false 时世界不变，detail 为拒绝原因（写日志）。
 struct ActionOutcome {
   bool accepted = false;
   std::uint8_t code = 0;  // 0 成功 / 1 参数非法 / 2 前置条件不满足 / 3 金币不足
   std::string detail;
 };
 
-// 裁判侧结算一个决策动作（非法动作不改世界；调用前会先 sync_respawn 同步死活与 info1 位段）：
-//   kAmmoExchange       本地兑换发弹量：需占领增益点（表 5-8），1 金币/发
-//   kHpExchange         兑换血量：需脱战（规则 5.2.1 仅允许远程兑换），1 金币/点（简化）
-//   kFreeResurrect      需待复活；置 confirmed，读条完成即以 10% 上限血复活
-//   kInstantResurrect   需待复活、info1.can_instant_resurrect 且金币 >= 所需；回满血并累计次数
-//   kRemoteAmmoExchange 需脱战；value = 次数，150 金币/次、每次 +100 发
-//   kRemoteHpExchange   需脱战；value = 次数，按规则公式计费、+60% 上限血量
+// 裁判侧结算一个决策动作（非法动作不改世界；调用前会先 sync_respawn 同步死活与 info1 位段）。
+// value 一律是协议 0x0120 的累计目标值 / 电平位，重复下发幂等：
+//   kAmmoExchange       本地累计兑换发弹量（bit 2-12，单调递增），按增量扣金币、加弹量
+//   kFreeResurrect      电平 bit 0；1 = 确认复活（读条完成即复活），0 = 清除
+//   kInstantResurrect   电平 bit 1；1 = 兑换立即复活，0 = 清除
+//   kRemoteAmmoExchange 累计远程兑换次数（bit 13-16，每次仅 +1），150 金币/次、每次 +100 发
+//   kRemoteHpExchange   累计远程兑换次数（bit 17-20，每次仅 +1），按规则公式计费、+60% 上限血量
 ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAction& action,
                              int max_hp);
 

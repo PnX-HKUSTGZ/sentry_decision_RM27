@@ -30,7 +30,6 @@
 #include "sentry_decision_sim/scenario.hpp"
 #include "sentry_decision_sim/sim_config.hpp"
 #include "sentry_decision_sim/sim_world.hpp"
-#include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
 #include "sentry_interfaces/msg/sentry_info_offline.hpp"
@@ -102,8 +101,6 @@ sentry_decision::DecisionActionKind kind_from_msg(std::uint8_t kind) {
   switch (kind) {
     case M::KIND_AMMO_EXCHANGE:
       return K::kAmmoExchange;
-    case M::KIND_HP_EXCHANGE:
-      return K::kHpExchange;
     case M::KIND_FREE_RESURRECT:
       return K::kFreeResurrect;
     case M::KIND_INSTANT_RESURRECT:
@@ -121,16 +118,12 @@ sentry_decision::DecisionAction action_from_msg(
     const sentry_interfaces::msg::DecisionCommand& msg) {
   sentry_decision::DecisionAction action;
   action.kind = kind_from_msg(msg.action.kind);
-  action.mode = msg.action.mode == sentry_interfaces::msg::DecisionAction::MODE_POLLED
-                    ? sentry_decision::ActionMode::kPolled
-                    : sentry_decision::ActionMode::kOneShot;
-  action.interval = Duration{msg.action.interval_ms};
   action.value = msg.action.value;
   action.request_id = msg.request_id;
   return action;
 }
 
-// ROS 侧裁判仿真：发五条上行消息 + odom，提供 NavigateToPose action server 与动作回执，
+// ROS 侧裁判仿真：发四条上行消息 + odom，提供 NavigateToPose action server 与动作结算，
 // 可选按场景时间轴改世界并断言 /decision/state。ROS 无关的仿真状态与解析在 sim 库里。
 class RefereeSimNode : public rclcpp::Node {
  public:
@@ -165,7 +158,7 @@ class RefereeSimNode : public rclcpp::Node {
     start_pose_ = scenario_.start_pose.value_or(nav_.pose());
     nav_.set_pose(start_pose_);
     sim_pose_ = start_pose_;
-    // 动作执行端在回执时把兑换结算进仿真世界（扣金币、加血量/发弹量）。
+    // 动作执行端在延迟结束后把兑换结算进仿真世界（扣金币、加血量/发弹量）。
     actuator_.bind_world(&world_, max_hp_);
     last_stage_tick_ = SteadyClock::now();
     last_supply_tick_ = last_stage_tick_;
@@ -244,8 +237,6 @@ class RefereeSimNode : public rclcpp::Node {
         declare_parameter<std::string>("team_info_topic", "/sentry/team_info");
     const auto decision_command_topic =
         declare_parameter<std::string>("decision_command_topic", "/sentry/decision_command");
-    const auto decision_ack_topic =
-        declare_parameter<std::string>("decision_ack_topic", "/sentry/decision_ack");
     const auto decision_state_topic =
         declare_parameter<std::string>("decision_state_topic", "/decision/state");
     odom_topic_ = declare_parameter<std::string>("odom_topic", "/aft_mapped_to_init");
@@ -260,7 +251,6 @@ class RefereeSimNode : public rclcpp::Node {
         create_publisher<sentry_interfaces::msg::SentryInfoOffline>(offline_info_topic, 10);
     team_info_pub_ = create_publisher<sentry_interfaces::msg::TeamInfo>(team_info_topic, 10);
     odom_pub_ = create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
-    ack_pub_ = create_publisher<sentry_interfaces::msg::DecisionAck>(decision_ack_topic, 10);
 
     decision_command_sub_ = create_subscription<sentry_interfaces::msg::DecisionCommand>(
         decision_command_topic, 10, [this](sentry_interfaces::msg::DecisionCommand::SharedPtr msg) {
@@ -395,8 +385,8 @@ class RefereeSimNode : public rclcpp::Node {
     view.nav_goal_y = msg.output.nav_goal.y;
     view.has_cmd_vel = msg.output.has_cmd_vel;
     view.resource_ammo = msg.output.resource_ammo;
-    view.resource_hp = msg.output.resource_hp;
     view.resource_revive = msg.output.resource_revive;
+    view.resource_instant_revive = msg.output.resource_instant_revive;
     last_decision_ = view;
     has_decision_ = true;
     // 仿真近似：下位机执行决策姿态后，裁判上报的「当前姿态」应与期望一致
@@ -605,8 +595,8 @@ class RefereeSimNode : public rclcpp::Node {
       if (world_.self_hp > 0) {
         continue;
       }
-      // 规则 5.2.2：位于补给区或己方基地血量 <2000 时读条加速（每秒 +4）。
-      const bool speed_up = in_supply_zone() || world_.base_hp < 2000;
+      // 规则 5.2.2：位于补给区增益点或己方基地血量 <4000 时读条加速（每秒 +4）。
+      const bool speed_up = in_supply_zone() || world_.base_hp < 4000;
       const sentry_decision_sim::RespawnStepResult step =
           sentry_decision_sim::step_respawn(&world_, max_hp_, speed_up);
       if (step.revived) {
@@ -640,9 +630,6 @@ class RefereeSimNode : public rclcpp::Node {
     }
     update_occupancy();
     actuator_.update();
-    for (const auto& ack : actuator_.take_acks()) {
-      publish_ack(ack);
-    }
     step_remote_exchanges();
     step_game_stage();
     step_supply();
@@ -670,21 +657,6 @@ class RefereeSimNode : public rclcpp::Node {
       goal_handle_->abort(result);
       goal_handle_.reset();
     }
-  }
-
-  void publish_ack(const sentry_decision::ActionAck& ack) {
-    if (!ack.accepted) {
-      // 裁判系统是动作合法性的权威：拒绝时必须留下日志。
-      SD_LOG_WARN("sim", "裁判拒绝动作 request_id=%u code=%u %s", ack.request_id,
-                  static_cast<unsigned>(ack.code), ack.detail.c_str());
-    }
-    sentry_interfaces::msg::DecisionAck msg;
-    msg.header.stamp = now();
-    msg.request_id = ack.request_id;
-    msg.accepted = ack.accepted;
-    msg.code = ack.code;
-    msg.detail = ack.detail;
-    ack_pub_->publish(msg);
   }
 
   void publish_uplinks() {
@@ -903,7 +875,6 @@ class RefereeSimNode : public rclcpp::Node {
   rclcpp::Publisher<sentry_interfaces::msg::SentryInfoOffline>::SharedPtr offline_info_pub_;
   rclcpp::Publisher<sentry_interfaces::msg::TeamInfo>::SharedPtr team_info_pub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-  rclcpp::Publisher<sentry_interfaces::msg::DecisionAck>::SharedPtr ack_pub_;
   rclcpp::Subscription<sentry_interfaces::msg::DecisionCommand>::SharedPtr decision_command_sub_;
   rclcpp::Subscription<sentry_decision_msgs::msg::DecisionState>::SharedPtr decision_state_sub_;
   rclcpp::Service<sentry_decision_msgs::srv::SetGameStage>::SharedPtr set_game_stage_server_;

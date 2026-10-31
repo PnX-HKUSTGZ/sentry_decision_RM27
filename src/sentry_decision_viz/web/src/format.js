@@ -100,8 +100,8 @@ export function decisionToView(msg) {
     navGoalY: (out.nav_goal && out.nav_goal.y) || 0,
     hasCmdVel: !!out.has_cmd_vel,
     resourceAmmo: out.resource_ammo || 0,
-    resourceHp: out.resource_hp || 0,
     resourceRevive: !!out.resource_revive,
+    resourceInstantRevive: !!out.resource_instant_revive,
     conflictCount: msg.conflict_count || 0,
     warnings: msg.warnings || [],
   };

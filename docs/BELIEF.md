@@ -25,12 +25,12 @@ flowchart LR
   WS --> Tactical[战略 / 任务 / 技能 / BT]
 ```
 
-- **实机**：`RosIoNode`（`sentry_decision_io`）订阅 4 条上行 + odom + `DecisionAck`，
+- **实机**：`RosIoNode`（`sentry_decision_io`）订阅 4 条上行 + odom，
   `sentry_bridge` 把消息字段合并进 `UpstreamState`。
 - **本地仿真**：`referee_sim_node` 发同样的 4 条消息 + odom，`RosIoNode` 照常消费；
   离线 `decision_main` 用 ROS 无关的 `RefereeSimulator` + `NavSimulator`。
 - **回放**：`ReplaySource`（`sentry_decision_core/include/sentry_decision_core/replay.hpp`）按时刻回放同一批上游数据。
-- **串口字节层（P2.3b）尚未实现**：当前实机路径假设 MCU / 视觉侧已把数据发成上述 ROS 消息；
+- **串口字节层**：auto-aim 侧已实现 v1 帧收发，MCU 固件待实现；决策侧不接触串口，
   `sentry_interfaces` 是决策与 auto-aim 之间的契约，auto-aim ↔ MCU 的字节帧见
   `auto-aim-new/docs/serial_protocol.md` §2。
 
@@ -50,7 +50,7 @@ flowchart LR
 - `WorldModel` 分别对 upstream / odom / nav 按超时判定：默认 upstream 500ms、odom 500ms、nav 500ms
   （odom 可放宽以适配由点云回调驱动、约 10Hz 的 `/odometry`）。
 - `RosIoNode` 额外要求 **`GameInfo` 与 `SentryInfoOnline` 都出现过**才返回就绪
-  （`referee_sources_ready`）：只到其中一条时缺失字段会以默认 0 参与决策，可能被误判为「0 血 / 阵亡」。
+  （`upstream_sources_ready`）：只到其中一条时缺失字段会以默认 0 参与决策，可能被误判为「0 血 / 阵亡」。
 - `upstream.valid=false` 时 `SafetySupervisor` 触发急停（撤销导航目标 + 速度清零）。
 - 状态变化只打印一次（`upstream data stale / recovered` 等）。
 

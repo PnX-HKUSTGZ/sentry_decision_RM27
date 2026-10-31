@@ -1,11 +1,11 @@
 # 双仓库联调：导航接入决策本地仿真
 
-> 状态：实施中。决策分支 `v0.4.0`，导航仓库保持 `dock/jazzy` 不改代码。
+> 状态：已完成（v0.4.0 接入真实导航，v0.4.1 补齐位姿 / 重置）。导航仓库保持 `dock/jazzy` 不改代码。
 > 本文是「决策本地仿真 ↔ 真实导航栈」联调的设计与接口单一事实来源；实施进度见 `docs/NOTE.md`。
 
 ## 1. 目标与边界
 
-- **保持信念层的裁判仿真输入不变**：`/sentry/game_info` 等 5 条上行仍由 `referee_sim_node` 提供。
+- **保持信念层的裁判仿真输入不变**：`/sentry/game_info` 等 4 条上行仍由 `referee_sim_node` 提供。
 - **替换导航互动为真实逻辑**：决策下发的导航目标（`/navigate_to_pose`）、底盘速度（`/cmd_vel`）、
   以及导航回传的位姿，全部改由导航仓库（Gazebo + Point-LIO + Nav2）提供。
 - `tools/demo.sh` 一键运行，**兼容两种模式**：
@@ -19,12 +19,12 @@
 
 | 方向 | 决策侧 | 导航侧 | 坐标 / 类型 |
 | --- | --- | --- | --- |
-| 裁判上行 | `RosIoNode` 订阅 | `referee_sim_node` 发布 | `/sentry/game_info` 等 5 条（`sentry_interfaces`） |
+| 裁判上行 | `RosIoNode` 订阅 | `referee_sim_node` 发布 | `/sentry/game_info` 等 4 条（`sentry_interfaces`） |
 | 导航目标 | `RosIoNode::send_goal` | Nav2 `/bt_navigator` | action `/navigate_to_pose`，`map` 系 |
 | 位姿回传 | `RosIoNode` 订阅 | Point-LIO / loam_interface | `/odometry`（`odom` 系） |
 | 坐标变换 | 决策侧 tf2 | `map->odom` TF | `map` 系位姿 = TF(`map->odom`) ∘ odom 位姿 |
 | 底盘速度 | `RosIoNode::set_velocity` | `/cmd_vel` → Gazebo | `geometry_msgs/Twist` |
-| 决策下行 | `RosIoNode::send_action` | `referee_sim_node` 回 `DecisionAck` | `sentry_interfaces/DecisionCommand` |
+| 决策下行 | `RosIoNode::send_action` | `referee_sim_node` 结算进仿真世界，再用上行回填 | `sentry_interfaces/DecisionCommand` |
 
 导航侧定位由 `relocalization_manager` + `small_gicp` 完成：加载先验点云
 `RMUC2026.pcd` 与栅格地图 `RMUC2026.yaml`，匹配成功后发布 `map->odom`。
@@ -62,16 +62,16 @@
 6. **移除仿真暂停**（已完成）。
 7. **不纳入 CI**。
 
-## 4. 分步计划
+## 4. 实施结果
 
-| 步骤 | 内容 | 验收 |
+| 步骤 | 内容 | 结果 |
 | --- | --- | --- |
-| N1 | PCD 落位 + 容器验证真实重定位 | `/map` 正常、`map->base_footprint` ≈ 出生点、map 系目标规划成功 |
-| D1 | `decision_node` 支持 `--ros-args` | `--ros-args -p odom_topic:=/x` 正常启动 |
-| D2 | 决策 tf2 坐标变换 + 纯逻辑单测 | `odom_frame` 为空行为不变；给出 TF 时输出 map 系 |
-| D3 | `referee_sim_node` `provide_nav` 解耦 | 独立模式回归不变；双仓库模式不再抢 action server |
-| D4 | `tools/demo.sh --with-nav [--nav-silent]` | 一键起导航 + 决策；面板显示真实点位 |
-| D5 | 文档与 `CHANGELOG` | ARCHITECTURE / USAGE / BELIEF 同步 |
+| N1 | PCD 落位 + 容器验证真实重定位 | ✅ `/map` 正常、`map->base_footprint` ≈ 出生点、map 系目标规划成功（GICP `mean_error=0.01`） |
+| D1 | `decision_node` 支持 `--ros-args` | ✅ `--ros-args -p odom_topic:=/x` 正常启动 |
+| D2 | 决策 tf2 坐标变换 + 纯逻辑单测 | ✅ `odom_frame` 为空行为不变；给出 TF 时输出 map 系 |
+| D3 | `referee_sim_node` `provide_nav` 解耦 | ✅ 独立模式回归不变；双仓库模式不再抢 action server |
+| D4 | `tools/demo.sh --with-nav [--nav-silent]` | ✅ 一键起导航 + 决策；面板显示真实点位 |
+| D5 | 文档与 `CHANGELOG` | ✅ 已同步 |
 
 ## 5. 运行（目标形态）
 

@@ -47,8 +47,6 @@ std::uint8_t to_msg_kind(sentry_decision::DecisionActionKind kind) {
   switch (kind) {
     case K::kAmmoExchange:
       return sentry_interfaces::msg::DecisionAction::KIND_AMMO_EXCHANGE;
-    case K::kHpExchange:
-      return sentry_interfaces::msg::DecisionAction::KIND_HP_EXCHANGE;
     case K::kFreeResurrect:
       return sentry_interfaces::msg::DecisionAction::KIND_FREE_RESURRECT;
     case K::kInstantResurrect:
@@ -63,12 +61,6 @@ std::uint8_t to_msg_kind(sentry_decision::DecisionActionKind kind) {
   }
 }
 
-std::uint8_t to_msg_mode(sentry_decision::ActionMode mode) {
-  return mode == sentry_decision::ActionMode::kPolled
-             ? sentry_interfaces::msg::DecisionAction::MODE_POLLED
-             : sentry_interfaces::msg::DecisionAction::MODE_ONE_SHOT;
-}
-
 }  // namespace
 
 bool upstream_sources_ready(bool has_game_info, bool has_online_info) {
@@ -79,8 +71,6 @@ sentry_interfaces::msg::DecisionCommand to_msg(const sentry_decision::DecisionAc
   sentry_interfaces::msg::DecisionCommand msg;
   msg.request_id = action.request_id;
   msg.action.kind = to_msg_kind(action.kind);
-  msg.action.mode = to_msg_mode(action.mode);
-  msg.action.interval_ms = static_cast<std::uint16_t>(action.interval.count());
   msg.action.value = action.value;
   return msg;
 }

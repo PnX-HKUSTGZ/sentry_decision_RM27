@@ -2,7 +2,7 @@
 # 容器内冒烟：裁判系统按前置条件拒绝非法动作并打印日志。
 # 直接向下位机侧发 DecisionCommand，验证执行端校验（不经过决策内部干预）。
 #   - 本地兑换发弹量：不在增益点 -> 拒绝
-#   - 兑换血量：未脱战 -> 拒绝；脱战 -> 允许
+#   - 远程兑换血量：未脱战 -> 拒绝；脱战 -> 允许（value 为累计请求次数）
 set -euo pipefail
 
 export ROS_DOMAIN_ID="${REFEREE_GUARD_DOMAIN_ID:-47}"
@@ -47,12 +47,12 @@ set_world() {
     "{field: '$1', value: $2}" >/dev/null 2>&1 || true
 }
 
-# 直接发动作：kind 1 = 本地兑换发弹，kind 2 = 兑换血量（需脱战）。
+# 直接发动作：kind 1 = 本地兑换发弹，kind 5 = 远程兑换血量（需脱战）。
 request_seq=8100
 send_action() {
   request_seq=$((request_seq + 1))
   timeout 5 ros2 topic pub --once /sentry/decision_command sentry_interfaces/msg/DecisionCommand \
-    "{request_id: ${request_seq}, action: {kind: $1, mode: 0, interval_ms: 0, value: $2}}" \
+    "{request_id: ${request_seq}, action: {kind: $1, value: $2}}" \
     >/dev/null 2>&1 || true
 }
 
@@ -78,23 +78,23 @@ if [[ "${ammo_after}" != "10" ]]; then
 fi
 check_log "未占领可兑换增益点"
 
-# 2) 兑换血量：未脱战 -> 拒绝。
+# 2) 远程兑换血量：未脱战 -> 拒绝。
 set_world disengaged 0.0
-set_world self_hp 100.0
+set_world coins 500.0
 sleep 0.5
-send_action 2 50
+send_action 5 1
 sleep 2
 check_log "未脱战"
 
-# 3) 兑换血量：脱战 -> 允许，血量上升。
+# 3) 远程兑换血量：脱战 -> 允许，确认时立即扣金币（血量 6s 后才到账）。
 set_world disengaged 1.0
-set_world self_hp 100.0
+set_world coins 500.0
 sleep 0.5
-send_action 2 50
+send_action 5 1
 sleep 2
-hp_after="$(online_field self_health)"
-if [[ -z "${hp_after}" || "${hp_after}" -le 100 ]]; then
-  echo "FAIL: 脱战后兑换血量应生效（实际 ${hp_after}）" >&2
+coins_after="$(timeout 5 ros2 topic echo --once /sentry/game_info 2>/dev/null | awk '$1=="coin_remaining:"{print $2; exit}')"
+if [[ -z "${coins_after}" || "${coins_after}" -ge 500 ]]; then
+  echo "FAIL: 脱战后远程兑换血量应扣金币（实际 ${coins_after}）" >&2
   fail=1
 fi
 

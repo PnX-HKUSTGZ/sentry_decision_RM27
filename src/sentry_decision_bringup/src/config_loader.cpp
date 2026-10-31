@@ -43,8 +43,10 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"timeouts.upstream_ms", {true, true}},
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
-      {"action.one_shot_timeout_ms", {true, true}},
-      {"action.revive_poll_interval_ms", {true, true}},
+      {"action.verify_delay_ms", {true, true}},
+      {"action.max_attempts", {true, true}},
+      {"action.revive_verify_delay_ms", {true, true}},
+      {"action.revive_max_attempts", {true, true}},
   };
   return rules;
 }

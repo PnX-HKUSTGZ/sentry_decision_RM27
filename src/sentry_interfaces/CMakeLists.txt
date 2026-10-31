@@ -19,7 +19,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AllyRobotStatus.msg"
   "msg/RadarInfo.msg"
   "msg/EnemyRobotStatus.msg"
-  "msg/DecisionAck.msg"
   "msg/DecisionAction.msg"
   "msg/DecisionCommand.msg"
   DEPENDENCIES std_msgs geometry_msgs)

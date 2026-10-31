@@ -19,253 +19,312 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
-DecisionAction make_action(DecisionActionKind kind, ActionMode mode, int value,
-                           Duration interval = Duration{0}) {
+ActionDispatcherConfig make_config(Duration verify = Duration{100}, int max_attempts = 3,
+                                   Duration revive = Duration{100},
+                                   int revive_max_attempts = 0) {
+  return ActionDispatcherConfig{verify, max_attempts, revive, revive_max_attempts};
+}
+
+DecisionAction make_action(DecisionActionKind kind, int value) {
   DecisionAction action;
   action.kind = kind;
-  action.mode = mode;
   action.value = value;
-  action.interval = interval;
   return action;
 }
 
-void test_one_shot_sends_once() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
-  const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kAmmoExchange, ActionMode::kOneShot, 50);
+UpstreamState make_upstream() {
+  UpstreamState state;
+  state.valid = true;
+  state.self_hp = 400;
+  state.game_status = GameStatus::kRunning;  // 累计值只在比赛中单调递增
+  return state;
+}
 
-  dispatcher.submit(action);
-  auto outgoing = dispatcher.poll(t0);
+// 生效判据：兑换看 0x020D 累计值，复活看血量从 0 变正。
+void test_action_effective() {
+  UpstreamState baseline = make_upstream();
+  UpstreamState now = baseline;
+  now.info1.ammo_exchanged_local = 149;
+  CHECK(!action_effective(DecisionActionKind::kAmmoExchange, 150, baseline, now));
+  now.info1.ammo_exchanged_local = 150;
+  CHECK(action_effective(DecisionActionKind::kAmmoExchange, 150, baseline, now));
+
+  now.info1.remote_ammo_exchange_count = 2;
+  CHECK(!action_effective(DecisionActionKind::kRemoteAmmoExchange, 3, baseline, now));
+  CHECK(action_effective(DecisionActionKind::kRemoteAmmoExchange, 2, baseline, now));
+  now.info1.remote_health_exchange_count = 1;
+  CHECK(action_effective(DecisionActionKind::kRemoteHpExchange, 1, baseline, now));
+
+  UpstreamState dead = make_upstream();
+  dead.self_hp = 0;
+  UpstreamState alive = dead;
+  alive.self_hp = 40;
+  CHECK(!action_effective(DecisionActionKind::kFreeResurrect, 1, dead, dead));
+  CHECK(action_effective(DecisionActionKind::kFreeResurrect, 1, dead, alive));
+  CHECK(!action_effective(DecisionActionKind::kFreeResurrect, 1, alive, alive));
+  CHECK(action_effective(DecisionActionKind::kInstantResurrect, 1, dead, alive));
+}
+
+// 增量 -> 累计目标值：baseline 100 + 50 = 150。
+void test_delta_becomes_cumulative_target() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.info1.ammo_exchanged_local = 100;
+  const TimePoint t0{};
+
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  const auto outgoing = dispatcher.poll(t0, &upstream);
   CHECK(outgoing.size() == 1);
-  CHECK(outgoing[0].value == 50);
+  CHECK(outgoing[0].value == 150);
   CHECK(outgoing[0].request_id != 0);
-
-  // 持续提交同一请求：不重发。
-  dispatcher.submit(action);
-  outgoing = dispatcher.poll(t0 + Duration{50});
-  CHECK(outgoing.empty());
-
-  // 收到 ack 后，同值仍不重发。
-  ActionAck ack;
-  ack.request_id = 1;
-  ack.accepted = true;
-  dispatcher.on_ack(ack);
-  dispatcher.submit(action);
-  outgoing = dispatcher.poll(t0 + Duration{100});
-  CHECK(outgoing.empty());
-
-  // 值变化 -> 新请求。
-  const DecisionAction changed =
-      make_action(DecisionActionKind::kAmmoExchange, ActionMode::kOneShot, 100);
-  dispatcher.submit(changed);
-  outgoing = dispatcher.poll(t0 + Duration{150});
-  CHECK(outgoing.size() == 1);
-  CHECK(outgoing[0].value == 100);
-  CHECK(outgoing[0].request_id == 2);
 }
 
-// 停止提交后再提交同值，视为新请求（由无到有）。
-void test_one_shot_rearms_after_gap() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+// 生效后不再重发，并产生 effective 报告。
+void test_verify_stops_resend() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.info1.remote_ammo_exchange_count = 0;
   const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kFreeResurrect, ActionMode::kOneShot, 0);
 
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
-  // 停止提交：条目被清理。
-  CHECK(dispatcher.poll(t0 + Duration{50}).empty());
-  // 再次提交同值 -> 重新发送。
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{100}).size() == 1);
+  dispatcher.submit(make_action(DecisionActionKind::kRemoteAmmoExchange, 1));
+  const auto first = dispatcher.poll(t0, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 1);
+
+  dispatcher.submit(make_action(DecisionActionKind::kRemoteAmmoExchange, 1));
+  CHECK(dispatcher.poll(t0 + Duration{99}, &upstream).empty());
+
+  upstream.info1.remote_ammo_exchange_count = 1;
+  dispatcher.submit(make_action(DecisionActionKind::kRemoteAmmoExchange, 1));
+  CHECK(dispatcher.poll(t0 + Duration{100}, &upstream).empty());
+  const auto report = dispatcher.last_report();
+  CHECK(report.has_value());
+  CHECK(report->effective);
+  CHECK(report->attempts == 1);
 }
 
-// 人工重复触发：rearm 清除 one-shot 记忆后，同值可再次发送。
-void test_rearm_allows_same_value_again() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+// 未生效：按间隔重发同一目标（同一 request_id），达到上限后放弃。
+void test_retry_then_give_up() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.info1.ammo_exchanged_local = 0;
   const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kAmmoExchange, ActionMode::kOneShot, 50);
+
+  const DecisionAction action = make_action(DecisionActionKind::kAmmoExchange, 50);
+  dispatcher.submit(action);
+  const auto first = dispatcher.poll(t0, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 50);
 
   dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{50}).empty());
+  CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
 
-  dispatcher.rearm(DecisionActionKind::kAmmoExchange);
   dispatcher.submit(action);
-  const auto outgoing = dispatcher.poll(t0 + Duration{100});
-  CHECK(outgoing.size() == 1);
-  CHECK(outgoing[0].value == 50);
+  const auto second = dispatcher.poll(t0 + Duration{100}, &upstream);
+  CHECK(second.size() == 1);
+  CHECK(second[0].value == 50);
+  CHECK(second[0].request_id == first[0].request_id);
+
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0 + Duration{200}, &upstream).size() == 1);
+
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0 + Duration{300}, &upstream).empty());
+  const auto report = dispatcher.last_report();
+  CHECK(report.has_value());
+  CHECK(!report->effective);
+  CHECK(report->attempts == 3);
+
+  // 放弃后，只要请求还在就不再重试。
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0 + Duration{1000}, &upstream).empty());
 }
 
-void test_polled_resends_at_interval() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+// 裁判数据无效时暂停：不开始、不判定、不重发。
+void test_invalid_upstream_pauses() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.valid = false;
+  upstream.info1.ammo_exchanged_local = 0;
   const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kRemoteAmmoExchange, ActionMode::kPolled, 1, Duration{100});
 
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  CHECK(dispatcher.poll(t0, &upstream).empty());
 
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{50}).empty());
+  upstream.valid = true;
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  const auto first = dispatcher.poll(t0 + Duration{50}, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 50);
 
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{100}).size() == 1);
+  upstream.valid = false;
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  CHECK(dispatcher.poll(t0 + Duration{500}, &upstream).empty());
 
-  // 停止提交 -> 停止重发。
-  CHECK(dispatcher.poll(t0 + Duration{200}).empty());
+  upstream.valid = true;
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  CHECK(dispatcher.poll(t0 + Duration{600}, &upstream).size() == 1);
 }
 
-void test_polled_zero_interval_every_tick() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+// 请求值变化 -> 新一段请求：按当时的累计值重新折算，并使用新的 request_id。
+void test_value_change_starts_new_series() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.info1.ammo_exchanged_local = 100;
   const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kRemoteHpExchange, ActionMode::kPolled, 1, Duration{0});
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
+
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  const auto first = dispatcher.poll(t0, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 150);
+
+  // 上一段已经生效，累计值变为 150；决策层又请求 20。
+  upstream.info1.ammo_exchanged_local = 150;
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 20));
+  const auto second = dispatcher.poll(t0 + Duration{200}, &upstream);
+  CHECK(second.size() == 1);
+  CHECK(second[0].value == 170);
+  CHECK(second[0].request_id != first[0].request_id);
 }
 
-void test_one_shot_timeout_warns() {
-  auto sink = std::make_shared<MemorySink>();
-  Logger::instance().clear_sinks();
-  Logger::instance().add_full_sink(sink);
-  Logger::instance().set_full_min_level(LogLevel::kWarn);
-
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{100}, Duration{0}});
+// 累计目标只增不减：上行回退到旧值时，下界仍取历史最大值。
+void test_target_never_decreases() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.info1.ammo_exchanged_local = 100;
   const TimePoint t0{};
-  const DecisionAction action =
-      make_action(DecisionActionKind::kHpExchange, ActionMode::kOneShot, 30);
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0).size() == 1);
 
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{150}).empty());
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  const auto first = dispatcher.poll(t0, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 150);
 
-  bool warned = false;
-  for (const auto& record : sink->records()) {
-    if (record.level == LogLevel::kWarn && record.message.find("超时未确认") != std::string::npos) {
-      warned = true;
-    }
+  // 停止提交，条目清除；上行仍是旧值 100。
+  CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
+  dispatcher.submit(make_action(DecisionActionKind::kAmmoExchange, 50));
+  const auto second = dispatcher.poll(t0 + Duration{100}, &upstream);
+  CHECK(second.size() == 1);
+  CHECK(second[0].value == 200);  // 不回到 150，避免协议要求的非法回退
+}
+
+// 免费复活：读条期间无限重发 1；复活后补发 0 清零。
+void test_free_resurrect_is_level_until_alive() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.self_hp = 0;
+  upstream.info1.can_free_resurrect = true;
+  const TimePoint t0{};
+
+  const DecisionAction action = make_action(DecisionActionKind::kFreeResurrect, 1);
+  dispatcher.submit(action);
+  const auto first = dispatcher.poll(t0, &upstream);
+  CHECK(first.size() == 1);
+  CHECK(first[0].value == 1);
+
+  // 免费复活不限次数：超过普通上限（3）后仍持续置位。
+  for (int i = 1; i <= 5; ++i) {
+    dispatcher.submit(action);
+    const auto again = dispatcher.poll(t0 + Duration{100} * i, &upstream);
+    CHECK(again.size() == 1);
+    CHECK(again[0].value == 1);
   }
-  CHECK(warned);
 
-  Logger::instance().clear_sinks();
+  upstream.self_hp = 40;
+  dispatcher.submit(action);
+  const auto third = dispatcher.poll(t0 + Duration{600}, &upstream);
+  CHECK(third.size() == 1);
+  CHECK(third[0].value == 0);  // 清零
+  CHECK(third[0].request_id != first[0].request_id);
+  const auto report = dispatcher.last_report();
+  CHECK(report.has_value());
+  CHECK(report->effective);
+  CHECK(report->attempts == 6);
+
+  // 已清零：请求消失时不再重复补发。
+  CHECK(dispatcher.poll(t0 + Duration{650}, &upstream).empty());
 }
 
-void test_unknown_ack_warns() {
-  auto sink = std::make_shared<MemorySink>();
-  Logger::instance().clear_sinks();
-  Logger::instance().add_full_sink(sink);
-  Logger::instance().set_full_min_level(LogLevel::kWarn);
+// 电平动作在请求消失时也要清零。
+void test_level_cleared_when_request_disappears() {
+  ActionDispatcher dispatcher(make_config());
+  UpstreamState upstream = make_upstream();
+  upstream.self_hp = 0;
+  upstream.info1.can_free_resurrect = true;
+  const TimePoint t0{};
 
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
-  ActionAck ack;
-  ack.request_id = 999;
-  dispatcher.on_ack(ack);
+  dispatcher.submit(make_action(DecisionActionKind::kFreeResurrect, 1));
+  CHECK(dispatcher.poll(t0, &upstream).size() == 1);
 
-  bool warned = false;
-  for (const auto& record : sink->records()) {
-    if (record.message.find("未知 request_id") != std::string::npos) {
-      warned = true;
-    }
-  }
-  CHECK(warned);
-  Logger::instance().clear_sinks();
+  const auto cleared = dispatcher.poll(t0 + Duration{50}, &upstream);
+  CHECK(cleared.size() == 1);
+  CHECK(cleared[0].value == 0);
 }
 
-// 资源请求 -> 动作类型映射：远程 / 立即复活分别落到对应 kind，立即复活优先。
+// 不校验模式（回放 / 无裁判数据）：每次由无到有只发一次。
+void test_null_upstream_sends_once() {
+  ActionDispatcher dispatcher(make_config());
+  const TimePoint t0{};
+  const DecisionAction action = make_action(DecisionActionKind::kAmmoExchange, 50);
+
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0, nullptr).size() == 1);
+  dispatcher.submit(action);
+  CHECK(dispatcher.poll(t0 + Duration{500}, nullptr).empty());
+}
+
+// 资源请求 -> 动作映射：复活优先，兑换按增量提交。
 void test_submit_resource_requests_maps_kinds() {
   const TimePoint t0{};
+  UpstreamState upstream = make_upstream();
+  upstream.info1.ammo_exchanged_local = 10;
+  upstream.info1.remote_ammo_exchange_count = 2;
+  upstream.info1.remote_health_exchange_count = 3;
+
   {
-    ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+    ActionDispatcher dispatcher(make_config());
     ResourceRequest request;
-    request.remote_hp = 2;
-    submit_resource_requests(dispatcher, request);
-    const auto out = dispatcher.poll(t0);
-    CHECK(out.size() == 1);
-    CHECK(out[0].kind == DecisionActionKind::kRemoteHpExchange);
-    CHECK(out[0].value == 2);
-  }
-  {
-    ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
-    ResourceRequest request;
+    request.ammo = 50;
     request.remote_ammo = 1;
+    request.remote_hp = 1;
     submit_resource_requests(dispatcher, request);
-    const auto out = dispatcher.poll(t0);
-    CHECK(out.size() == 1);
-    CHECK(out[0].kind == DecisionActionKind::kRemoteAmmoExchange);
-    CHECK(out[0].value == 1);
+    const auto out = dispatcher.poll(t0, &upstream);
+    CHECK(out.size() == 3);
+    CHECK(out[0].kind == DecisionActionKind::kAmmoExchange);
+    CHECK(out[0].value == 60);
+    CHECK(out[1].kind == DecisionActionKind::kRemoteAmmoExchange);
+    CHECK(out[1].value == 3);
+    CHECK(out[2].kind == DecisionActionKind::kRemoteHpExchange);
+    CHECK(out[2].value == 4);
   }
   {
-    ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
+    ActionDispatcher dispatcher(make_config());
     ResourceRequest request;
     request.instant_revive = true;
     request.revive = true;  // 互斥：立即复活优先
+    UpstreamState dead = upstream;
+    dead.self_hp = 0;
     submit_resource_requests(dispatcher, request);
-    const auto out = dispatcher.poll(t0);
+    const auto out = dispatcher.poll(t0, &dead);
     CHECK(out.size() == 1);
     CHECK(out[0].kind == DecisionActionKind::kInstantResurrect);
+    CHECK(out[0].value == 1);
   }
-  {
-    ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
-    ResourceRequest request;
-    request.ammo = 50;
-    request.hp = 30;  // 人工注入的本地血量兑换仍可下发（规则上仅用于调试）
-    submit_resource_requests(dispatcher, request);
-    CHECK(dispatcher.poll(t0).size() == 2);
-  }
-}
-
-// 复活动作是协议电平位：资源请求落成 kPolled，并按配置间隔重发。
-void test_revive_is_polled_with_interval() {
-  const TimePoint t0{};
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{200}});
-  ResourceRequest request;
-  request.revive = true;
-  submit_resource_requests(dispatcher, request);
-  const auto first = dispatcher.poll(t0);
-  CHECK(first.size() == 1);
-  CHECK(first[0].kind == DecisionActionKind::kFreeResurrect);
-  CHECK(first[0].mode == ActionMode::kPolled);
-  CHECK(first[0].interval == Duration{200});
-
-  // 间隔内不重发，超过间隔后重发新 request_id。
-  submit_resource_requests(dispatcher, request);
-  CHECK(dispatcher.poll(t0 + Duration{100}).empty());
-  submit_resource_requests(dispatcher, request);
-  const auto again = dispatcher.poll(t0 + Duration{200});
-  CHECK(again.size() == 1);
-  CHECK(again[0].request_id != first[0].request_id);
-
-  // 立即复活优先，同样落成 kPolled。
-  ActionDispatcher instant(ActionDispatcherConfig{Duration{500}, Duration{200}});
-  ResourceRequest both;
-  both.instant_revive = true;
-  both.revive = true;
-  submit_resource_requests(instant, both);
-  const auto out = instant.poll(t0);
-  CHECK(out.size() == 1);
-  CHECK(out[0].kind == DecisionActionKind::kInstantResurrect);
-  CHECK(out[0].mode == ActionMode::kPolled);
 }
 
 }  // namespace
 
 int main() {
+  test_action_effective();
+  test_delta_becomes_cumulative_target();
+  test_verify_stops_resend();
+  test_retry_then_give_up();
+  test_invalid_upstream_pauses();
+  test_value_change_starts_new_series();
+  test_target_never_decreases();
+  test_free_resurrect_is_level_until_alive();
+  test_level_cleared_when_request_disappears();
+  test_null_upstream_sends_once();
   test_submit_resource_requests_maps_kinds();
-  test_revive_is_polled_with_interval();
-  test_one_shot_sends_once();
-  test_one_shot_rearms_after_gap();
-  test_rearm_allows_same_value_again();
-  test_polled_resends_at_interval();
-  test_polled_zero_interval_every_tick();
-  test_one_shot_timeout_warns();
-  test_unknown_ack_warns();
   if (g_failures == 0) {
     std::printf("all action dispatcher tests passed\n");
     return 0;

@@ -86,16 +86,16 @@ sleep 1
 ammo0="$(online_field bullets_remaining)"
 coin0="$(game_field coin_remaining)"
 
-# 直接向下位机侧发一次本地兑换发弹动作（kind 1 = 本地兑换发弹，value = 发数）。
+# 直接向下位机侧发本地兑换发弹动作（kind 1，value = 本场累计兑换发数）。
 exchange_seq=8000
 inject_exchange() {
   exchange_seq=$((exchange_seq + 1))
   timeout 5 ros2 topic pub --once /sentry/decision_command sentry_interfaces/msg/DecisionCommand \
-    "{request_id: ${exchange_seq}, action: {kind: 1, mode: 0, interval_ms: 0, value: 50}}" \
+    "{request_id: ${exchange_seq}, action: {kind: 1, value: $1}}" \
     >/dev/null 2>&1 || true
 }
 
-inject_exchange
+inject_exchange 50
 sleep 2
 
 ammo1="$(online_field bullets_remaining)"
@@ -109,8 +109,8 @@ if [[ -z "${coin1}" || $((coin0 - coin1)) -ne 50 ]]; then
   fail=1
 fi
 
-# 再次发起兑换：应再次结算。
-inject_exchange
+# 再次发起兑换：把累计目标提高到 100，只按增量再结算 50。
+inject_exchange 100
 sleep 2
 ammo2="$(online_field bullets_remaining)"
 coin2="$(game_field coin_remaining)"
@@ -130,7 +130,7 @@ set_world sentry_info_2 1.0
 sleep 0.5
 remote_before="$(online_field bullets_remaining)"
 timeout 5 ros2 topic pub --once /sentry/decision_command sentry_interfaces/msg/DecisionCommand \
-  "{request_id: 9001, action: {kind: 5, mode: 0, interval_ms: 0, value: 1}}" >/dev/null 2>&1 || true
+  "{request_id: 9001, action: {kind: 4, value: 1}}" >/dev/null 2>&1 || true
 sleep 2
 remote_mid="$(online_field bullets_remaining)"
 if [[ -z "${remote_mid}" || "${remote_mid}" -ne "${remote_before}" ]]; then

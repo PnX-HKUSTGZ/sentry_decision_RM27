@@ -234,12 +234,9 @@ int main(int argc, char** argv) {
       navigation.cancel_goal();
     }
 
-    // 决策动作：本地模拟执行端回执，离线跑通 one-shot / ack 闭环。
-    for (const auto& ack : actuator.take_acks()) {
-      dispatcher.on_ack(ack);
-    }
+    // 本地仿真没有裁判上行回填，按「不校验」模式只下发一次。
     sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
-    for (const auto& action : dispatcher.poll(now)) {
+    for (const auto& action : dispatcher.poll(now, nullptr)) {
       actuator.send_action(action);
     }
     actuator.update();

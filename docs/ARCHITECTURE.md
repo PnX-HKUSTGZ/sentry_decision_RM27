@@ -101,16 +101,17 @@ struct WorldState {
 
 裁判消息中「未解码」的原始整数（`event_code`、`sentry_info_1/2/3`）不直接进决策，而是先经
 `core/referee_protocol.hpp` 的纯函数拆成具名位段（`EventCode`、`SentryInfo1/2/3`），再写入 `UpstreamState`。
-位段依据 2026 比赛规则手册 V2.2.0 与通信协议 V2.0.0；姿态（`info2.stance` / `info3` 剩余时长）为规则
+位段依据 2027 比赛规则手册 V1.0.0 与通信协议 V1.0.0；姿态（`info2.stance` / `info3` 剩余时长）为规则
 5.6.4 的有效机制，决策当前不使用，仅做完整解码与观测。
 位段定义集中在这一处，协议变更只改这里，并配套 `test/test_referee_protocol.cpp` 单测；io 适配器只负责
 把消息字段喂给解码函数，不内联位运算。
 
-### 4.1 下位机通信（P2.3b 待实现）
+### 4.1 下位机通信
 
 裁判系统与下位机传感器信息由下位机（MCU）统一采集，决策侧不直接接触串口；auto-aim 独占串口并在
 ROS 图上收发。`sentry_interfaces` 是决策 ↔ auto-aim 的契约，auto-aim ↔ MCU 的字节帧 v1 见
-`auto-aim-new/docs/serial_protocol.md` §2。`WorldState` 字段与消息的映射：
+`auto-aim-new/docs/serial_protocol.md` §2。auto-aim 侧的 v1 收发（`RefereeUplink` /
+`DecisionCommand`）已实现，MCU 固件待实现。`WorldState` 字段与消息的映射：
 
 | 消息 | 对应子状态 | 备注 |
 | --- | --- | --- |
@@ -121,10 +122,14 @@ ROS 图上收发。`sentry_interfaces` 是决策 ↔ auto-aim 的契约，auto-a
 
 雷达 / 变形 / 隧道相关字段当前未启用，已从协议与信念层移除，待需要时再补充。
 
-下行指令的语义（待通信包确定后落地）：
+下行指令的语义（已在 auto-aim 侧落地，串口 v1 动作 `kind` 表见 `serial_protocol.md` §2.3）：
 
-- 每个动作在配置时**必须显式选择** `kOneShot`（一次性，如兑换一次发弹量）或 `kPolled`（轮询，如确认复活）；
-- `kPolled` 动作带**轮询间隔**，按间隔重发而非每帧重发；`kOneShot` 边沿触发，发送成功后消费，不重复执行。
+- 下行值是裁判 0x0120 要求的**累计目标值 / 电平位**，不是本次增量：本地兑换发弹量 = 本场累计兑换量，
+  远程兑换 = 累计请求次数，复活 = bit 0 / bit 1 的 0 或 1。重复下发同一目标是幂等的。
+- MCU **只转发**：维护一份 4 字节 0x0120 状态并更新对应字段，不回执、不判断成功。
+- 决策侧 `ActionDispatcher` 发出后等 `action.verify_delay_ms`，用 0x020D 的累计值 / 血量判断是否生效；
+  未生效重发同一目标，最多 `action.max_attempts` 次；复活动作按 `action.revive_verify_delay_ms`
+  持续置位，完成或放弃后补发 0 清零。
 
 IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用，作为 `SelfState.imu` 保留。
 
@@ -149,7 +154,7 @@ struct DecisionOutput {
   std::optional<Twist>   safe_cmd_vel;
   ResourceRequest        resource;
   TacticalMode           tactical_mode;
-  SentryStance           stance;   // 期望物理姿态（2026 规则 §5.6.4）
+  SentryStance           stance;   // 期望物理姿态（2027 规则 §5.6.4）
   TimePoint              stamp;
   // 各字段的 owner 与默认值见第 9 节
 };
@@ -194,8 +199,8 @@ flowchart TD
   NODES --> CORE
   NODES -->|仅调用抽象接口| IO
   IO --> CORE
-  VIZ[viz 后续] --> CORE
-  SIM[sim 后续] --> IO
+  VIZ[viz] -.只读.-> CORE
+  SIM[sim] --> IO
 ```
 
 关键约束：行为树节点不得直接创建 ROS 节点或订阅。所有 I/O 集中在 `io` 的单一节点（建议 `rclcpp_components`），
@@ -442,9 +447,10 @@ P2 落地：`nav_policy` 表现为 `tree/mission/nav/`（任务选择）+ `tree/
 核心实现：`core/replay.hpp` 定义与 ROS 解耦的 `ReplayData`（带仿真时间戳的输入记录）与 `ReplaySource`
 （固定步长推进、按时间取最近记录、时间戳 = `epoch + at`）。`ReplaySource` 同时实现 `UpstreamSource` /
 `OdometrySource` / `NavigationSink`，可直接驱动 `WorldModel`，并统计决策下发的目标数用于回归断言。
-rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 `ReplayData`，默认映射旧仓库
-的简单话题（`/ifhealth`、`/remain_ammo`、`/our_base_health`、`/our_outpost_health`、
-`/enemy_outpost_health`、`/can_rebuild_outpost`、`/odom`）；core 回放不依赖任何 ROS 类型，确定性由宿主单测覆盖。
+rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 `ReplayData`，读取新格式的
+`/sentry/*` 上行（同时兼容旧仓库的标量话题 `/ifhealth`、`/remain_ammo`、`/our_base_health`、
+`/our_outpost_health`、`/enemy_outpost_health`、`/can_rebuild_outpost`、`/odom`）；
+core 回放不依赖任何 ROS 类型，确定性由宿主单测覆盖。
 
 测试金字塔：
 
@@ -456,7 +462,7 @@ rosbag 读取由 io 适配器 `load_replay_data`（`rosbag2_cpp`）负责填充 
 
 ## 14. 可视化与仿真
 
-目标：让决策过程可观测、可手动干预、可赛后回放（对应 `docs/ROADMAP.md` P3）。
+目标：让决策过程可观测、可受控干预、可赛后回放（对应 `docs/ROADMAP.md` P3）。
 可视化只**读取**决策数据；战术层覆盖与仿真世界干预都走受控入口，不绕过安全。
 
 ### 14.1 包与边界
@@ -504,7 +510,7 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 
 | command | args | 作用 |
 | --- | --- | --- |
-| `list_state` | — | 返回 `points`（含半径）/ `resource` / `last_action` / `last_ack` / `safety_emergency` / `tactical_override` 的 JSON 快照，供面板渲染 |
+| `list_state` | — | 返回 `points`（含半径）/ `resource` / `last_action` / `last_action_report` / `safety_emergency` / `tactical_override` 的 JSON 快照，供面板渲染 |
 | `set_tactical_mode` | `{mode, lease_sec}` | 设置战术层覆盖，`lease_sec` 为 `0` 表示不过期 |
 | `clear_tactical_mode` | — | 清除战术层覆盖 |
 
@@ -517,12 +523,13 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
 
 - 发布 `sentry_interfaces` 的四条上行消息，驱动 `decision_node`；
 - `provide_nav=true`（默认）时内嵌 `NavSimulator` 作为 `NavigateToPose` action server 并发布 odom，
-  在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 回 `DecisionAck`，形成完整闭环；
+  在收到 `DecisionCommand` 后用 `DecisionActuatorSim` 结算进仿真世界，再由上行消息把效果回填给决策，
+  形成与实车一致的「下发 → 观测 → 校验」闭环；
 - `provide_nav=false` 时不自建导航 action server、不发 odom，改用 `/decision/world_state` 的 map 系位姿做
   补给区 / 占位判定，导航由真实 Nav2（双仓库联调）提供；此时重置无法瞬移真实机器人，改为用
   `NavigateToPose` **客户端**下发一个回起点目标（坐标来自 `config/sim.yaml` 的 `nav_start` 命名点）；
 - **动作前置校验**：执行端 `execute_action()` 是动作合法性的权威，校验通过才会改世界；非法动作
-  返回 `accepted=false` + `code`/`detail`，节点在 `publish_ack` 打印「裁判拒绝动作 ...」。
+  不改世界，由 `DecisionActuatorSim` 打印「裁判拒绝动作 ...」。
   规则依据：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点（表 5-8）；兑换血量与远程兑换
   要求脱战（5.2.1 / 表 5-6）；复活要求处于待复活且 `info1` 给出对应标志（免费 / 立即）与金币。
   合法时按 10 金币/10 发等结算；
@@ -531,42 +538,15 @@ Groot2 为**可选**能力：`decision_node` 提供 `--groot2-port`，仅在显�
   `IfOccupyingGainPoint` 门控；区域圆心与半径来自地图点（半径 = 点第 4 位），四个区域默认启用
   （可 `-p *_radius:=0` 关闭）；
   `sentry_info_2.disengaged` 默认脱战（可用 `set_world {disengaged: 0}` 覆盖）；
-- 节点按真实秒在补给区回血（近似规则 5.2.1：每秒回上限血量的 10%，比赛 4 分钟后 25%，
-  上限受 `max_hp` 约束；补给区为可配置的「圆心 + 半径」，进入后延迟 `supply_enter_delay_s`
-  才开始回血）；基地 / 前哨站 / 堡垒增益点只用于本地兑换，不回血；
-- **补给区免费发弹量**（规则 5.3.2）：比赛每满 1 分钟累积 100 发，未被占领领取的部分一直累积，
-  机器人进入补给区的整秒一次性领取全部累积值（示例：剩余 30s 时才进补给区，一次 +600）；
-- **远程兑换延迟**（规则 5.3.2 / 5.2.1）：确认时立即扣金币并进入延迟队列，6 秒后发弹量 / 血量
-  才生效；远程兑换血量在 6 秒内战亡则作废且金币不返还（`step_pending_remote` 纯逻辑结算）；
-- **复活读条**（规则 5.2.2）：机器人战亡（`self_hp<=0`）时裁判立即开始复活读条，总长
-  `10 + round((420-战亡时剩余秒数)/10) + 20*本局累计兑换立即复活次数`，战亡瞬间锁定；
-  每秒 +1，在己方补给区或己方基地血量 <2000 时每秒 +4。待复活期间 `info1.can_free_resurrect`
-  （bit 19）置 1；哨兵「确认免费复活」后读条完成即以 **10% 上限血量**复活并清零射击热量，
-  未确认则读条完成后保持待复活。`kInstantResurrect` 需待复活且金币足够，回满血、本局累计立即复活
-  次数 +1。读条状态是仿真专属（`SimWorld::respawn`），不进入上行消息；
+- 补给区回血、免费发弹量、远程兑换 6 秒延迟与战亡作废、复活读条、增益点占领等规则的
+  **语义、前置条件与参数**见 [SIMULATION.md](SIMULATION.md) §4（规则 5.2.1 / 5.2.2 / 5.3.2 的近似实现）；
+  读条状态是仿真专属（`SimWorld::respawn`），不进入上行消息；
 - `srv/SetWorld`（`/sentry_sim/set_world`）直接改仿真世界真实值；`srv/ApplyEffect`
   （`/sentry_sim/apply_effect`）按 `config/sim.yaml` 的 `effects` 施加具名效果
   （自身扣血 / 扣弹 / 死亡、双方前哨 / 基地扣血与摧毁），供面板做闭环测试；
-- 场景脚本 YAML 描述带时间轴的事件与断言：
-
-```yaml
-# scenario/full_match.yaml（片段）
-world:   { self_hp: 400, self_ammo: 100, enemy_outpost_hp: 1500 }
-timeline:
-  - at: 2.0
-    expect:    { tactical_mode: attack, has_nav_goal: true }   # 敌前哨存活 -> 进攻
-  - at: 3.0
-    set_world: { enemy_outpost_hp: 0 }
-  - at: 4.5
-    expect:    { tactical_mode: patrol, nav_goal_x: 2.49, nav_goal_y: 4.05 }  # -> 高地巡逻
-  - at: 9.0
-    set_world: { game_time_remaining: 100 }
-  - at: 10.5
-    expect:    { tactical_mode: defend, nav_goal_x: -7.37, nav_goal_y: 1.60 }  # -> 守堡垒
-```
-
-场景支持 `set_world` / `expect`：在事件时刻改世界或断言决策输出，因此场景脚本可直接把测试用例写成时间轴。
-场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
+- 场景脚本用时间轴描述 `set_world` / `expect` 事件，把测试用例直接写成时间轴；
+  场景在 `colcon test` 中启动 `referee_sim_node` + `decision_node`，订阅 `/decision/state` 在事件时刻断言。
+  结构与字段见 [SIMULATION.md](SIMULATION.md) §3.2。
 
 主策略 `RuleBasedStrategicPolicy` 按上一赛季还原为三条规则：**敌前哨存活 → 进攻；敌前哨毁且我前哨存活 →
 中央高地 3 点循环；双方前哨皆毁 → 剩余 > `strategic.fort_after_remaining_s` 后方巡逻，否则守堡垒**；
@@ -588,15 +568,9 @@ timeline:
 
 rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅用于纯逻辑单测）：
 
-- 布局：左侧行为树（`TreeStatus`，active path 高亮）、中间战场俯视图（场地底图 + 己方 /
-  导航目标 / 敌方 / 增益区，canvas 绘制）并在上方显示比赛状态栏、右侧 `WorldState` 与资源 / 动作面板；
-  增益区来自 `list_state.points` 中带半径的点，画成青色虚线环、标签置于环下方居中；
-- 比赛阶段按钮（准备 / 15s自检 / 5s倒计时 / 开始比赛 / 重置）调用 `/sentry_sim/set_game_stage`，
-  只可前进；重置同时调用 `/decision/debug clear_tactical_mode` 清除战术层覆盖；
-- 仿真控制：「仿真世界」（`/sentry_sim/set_world`，直接改真实世界）与三行「仿真效果」按钮
-  （`/sentry_sim/apply_effect`，步长来自 `config/sim.yaml` 的 `effects`）；
-- 战术层覆盖：模式下拉 + 设置 / 清除按钮，通过 `/decision/debug` 的
-  `set_tactical_mode` / `clear_tactical_mode` service 下发；未进入「比赛中」时自动禁用；
+- 数据来源全部只读：`/decision/tree_status`、`/decision/world_state`、`/decision/state` 与
+  `/decision/debug list_state`；写操作只走 `/sentry_sim/*`（仿真世界）与 `/decision/debug`
+  （战术层覆盖），不进入决策内部。
 - 前端按 `bridge`（roslib 适配）/ `store`（订阅式状态）/ `format`（纯转换）/
   `panels/*`（每个面板一个模块）/ `battlefield`（canvas）分层，使用浏览器原生 ES modules；
 - `web/vendor/roslib.min.js` 锁版本 vendor（BSD-2，1.4.1）；`web/package.json` 仅声明
@@ -607,6 +581,8 @@ rosbridge + roslibjs 的纯静态页，**无打包 / 构建步骤**（Node 仅�
   `tools/viz_smoke_test.sh` 校验静态资源、rosbridge 端口与决策话题数据通路（未装 rosbridge 时跳过）；
 - 不引入打包器：当前规模的收益大于成本，且分层已为将来平滑迁移到 Vite + TS 留好接缝；
 - 说明：`WorldState` 目前只带单个敌方位置与队友数量，战场页暂不画队友；「急停」无独立接口，留待 P4。
+
+布局、按钮与场地标定工具的用户视角说明见 [SIMULATION.md](SIMULATION.md) §6–§7。
 
 ### 14.6 依赖
 
@@ -635,7 +611,7 @@ config/
 
 - 目标运行环境：Ubuntu 24.04 + ROS 2 Jazzy。
 - 开发宿主若非 24.04，统一通过 Docker 开发与测试。
-- 当前阶段无法上实车，所有开发以本地 PC 容器验证为准；镜像、入口与 Compose 见 `docker/`。
+- 开发以本地 PC 容器验证为准；实车联调进行中，镜像、入口与 Compose 见 `docker/`。
 - 本地仿真：`sentry_decision_sim` 提供 dummy 裁判系统 `RefereeSimulator` 与伪导航 `NavSimulator`，
   直接实现 core 的 IO 端口并驱动信念层，因此无需下位机通信包与 navigation 仓库即可调试。
 - 固定源码依赖（vcstool）与二进制依赖（rosdep），去掉临时的 clone + patch。
@@ -644,8 +620,10 @@ config/
 
 ## 17. 开放问题
 
-- 决策 ↔ auto-aim 的 ROS 契约已冻结为 `sentry_interfaces`（见 `docs/INTERFACES.md`）；`/set_bool` 已弃用，`/change_follow_mark` 属 auto-aim ↔ 导航。
-- 下位机串口字节帧（上行 / 下行）的布局与动作 `code` 表；确认后再落地 `UplinkFrame` / `DownlinkFrame`。
-- 可视化选型已定：`TreeStatePublisher` + 可选 Groot2 + rosbridge 静态页（见 §14），细节随 P3 落地调整。
+- 下位机串口 v1 的 `detect_color` 编码、下行发送节拍、姿态位由谁维护，
+  以及 MCU 能否直接转发裁判 `0x020D` 原始位段（与电控 / MCU 对齐，见 `serial_protocol.md` §3）。
+- `SentryInfoOffline` 视觉锁定字段（`is_get` / `armor_pos` / `armor_num`）与 `TeamInfo.allies[4]`
+  尚未接入 `EnemyState` / `WorldState.allies`（见 [BELIEF.md](BELIEF.md) §7）。
+- 实车与导航仓库联合跑通（P4）、旧仓库归档与迁移报告。
 - 回放文件格式与录制范围。
 - BT.CPP 在 Jazzy 镜像中的具体版本锁定与语义复验。

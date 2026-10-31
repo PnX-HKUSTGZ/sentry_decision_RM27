@@ -16,7 +16,6 @@
 
 #include "sentry_decision_core/io.hpp"
 #include "sentry_decision_io/pose_transform.hpp"
-#include "sentry_interfaces/msg/decision_ack.hpp"
 #include "sentry_interfaces/msg/decision_command.hpp"
 #include "sentry_interfaces/msg/game_info.hpp"
 #include "sentry_interfaces/msg/sentry_info_offline.hpp"
@@ -27,7 +26,7 @@ namespace sentry_decision_io {
 
 // 单一 ROS 节点，实现 core 的 IO 端口接口。
 //
-// 上行：订阅 sentry_interfaces 的 5 个裁判消息与 DecisionAck，回调只做解码/合并，
+// 上行：订阅 sentry_interfaces 的 4 条裁判消息，回调只做解码/合并，
 // 决策线程通过 upstream()/odometry() 取带时间戳的快照。
 // 下行：发布 DecisionCommand，并保留 /cmd_vel 与 Nav2 action。
 class RosIoNode : public rclcpp::Node,
@@ -53,12 +52,6 @@ class RosIoNode : public rclcpp::Node,
 
   void send_action(const sentry_decision::DecisionAction& action) override;
 
-  // 最近一次收到的执行回执；无则空。
-  std::optional<sentry_interfaces::msg::DecisionAck> last_ack() const;
-
-  // 取出自上次调用以来收到的全部执行回执（ROS 无关类型），供决策线程消费。
-  std::vector<sentry_decision::ActionAck> take_acks();
-
  private:
   // odom_frame_ 非空时，用 TF map->odom 把订阅到的 odom 系位姿转成 map 系。
   bool lookup_map_to_odom(MapToOdom* out);
@@ -83,15 +76,10 @@ class RosIoNode : public rclcpp::Node,
   sentry_decision::NavState nav_state_;
   GoalHandle::SharedPtr goal_handle_;
 
-  mutable std::mutex decision_mutex_;
-  std::optional<sentry_interfaces::msg::DecisionAck> last_ack_;
-  std::vector<sentry_decision::ActionAck> ack_queue_;
-
   rclcpp::Subscription<sentry_interfaces::msg::GameInfo>::SharedPtr game_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::SentryInfoOnline>::SharedPtr online_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::SentryInfoOffline>::SharedPtr offline_info_sub_;
   rclcpp::Subscription<sentry_interfaces::msg::TeamInfo>::SharedPtr team_info_sub_;
-  rclcpp::Subscription<sentry_interfaces::msg::DecisionAck>::SharedPtr decision_ack_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;

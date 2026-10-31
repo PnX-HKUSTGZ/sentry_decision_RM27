@@ -7,6 +7,68 @@
 > [注意] 本文档是项目历史的单一事实来源，应随项目演进保持更新。
 > [注意] 本文档不是所有变更的完整清单；只记录重要变更并保持简洁易读。完整变更见版本控制系统（如 Git）历史。
 
+## [v0.5.1] - 2026-10-31
+
+> 通信简化：取消执行回执，改为「下发累计目标值 → 用裁判上行校验 → 未生效重试」。
+> 依据 2027 通信协议 V1.0.0，0x0120 的兑换字段本身就是累计值，重复下发幂等。
+
+### Added
+
+- `ActionDispatcher` 生效校验：`action_effective()` 用 0x020D 累计值 / 血量判断；新增配置项
+  `action.verify_delay_ms` / `action.max_attempts` / `action.revive_verify_delay_ms` / `action.revive_max_attempts`。
+- 面板 `list_state` 新增 `last_action_report`（生效 / 放弃、尝试次数）。
+
+### Changed
+
+- 下行 `DecisionAction.value` 改为协议累计目标值 / 电平位；决策层增量在派发器内折算，
+  同一目标重复下发幂等。
+- 串口 `DecisionCommand` 由 12 B 缩为 9 B（删除 `mode` / `interval_ms`）。
+- 仿真执行端按累计值结算，重复下发不再重复扣金币。
+
+### Removed
+
+- 删除 `DecisionAck` ROS 消息、`/sentry/decision_ack` 话题、串口 `type=0x03` 回执帧与 `Gimbal` 回执队列。
+- 删除本地兑换血量动作（`kHpExchange` / `resource.hp`）：0x0120 无对应字段。
+
+## [v0.5.0] - 2026-10-11
+
+> v0.5.0：重构与下位机的通信链路——auto-aim 独占串口并把协议升级为带版本与 CRC 的统一帧 v1，
+> 决策不再接触串口，双方只通过 ROS（`sentry_interfaces`）交互；同时统一信念层命名为 `upstream`
+> 并移除未启用字段。
+
+### Added
+
+- auto-aim 侧串口协议 v1：统一帧 `[0xAA][version][type][length][payload][crc16]`（CRC-16/MCRF4XX），
+  `RefereeUplink`（29 B，裁判上行）/ `DecisionCommand`（12 B，决策下行）/ `DecisionAck`（6 B，回执）；
+  与旧 `0x5A` / `0xA5` / `0xA6` 帧按首字节共存在同一串口。协议见 auto-aim `docs/serial_protocol.md`。
+- auto-aim 侧 `Subscribe2Decision`：订阅 `/sentry/decision_command`，按 v1 组帧下发，并把 MCU 回执
+  发布到 `/sentry/decision_ack`；`Gimbal` 新增 `send_decision_command` / `pop_decision_ack` 与 v1 帧解析。
+
+### Changed
+
+- 通信链路归属：由「决策直接对接 MCU」改为「auto-aim 独占串口 + 决策 ↔ auto-aim 走 ROS」；
+  `sentry_interfaces` 成为双方唯一契约（见 `docs/INTERFACES.md`）。
+- 信念层一致性改名：`RefereeState` → `UpstreamState`，`RefereeSource` → `UpstreamSource`；
+  `WorldState.referee` / `WorldTimeouts.referee` / `ReplayData.referee` → `upstream`；
+  配置键 `timeouts.referee_ms` → `timeouts.upstream_ms`、`safety.require_referee` → `safety.require_upstream`；
+  消息字段 `referee_valid` → `upstream_valid`。
+- auto-aim `Publish2DecisionMaking` 改为发布 4 条 `sentry_interfaces` 上行；补齐
+  `game_status` / `game_time_remaining` / `coin_remaining` / `sentry_info_1/2` 字段。
+- 文档体系整理：新增 `docs/SIMULATION.md`（仿真、场景、面板与标定），`docs/USAGE.md` 收敛为命令速查；
+  `INTERFACES.md` / `BELIEF.md` / `ARCHITECTURE.md` / `ROADMAP.md` / `NOTE.md` 同步。
+
+### Removed
+
+- 移除未启用的雷达 / 变形链路：auto-aim 雷达桥、`RadarInfo` / `EnemyRobotStatus` 的空字段、
+  决策侧 `EnemyState.enemies` 与相关信念字段。
+- 移除旧 `DecisionToGimbal`（`0xA7`，`ifreload`）帧与对应发送路径，由 v1 `DecisionCommand` 取代。
+
+### Fixed
+
+- 修复 auto-aim 决策接口分支的编译阻断与构建耦合：恢复 `gimbal.hpp` 缺失代码、消除 Ceres 重复查找；
+  启用 ROS 时 `sentry_interfaces` 改为硬依赖，避免导航桥被静默跳过。
+- CI 适配：clang-format 与 io 冒烟测试同步 `upstream` 改名与雷达移除。
+
 ## [v0.4.1] - 2026-10-05
 
 > v0.4.1：功能修复与初版决策树——复活链路按规则 5.2.2 落地，双仓库联调补齐位姿 / 重置 / 面板，

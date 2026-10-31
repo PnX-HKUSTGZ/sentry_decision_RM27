@@ -111,28 +111,7 @@ std::string join_errors(const std::vector<std::string>& errors) {
   return text;
 }
 
-const char* action_kind_name(sentry_decision::DecisionActionKind kind) {
-  using K = sentry_decision::DecisionActionKind;
-  switch (kind) {
-    case K::kAmmoExchange:
-      return "ammo_exchange";
-    case K::kHpExchange:
-      return "hp_exchange";
-    case K::kFreeResurrect:
-      return "free_resurrect";
-    case K::kInstantResurrect:
-      return "instant_resurrect";
-    case K::kRemoteAmmoExchange:
-      return "remote_ammo_exchange";
-    case K::kRemoteHpExchange:
-      return "remote_hp_exchange";
-    case K::kNone:
-    default:
-      return "none";
-  }
-}
-
-// 最小 JSON 字符串转义，用于把回执 detail 放进 list_state。
+// 最小 JSON 字符串转义，用于把点位名放进 list_state。
 std::string json_escape(const std::string& text) {
   std::string out;
   out.reserve(text.size());
@@ -152,6 +131,25 @@ std::string json_escape(const std::string& text) {
     }
   }
   return out;
+}
+
+const char* action_kind_name(sentry_decision::DecisionActionKind kind) {
+  using K = sentry_decision::DecisionActionKind;
+  switch (kind) {
+    case K::kAmmoExchange:
+      return "ammo_exchange";
+    case K::kFreeResurrect:
+      return "free_resurrect";
+    case K::kInstantResurrect:
+      return "instant_resurrect";
+    case K::kRemoteAmmoExchange:
+      return "remote_ammo_exchange";
+    case K::kRemoteHpExchange:
+      return "remote_hp_exchange";
+    case K::kNone:
+    default:
+      return "none";
+  }
 }
 
 // 真实 IO 决策节点：RosIoNode 提供信念输入与执行端，本节点跑行为树与仲裁，
@@ -296,7 +294,6 @@ class DecisionNode : public rclcpp::Node {
       }
     }
     out << "],\"resource\":{\"ammo\":" << result.output.resource.ammo
-        << ",\"hp\":" << result.output.resource.hp
         << ",\"remote_ammo\":" << result.output.resource.remote_ammo
         << ",\"remote_hp\":" << result.output.resource.remote_hp
         << ",\"revive\":" << (result.output.resource.revive ? "true" : "false")
@@ -310,12 +307,12 @@ class DecisionNode : public rclcpp::Node {
     } else {
       out << "null";
     }
-    out << ",\"last_ack\":";
-    if (has_last_ack_) {
-      out << "{\"request_id\":" << last_ack_.request_id
-          << ",\"accepted\":" << (last_ack_.accepted ? "true" : "false")
-          << ",\"code\":" << static_cast<int>(last_ack_.code) << ",\"detail\":\""
-          << json_escape(last_ack_.detail) << "\"}";
+    out << ",\"last_action_report\":";
+    if (has_last_report_) {
+      out << "{\"kind\":\"" << action_kind_name(last_report_.kind)
+          << "\",\"request_id\":" << last_report_.request_id
+          << ",\"attempts\":" << last_report_.attempts
+          << ",\"effective\":" << (last_report_.effective ? "true" : "false") << "}";
     } else {
       out << "null";
     }
@@ -349,20 +346,22 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
-  // 资源请求 -> 决策动作：交给派发器处理 one-shot / polled 与 ack，再下发。
+  // 资源请求 -> 决策动作：派发器折算累计目标值，并用裁判上行做生效校验与重试。
   void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
-    for (const auto& ack : io_->take_acks()) {
-      dispatcher_.on_ack(ack);
-      last_ack_ = ack;
-      has_last_ack_ = true;
-    }
     sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
-    for (const auto& action : dispatcher_.poll(now)) {
+    for (const auto& action : dispatcher_.poll(now, &context_.world.upstream)) {
       io_->send_action(action);
-      last_action_ = action;
-      has_last_action_ = true;
+      if (action.value > 0) {
+        last_action_ = action;
+        has_last_action_ = true;
+      }
       SD_LOG_ACT("action", "下发 %s value=%d request_id=%u", action_kind_name(action.kind),
                  action.value, action.request_id);
+    }
+    const auto report = dispatcher_.last_report();
+    if (report.has_value()) {
+      last_report_ = *report;
+      has_last_report_ = true;
     }
   }
 
@@ -380,8 +379,8 @@ class DecisionNode : public rclcpp::Node {
   sentry_decision::NavGoalTracker nav_tracker_;
   bool has_last_action_ = false;
   sentry_decision::DecisionAction last_action_;
-  bool has_last_ack_ = false;
-  sentry_decision::ActionAck last_ack_;
+  bool has_last_report_ = false;
+  sentry_decision::ActionReport last_report_;
   bool safety_emergency_ = false;
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;

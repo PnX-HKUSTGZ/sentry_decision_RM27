@@ -56,7 +56,10 @@
 ## 8. 文档
 
 - docs-first：设计变更先更新文档，再改代码。
-- 架构变更更新 `docs/ARCHITECTURE.md`；阶段 / 进度更新 `docs/ROADMAP.md`；用户可见变更更新 `docs/CHANGELOG.md`；当前 sprint 记录在 `docs/NOTE.md`。
+- 文档分工：架构设计 → `ARCHITECTURE.md`；信念字段 → `BELIEF.md`；上位机接口 → `INTERFACES.md`；
+  命令与参数 → `USAGE.md`；仿真 / 场景 / 面板操作 → `SIMULATION.md`；阶段与进度 → `ROADMAP.md`；
+  用户可见变更 → `CHANGELOG.md`；当前 sprint → `NOTE.md`。
+- 面向使用者的命令放 `USAGE.md`，实现细节放 `ARCHITECTURE.md`，不要把两者混在一篇里。
 - 文档使用中文，避免 ASCII 图，优先 Mermaid 或表格。
 
 ## 9. 提交

@@ -64,8 +64,12 @@ inline sentry_decision::SafetyLimits safety_limits_from_config(
 inline sentry_decision::ActionDispatcherConfig action_config_from_config(
     const sentry_decision::PolicyConfig* config) {
   sentry_decision::ActionDispatcherConfig action_config;
-  action_config.one_shot_timeout = ms_from_config(config, "action.one_shot_timeout_ms");
-  action_config.revive_poll_interval = ms_from_config(config, "action.revive_poll_interval_ms");
+  action_config.verify_delay = ms_from_config(config, "action.verify_delay_ms");
+  action_config.max_attempts =
+      static_cast<int>(config_number(config, "action.max_attempts"));
+  action_config.revive_verify_delay = ms_from_config(config, "action.revive_verify_delay_ms");
+  action_config.revive_max_attempts =
+      static_cast<int>(config_number(config, "action.revive_max_attempts"));
   return action_config;
 }
 

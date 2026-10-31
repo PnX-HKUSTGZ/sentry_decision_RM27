@@ -82,8 +82,6 @@ struct Quaternion {
 struct ResourceRequest {
   // 本地兑换允许发弹量（需占领补给区 / 基地 / 前哨站增益点），单位：发。
   int ammo = 0;
-  // 本地兑换血量：规则只允许远程兑换，此字段仅保留给人工注入 / 调试，决策树不再主动产出。
-  int hp = 0;
   // 远程兑换允许发弹量次数（需脱战），单位：次。
   int remote_ammo = 0;
   // 远程兑换血量次数（需脱战），单位：次。
@@ -120,35 +118,29 @@ struct DecisionOutput {
 // 决策动作类型（下行给下位机）。
 enum class DecisionActionKind {
   kNone,
-  kAmmoExchange,  // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站），value = 数量
-  kHpExchange,        // 兑换血量：需脱战（规则仅允许远程兑换），value = 数量
-  kFreeResurrect,     // 确认免费复活：需 can_free_resurrect
-  kInstantResurrect,  // 兑换立即复活：需 can_instant_resurrect 且金币足够
+  // 兑换类的 value 是「本次增量」，下发前由派发器折算为协议累计目标值；复活类直接是电平位。
+  kAmmoExchange,        // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站），value = 发数
+  kFreeResurrect,       // 确认免费复活：电平位，value = 1 置位 / 0 清零
+  kInstantResurrect,    // 兑换立即复活：电平位，value = 1 置位 / 0 清零
   kRemoteAmmoExchange,  // 远程兑换发弹量：需脱战，value = 次数
   kRemoteHpExchange,    // 远程兑换血量：需脱战，value = 次数
 };
 
-// 动作发送模式：配置动作时必须显式选择。
-enum class ActionMode {
-  kOneShot,  // 边沿触发，执行一次即完成
-  kPolled,   // 轮询，按 interval 重发，以最新值为准
-};
-
 // 一个决策动作。
+// value 在 submit 时是「本次增量」（如要买 50 发）；派发器在真正下发前会按裁判
+// 0x020D 的累计值折算成「协议目标值」（如本场累计兑换 150 发），见 action_dispatcher。
 struct DecisionAction {
   DecisionActionKind kind = DecisionActionKind::kNone;
-  ActionMode mode = ActionMode::kOneShot;
-  Duration interval{0};  // 仅 kPolled 使用
   int value = 0;
   std::uint32_t request_id = 0;
 };
 
-// 下位机对某个动作的执行回执（ROS 无关版本，对应 DecisionAck 消息）。
-struct ActionAck {
+// 一次动作请求序列的最终结果（供日志 / 面板观测）。
+struct ActionReport {
+  DecisionActionKind kind = DecisionActionKind::kNone;
   std::uint32_t request_id = 0;
-  bool accepted = false;
-  std::uint8_t code = 0;
-  std::string detail;
+  int attempts = 0;        // 实际下发次数（含首次）
+  bool effective = false;  // true 生效；false 达到最大次数仍未观测到效果
 };
 
 }  // namespace sentry_decision

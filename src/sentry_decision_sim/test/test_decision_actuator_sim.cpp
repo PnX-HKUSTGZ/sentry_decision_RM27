@@ -20,80 +20,96 @@ void check(bool ok, const char* expr, const char* file, int line) {
 
 #define CHECK(cond) check((cond), #cond, __FILE__, __LINE__)
 
-// 离线 ack 闭环：派发器 -> 模拟执行端 -> 回执 -> 派发器。
-void test_action_roundtrip() {
-  ActionDispatcher dispatcher(ActionDispatcherConfig{Duration{500}, Duration{0}});
-  DecisionActuatorSim actuator(2);
-  const TimePoint t0{};
-
-  DecisionAction action;
-  action.kind = DecisionActionKind::kAmmoExchange;
-  action.mode = ActionMode::kOneShot;
-  action.value = 50;
-
-  dispatcher.submit(action);
-  const auto outgoing = dispatcher.poll(t0);
-  CHECK(outgoing.size() == 1);
-  for (const auto& item : outgoing) {
-    actuator.send_action(item);
-  }
-  CHECK(actuator.in_flight() == 1);
-
-  // 延迟 2 tick 后才产生回执。
-  actuator.update();
-  CHECK(actuator.take_acks().empty());
-  actuator.update();
-  const auto acks = actuator.take_acks();
-  CHECK(acks.size() == 1);
-  CHECK(acks[0].request_id == outgoing[0].request_id);
-  CHECK(acks[0].accepted);
-  for (const auto& ack : acks) {
-    dispatcher.on_ack(ack);
-  }
-
-  // ack 之后持续提交同值：不重发。
-  dispatcher.submit(action);
-  CHECK(dispatcher.poll(t0 + Duration{50}).empty());
-}
-
-// 绑定世界后：回执产生时把兑换结算进世界，金币不足则拒绝且世界不变。
-void test_exchange_applied_to_world() {
+// 执行端只在延迟结束后结算进世界；重复下发同一累计目标是幂等的。
+void test_apply_after_latency_and_idempotent() {
   SimWorld world;
   world.coins = 100;
   world.self_ammo = 10;
-  // 本地兑换发弹量要求占领增益点（规则表 5-8）。
-  world.event_code |= 1u;  // 己方补给区已占领
+  world.event_code |= 1u;  // 已占领己方补给区
+
   DecisionActuatorSim actuator(1);
   actuator.bind_world(&world, 400);
 
   DecisionAction action;
   action.kind = DecisionActionKind::kAmmoExchange;
-  action.mode = ActionMode::kOneShot;
-  action.value = 50;
+  action.value = 50;  // 协议累计目标值
   action.request_id = 7;
   actuator.send_action(action);
+  CHECK(actuator.in_flight() == 1);
+  CHECK(world.self_ammo == 10);
+
   actuator.update();
-  const auto acks = actuator.take_acks();
-  CHECK(acks.size() == 1);
-  CHECK(acks[0].accepted);
+  CHECK(actuator.in_flight() == 0);
   CHECK(world.self_ammo == 60);
   CHECK(world.coins == 50);
 
-  world.coins = 0;
+  // 同目标重发（模拟未观测到效果时的重试）：幂等，不再扣币。
   action.request_id = 8;
   actuator.send_action(action);
   actuator.update();
-  const auto rejected = actuator.take_acks();
-  CHECK(rejected.size() == 1);
-  CHECK(!rejected[0].accepted);
   CHECK(world.self_ammo == 60);
+  CHECK(world.coins == 50);
+}
+
+// 非法动作不修改世界。
+void test_rejected_action_keeps_world() {
+  SimWorld world;
+  world.coins = 20;  // 不够买 50 发
+  world.event_code |= 1u;
+
+  DecisionActuatorSim actuator(0);
+  actuator.bind_world(&world, 400);
+
+  DecisionAction action;
+  action.kind = DecisionActionKind::kAmmoExchange;
+  action.value = 50;
+  actuator.send_action(action);
+  actuator.update();
+  CHECK(world.self_ammo == 0);
+  CHECK(world.coins == 20);
+}
+
+// 派发器 + 仿真世界 + 裁判上行：发出 -> 世界结算 -> 上行回填 -> 校验生效。
+void test_dispatch_verify_roundtrip() {
+  ActionDispatcher dispatcher(
+      ActionDispatcherConfig{Duration{100}, 3, Duration{100}, 0});
+  const TimePoint t0{};
+
+  UpstreamState upstream;
+  upstream.valid = true;
+  upstream.self_hp = 400;
+  upstream.game_status = GameStatus::kRunning;
+  upstream.info1.ammo_exchanged_local = 0;
+
+  DecisionAction delta;
+  delta.kind = DecisionActionKind::kAmmoExchange;
+  delta.value = 10;  // 决策层给的是增量
+
+  dispatcher.submit(delta);
+  const auto outgoing = dispatcher.poll(t0, &upstream);
+  CHECK(outgoing.size() == 1);
+  CHECK(outgoing[0].value == 10);  // 0 + 10，折算成累计目标
+
+  // 等待期内不重发。
+  dispatcher.submit(delta);
+  CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
+
+  // 裁判上行回填累计值 -> 判定生效，不再下发。
+  upstream.info1.ammo_exchanged_local = 10;
+  dispatcher.submit(delta);
+  CHECK(dispatcher.poll(t0 + Duration{100}, &upstream).empty());
+  const auto report = dispatcher.last_report();
+  CHECK(report.has_value());
+  CHECK(report->effective);
+  CHECK(report->attempts == 1);
 }
 
 }  // namespace
 
 int main() {
-  test_action_roundtrip();
-  test_exchange_applied_to_world();
+  test_apply_after_latency_and_idempotent();
+  test_rejected_action_keeps_world();
+  test_dispatch_verify_roundtrip();
   if (g_failures == 0) {
     std::printf("all decision actuator sim tests passed\n");
     return 0;

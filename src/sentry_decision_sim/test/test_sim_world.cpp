@@ -156,7 +156,6 @@ void test_occupancy() {
 DecisionAction make_action(DecisionActionKind kind, int value) {
   DecisionAction action;
   action.kind = kind;
-  action.mode = ActionMode::kOneShot;
   action.value = value;
   action.request_id = 1;
   return action;
@@ -187,39 +186,47 @@ void test_execute_action_preconditions() {
     CHECK(out.accepted);
     CHECK(world.self_ammo == 50);
     CHECK(world.coins == 150);
-  }
-  // 兑换血量：未脱战 -> 拒绝；脱战 -> 成功。
-  {
-    SimWorld world;
-    world.coins = 200;
-    world.self_hp = 100;
-    world.sentry_info_2 = 0;
-    const ActionOutcome engaged =
-        execute_action(&world, make_action(DecisionActionKind::kHpExchange, 50), 400);
-    CHECK(!engaged.accepted);
-    CHECK(engaged.code == 2);
-    CHECK(world.self_hp == 100);
-    world.sentry_info_2 = 1;
-    const ActionOutcome out =
-        execute_action(&world, make_action(DecisionActionKind::kHpExchange, 50), 400);
-    CHECK(out.accepted);
-    CHECK(world.self_hp == 150);
+    CHECK(decode_sentry_info1(world.sentry_info_1).ammo_exchanged_local == 50);
+
+    // 同一累计目标重复下发：幂等，不重复扣币 / 加弹。
+    const ActionOutcome repeat =
+        execute_action(&world, make_action(DecisionActionKind::kAmmoExchange, 50), 400);
+    CHECK(repeat.accepted);
+    CHECK(world.self_ammo == 50);
     CHECK(world.coins == 150);
+
+    // 累计目标继续增加：只按增量结算。
+    const ActionOutcome more =
+        execute_action(&world, make_action(DecisionActionKind::kAmmoExchange, 80), 400);
+    CHECK(more.accepted);
+    CHECK(world.self_ammo == 80);
+    CHECK(world.coins == 120);
+
+    // 累计目标回退：非法，不改世界。
+    const ActionOutcome lower =
+        execute_action(&world, make_action(DecisionActionKind::kAmmoExchange, 30), 400);
+    CHECK(!lower.accepted);
+    CHECK(lower.code == 4);
+    CHECK(world.self_ammo == 80);
   }
   // 免费复活：存活 -> 拒绝；待复活 -> 接受并确认（读条未完成时不改血量）。
   {
     SimWorld world;
     world.self_hp = 100;  // 存活
     CHECK(
-        !execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
+        !execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 1), 400).accepted);
     world.self_hp = 0;  // 战亡 -> 裁判推导待复活
     world.game_time_remaining = 420;
     const ActionOutcome confirm =
-        execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400);
+        execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 1), 400);
     CHECK(confirm.accepted);
     CHECK(world.respawn.pending);
     CHECK(world.respawn.confirmed);
     CHECK(world.self_hp == 0);  // 读条未完成，不复活
+
+    // 电平清零：取消确认。
+    CHECK(execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
+    CHECK(!world.respawn.confirmed);
   }
   // 立即复活：金币不足 -> 拒绝；足够 -> 成功。
   {
@@ -228,12 +235,12 @@ void test_execute_action_preconditions() {
     world.self_hp = 0;
     world.sentry_info_1 = (1u << 20) | (120u << 21);
     const ActionOutcome poor =
-        execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 0), 400);
+        execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 1), 400);
     CHECK(!poor.accepted);
     CHECK(poor.code == 3);
     world.coins = 200;
     const ActionOutcome out =
-        execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 0), 400);
+        execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 1), 400);
     CHECK(out.accepted);
     CHECK(world.self_hp == 400);
     CHECK(world.coins == 80);
@@ -254,6 +261,15 @@ void test_execute_action_preconditions() {
     CHECK(world.coins == 850);    // 金币立即扣除
     CHECK(world.self_ammo == 0);  // 发弹量延迟
     CHECK(world.pending_remote.size() == 1);
+    CHECK(decode_sentry_info1(world.sentry_info_1).remote_ammo_exchange_count == 1);
+    // 同一累计次数重复下发：幂等，不再扣币 / 入队。
+    CHECK(execute_action(&world, make_action(DecisionActionKind::kRemoteAmmoExchange, 1), 400)
+              .accepted);
+    CHECK(world.coins == 850);
+    CHECK(world.pending_remote.size() == 1);
+    // 一次跳多次：规则要求每次仅 +1，拒绝。
+    CHECK(!execute_action(&world, make_action(DecisionActionKind::kRemoteAmmoExchange, 3), 400)
+               .accepted);
     CHECK(step_pending_remote(&world, 5999, 400).ammo_delivered == 0);
     CHECK(world.self_ammo == 0);
     CHECK(step_pending_remote(&world, 1, 400).ammo_delivered == 100);
@@ -358,13 +374,13 @@ void test_sync_respawn_starts_bar() {
   CHECK(!decode_sentry_info1(world.sentry_info_1).can_free_resurrect);
 }
 
-// 确认后读条完成 -> 10% 上限血复活；补给区 / 基地 <2000 时每秒 +4；未确认不复活。
+// 确认后读条完成 -> 10% 上限血复活；补给区 / 基地 <4000 时每秒 +4；未确认不复活。
 void test_step_respawn_revives_at_ten_percent() {
   SimWorld world;
   world.self_hp = 0;
   world.sentry_info_2 = 1;
   world.game_time_remaining = 420;  // 读条 10s
-  CHECK(execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 0), 400).accepted);
+  CHECK(execute_action(&world, make_action(DecisionActionKind::kFreeResurrect, 1), 400).accepted);
 
   for (int i = 0; i < 9; ++i) {
     CHECK(!step_respawn(&world, 400, false).revived);
@@ -388,7 +404,7 @@ void test_step_respawn_revives_at_ten_percent() {
   CHECK(unconfirmed.self_hp == 0);
   CHECK(unconfirmed.respawn.pending);
   const ActionOutcome late =
-      execute_action(&unconfirmed, make_action(DecisionActionKind::kFreeResurrect, 0), 400);
+      execute_action(&unconfirmed, make_action(DecisionActionKind::kFreeResurrect, 1), 400);
   CHECK(late.accepted);
   CHECK(unconfirmed.self_hp == 40);
 
@@ -412,7 +428,7 @@ void test_instant_resurrect_counts() {
   world.game_time_remaining = 420;
   world.sentry_info_1 = (1u << 20) | (120u << 21);
   const ActionOutcome out =
-      execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 0), 400);
+      execute_action(&world, make_action(DecisionActionKind::kInstantResurrect, 1), 400);
   CHECK(out.accepted);
   CHECK(world.self_hp == 400);
   CHECK(world.coins == 80);
