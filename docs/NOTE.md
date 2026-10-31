@@ -4,12 +4,12 @@
 > 历史变更见 [CHANGELOG.md](CHANGELOG.md)，阶段状态见 [ROADMAP.md](ROADMAP.md)。
 > 仅作为开发草稿纸，不属于项目正式文档。
 
-## 当前 sprint：v0.5.1 通信简化（取消回执）
+## 当前 sprint：v0.5.2 通信简化 + 动作策略下沉
 
 ### 目标
 
 MCU 只把决策转成裁判 `0x0120` 指令，不回执、不判断成功；决策侧用裁判 `0x020D` 上行校验是否生效，
-未生效则重发同一目标，超过次数上限后放弃。
+未生效则重发同一目标，超过次数上限后放弃。重试策略由行为树随动作传入，dispatcher 不按 `kind` 分支。
 
 ### 已锁定决策
 
@@ -20,15 +20,20 @@ MCU 只把决策转成裁判 `0x0120` 指令，不回执、不判断成功；决
   （`request_id` + `kind` + `value`）。
 - **生效判据**：本地兑换看 `info1.ammo_exchanged_local`；远程兑换看对应累计次数；
   复活看 `self_hp` 从 0 变正（协议没有「已确认复活」回传）。
-- **重试参数**：`action.verify_delay_ms`（默认 600）、`action.max_attempts`（默认 3）；
-  复活用 `revive_verify_delay_ms`（200）与 `revive_max_attempts`（0 = 不限）。
+- **重试参数由行为树传入**：`Request*` 节点的 `retry_ms` / `max_attempts` 端口；
+  省略时回退到 config 的 `action.verify_delay_ms` / `action.max_attempts`；复活用
+  `action.revive_verify_delay_ms`（200）与 `action.revive_max_attempts`（0 = 不限）。
+- **动作策略下沉**：节点构造 `ActionRequest`，经 `ResourceIntent` 带到 `ActionDispatcher`；
+  dispatcher 不再按 `kind` 选间隔 / 次数 / 判据。
 - **电平位**：确认复活 / 立即复活是 0x0120 bit 0 / 1；待复活期间持续置 1，
   完成或放弃后补发 `value=0` 清零。MCU 原样保持电平，不做超时判断。
 - **删除本地兑换血量**：0x0120 没有对应字段，`kHpExchange` / `resource.hp` 一并移除。
 
 ### 已完成
 
-- `ActionDispatcher`：发送 → 等待 → 校验 → 重试 / 放弃；上游无效时暂停；电平位自动清零。
+- `ActionDispatcher`：通用「发送 → 等待 → 校验 → 重试 / 放弃」；上游无效时暂停；电平位自动清零。
+- 新增 `ActionRequest` / `ResourceIntent` / `action_factory`；资源节点按最小兑换单位（10 / 100）
+  与 1000 上限构造目标值。
 - 接口：删 `DecisionAck.msg`，`DecisionAction` 只剩 `kind` / `value`；`DecisionOutput` 去掉 `resource_hp`。
 - 仿真：`DecisionActuatorSim` 不再产生回执，动作直接结算进 `SimWorld`；执行端按累计值幂等结算。
 - 面板：`last_ack` 改为 `last_action_report`（生效 / 放弃、尝试次数）。

@@ -90,9 +90,47 @@ struct ResourceRequest {
   bool instant_revive = false;  // 兑换立即复活（需 can_instant_resurrect 且金币足够）
 };
 
+// 决策动作类型（下行给下位机）。
+enum class DecisionActionKind {
+  kNone,
+  kAmmoExchange,        // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站）
+  kFreeResurrect,       // 确认免费复活：电平位
+  kInstantResurrect,    // 兑换立即复活：电平位
+  kRemoteAmmoExchange,  // 远程兑换发弹量：需脱战，value = 次数
+  kRemoteHpExchange,    // 远程兑换血量：需脱战，value = 次数
+};
+
+// 生效判据：只描述“看哪个字段”，具体比较在 action_factory 里实现。
+enum class ActionVerify : std::uint8_t {
+  kNone,
+  kAmmoExchangedLocal,  // 0x020D bit 0-10 累计发弹量
+  kRemoteAmmoCount,     // 0x020D bit 11-14 累计远程兑换次数
+  kRemoteHpCount,       // 0x020D bit 15-18 累计远程兑换次数
+  kAlive,               // 血量从 0 变正
+};
+
+// 一个动作请求：语义 + 下发策略。
+// 由行为树节点构造，经 Intent / 仲裁原样带到 dispatcher；dispatcher 不再按 kind 猜策略。
+struct ActionRequest {
+  DecisionActionKind kind = DecisionActionKind::kNone;
+  int target = 0;          // 协议绝对目标值（累计值 / 电平位）
+  int delta = 0;           // 本次增量，仅用于判断请求是否变化 / 日志
+  bool monotonic = false;  // 累计目标，跨请求序列不回退
+  Duration retry_interval{0};  // 等待 + 重发间隔
+  int max_attempts = 0;        // 0 = 不限次数
+  ActionVerify verify = ActionVerify::kNone;
+  bool level = false;  // 电平动作：完成 / 放弃后补发 value=0
+};
+
+// 资源意图：request 给面板 / 日志 / ROS 投影，action 给 dispatcher。
+struct ResourceIntent {
+  ResourceRequest request{};
+  ActionRequest action{};
+};
+
 // 意图载荷；具体用哪一项由 Intent::field 决定。
 using IntentValue =
-    std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceRequest, SentryStance>;
+    std::variant<std::monostate, Point2D, Twist, TacticalMode, ResourceIntent, SentryStance>;
 
 // 意图：一次请求，不保证最终生效。
 struct Intent {
@@ -110,25 +148,13 @@ struct DecisionOutput {
   std::optional<Point2D> nav_goal;
   std::optional<Twist> cmd_vel;
   ResourceRequest resource{};
+  ActionRequest action{};
   TacticalMode tactical_mode = TacticalMode::kUnknown;
   SentryStance stance = SentryStance::kUnknown;
   TimePoint stamp{};
 };
 
-// 决策动作类型（下行给下位机）。
-enum class DecisionActionKind {
-  kNone,
-  // 兑换类的 value 是「本次增量」，下发前由派发器折算为协议累计目标值；复活类直接是电平位。
-  kAmmoExchange,        // 本地兑换允许发弹量：需占领增益点（补给区/基地/前哨站），value = 发数
-  kFreeResurrect,       // 确认免费复活：电平位，value = 1 置位 / 0 清零
-  kInstantResurrect,    // 兑换立即复活：电平位，value = 1 置位 / 0 清零
-  kRemoteAmmoExchange,  // 远程兑换发弹量：需脱战，value = 次数
-  kRemoteHpExchange,    // 远程兑换血量：需脱战，value = 次数
-};
-
-// 一个决策动作。
-// value 在 submit 时是「本次增量」（如要买 50 发）；派发器在真正下发前会按裁判
-// 0x020D 的累计值折算成「协议目标值」（如本场累计兑换 150 发），见 action_dispatcher。
+// 下行给下位机的动作（已完成策略解析）。
 struct DecisionAction {
   DecisionActionKind kind = DecisionActionKind::kNone;
   int value = 0;

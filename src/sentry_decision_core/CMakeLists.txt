@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/action_dispatcher.cpp
+  src/action_factory.cpp
   src/arbiter.cpp
   src/tactical_override.cpp
   src/logging.cpp

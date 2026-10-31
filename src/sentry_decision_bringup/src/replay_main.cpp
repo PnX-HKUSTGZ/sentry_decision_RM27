@@ -150,18 +150,16 @@ int main(int argc, char** argv) {
   sentry_decision::ReplaySource replay(std::move(data));
   sentry_decision::WorldTimeouts runtime_timeouts;
   sentry_decision::SafetyLimits safety_limits;
-  sentry_decision::ActionDispatcherConfig action_config;
   try {
     runtime_timeouts = sentry_decision_bringup::timeouts_from_config(&loaded.config);
     safety_limits = sentry_decision_bringup::safety_limits_from_config(&loaded.config);
-    action_config = sentry_decision_bringup::action_config_from_config(&loaded.config);
   } catch (const std::exception& ex) {
     std::cerr << "运行参数加载失败: " << ex.what() << "\n";
     return 1;
   }
   sentry_decision::WorldModel model(replay, replay, replay, runtime_timeouts);
   sentry_decision::IntentArbiter arbiter;
-  sentry_decision::ActionDispatcher dispatcher(action_config);
+  sentry_decision::ActionDispatcher dispatcher;
   sentry_decision::SafetySupervisor safety(safety_limits);
   sentry_decision::NavGoalTracker nav_tracker;
 
@@ -197,7 +195,9 @@ int main(int argc, char** argv) {
     } else if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kCancel) {
       replay.cancel_goal();
     }
-    sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
+    if (safe_result.output.action.kind != sentry_decision::DecisionActionKind::kNone) {
+      dispatcher.submit(safe_result.output.action);
+    }
     (void)dispatcher.poll(now, nullptr);  // 回放不真实下发动作，不校验生效
 
     if (safe_result.output.tactical_mode != last_mode) {

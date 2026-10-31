@@ -49,7 +49,7 @@ bool has_matching_value(const Intent& intent) {
     case IntentField::kChassisVel:
       return std::holds_alternative<Twist>(intent.value);
     case IntentField::kResourceRequest:
-      return std::holds_alternative<ResourceRequest>(intent.value);
+      return std::holds_alternative<ResourceIntent>(intent.value);
     case IntentField::kTacticalMode:
       return std::holds_alternative<TacticalMode>(intent.value);
     case IntentField::kStance:
@@ -66,9 +66,12 @@ void apply(const Intent& winner, DecisionOutput& out) {
     case IntentField::kChassisVel:
       out.cmd_vel = std::get<Twist>(winner.value);
       break;
-    case IntentField::kResourceRequest:
-      out.resource = std::get<ResourceRequest>(winner.value);
+    case IntentField::kResourceRequest: {
+      const ResourceIntent& resource = std::get<ResourceIntent>(winner.value);
+      out.resource = resource.request;
+      out.action = resource.action;
       break;
+    }
     case IntentField::kTacticalMode:
       out.tactical_mode = std::get<TacticalMode>(winner.value);
       break;

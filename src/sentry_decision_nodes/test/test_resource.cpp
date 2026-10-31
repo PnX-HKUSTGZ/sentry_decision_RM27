@@ -66,6 +66,10 @@ PolicyConfig make_config() {
   config.numbers["resource.remote_ammo_times"] = 1.0;
   config.numbers["resource.remote_ammo_min_coins"] = 150.0;
   config.numbers["nav.low_ammo"] = 50.0;
+  config.numbers["action.verify_delay_ms"] = 600.0;
+  config.numbers["action.max_attempts"] = 3.0;
+  config.numbers["action.revive_verify_delay_ms"] = 200.0;
+  config.numbers["action.revive_max_attempts"] = 0.0;
   return config;
 }
 
@@ -81,6 +85,7 @@ BT::Tree make_tree(DecisionContext* context) {
 WorldState make_world() {
   WorldState world;
   world.upstream.valid = true;
+  world.upstream.game_status = GameStatus::kRunning;
   world.upstream.self_hp = 400;
   world.upstream.self_ammo = 100;
   world.upstream.coins = 200;
@@ -100,7 +105,12 @@ void test_free_revive() {
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
   CHECK(context.intents[0].field == IntentField::kResourceRequest);
-  CHECK(std::get<ResourceRequest>(context.intents[0].value).revive);
+  const auto& intent = std::get<ResourceIntent>(context.intents[0].value);
+  CHECK(intent.request.revive);
+  CHECK(intent.action.kind == DecisionActionKind::kFreeResurrect);
+  CHECK(intent.action.target == 1);
+  CHECK(intent.action.level);
+  CHECK(intent.action.max_attempts == 0);
 }
 
 // 血量兑换按规则只走远程：脱战 + 金币够 -> remote_hp 次数。
@@ -114,10 +124,12 @@ void test_remote_hp_exchange() {
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
+  const auto& intent = std::get<ResourceIntent>(context.intents[0].value);
+  const auto& request = intent.request;
   CHECK(request.remote_hp == 1);
-  CHECK(request.hp == 0);
   CHECK(request.ammo == 0);
+  CHECK(intent.action.kind == DecisionActionKind::kRemoteHpExchange);
+  CHECK(intent.action.target == 1);
 }
 
 // 立即复活优先，且金币不足时不请求。
@@ -134,7 +146,10 @@ void test_instant_revive() {
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  CHECK(std::get<ResourceRequest>(context.intents[0].value).instant_revive);
+  const auto& intent = std::get<ResourceIntent>(context.intents[0].value);
+  CHECK(intent.request.instant_revive);
+  CHECK(intent.action.kind == DecisionActionKind::kInstantResurrect);
+  CHECK(intent.action.target == 1);
 }
 
 void test_instant_revive_blocked_without_coins() {
@@ -162,9 +177,14 @@ void test_local_ammo_exchange() {
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
+  const auto& intent = std::get<ResourceIntent>(context.intents[0].value);
+  const auto& request = intent.request;
   CHECK(request.ammo == 50);
   CHECK(request.remote_ammo == 0);
+  CHECK(intent.action.kind == DecisionActionKind::kAmmoExchange);
+  CHECK(intent.action.target == 50);
+  CHECK(intent.action.retry_interval == Duration{600});
+  CHECK(intent.action.max_attempts == 3);
 }
 
 // 不在增益点且脱战时，改走远程兑换发弹量。
@@ -179,9 +199,12 @@ void test_remote_ammo_exchange_without_gain_point() {
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  const auto& request = std::get<ResourceRequest>(context.intents[0].value);
+  const auto& intent = std::get<ResourceIntent>(context.intents[0].value);
+  const auto& request = intent.request;
   CHECK(request.remote_ammo == 1);
   CHECK(request.ammo == 0);
+  CHECK(intent.action.kind == DecisionActionKind::kRemoteAmmoExchange);
+  CHECK(intent.action.target == 1);
 }
 
 // 远程兑换发弹量金币不足（100 < 150）时不请求。
@@ -225,7 +248,7 @@ void test_ammo_exchange_accepts_supply_bit() {
   context.clear_intents();
   tree.tickOnce();
   CHECK(context.intents.size() == 1);
-  CHECK(std::get<ResourceRequest>(context.intents[0].value).ammo == 50);
+  CHECK(std::get<ResourceIntent>(context.intents[0].value).request.ammo == 50);
 }
 
 // 前置条件：未脱战时不请求远程兑换血量 / 发弹量。

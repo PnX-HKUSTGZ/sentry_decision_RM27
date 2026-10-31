@@ -71,8 +71,7 @@ void test_rejected_action_keeps_world() {
 
 // 派发器 + 仿真世界 + 裁判上行：发出 -> 世界结算 -> 上行回填 -> 校验生效。
 void test_dispatch_verify_roundtrip() {
-  ActionDispatcher dispatcher(
-      ActionDispatcherConfig{Duration{100}, 3, Duration{100}, 0});
+  ActionDispatcher dispatcher;
   const TimePoint t0{};
 
   UpstreamState upstream;
@@ -81,22 +80,27 @@ void test_dispatch_verify_roundtrip() {
   upstream.game_status = GameStatus::kRunning;
   upstream.info1.ammo_exchanged_local = 0;
 
-  DecisionAction delta;
-  delta.kind = DecisionActionKind::kAmmoExchange;
-  delta.value = 10;  // 决策层给的是增量
+  ActionRequest request;
+  request.kind = DecisionActionKind::kAmmoExchange;
+  request.target = 10;  // 由 action factory 按累计值折算后的目标
+  request.delta = 10;
+  request.retry_interval = Duration{100};
+  request.max_attempts = 3;
+  request.verify = ActionVerify::kAmmoExchangedLocal;
+  request.monotonic = true;
 
-  dispatcher.submit(delta);
+  dispatcher.submit(request);
   const auto outgoing = dispatcher.poll(t0, &upstream);
   CHECK(outgoing.size() == 1);
   CHECK(outgoing[0].value == 10);  // 0 + 10，折算成累计目标
 
   // 等待期内不重发。
-  dispatcher.submit(delta);
+  dispatcher.submit(request);
   CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
 
   // 裁判上行回填累计值 -> 判定生效，不再下发。
   upstream.info1.ammo_exchanged_local = 10;
-  dispatcher.submit(delta);
+  dispatcher.submit(request);
   CHECK(dispatcher.poll(t0 + Duration{100}, &upstream).empty());
   const auto report = dispatcher.last_report();
   CHECK(report.has_value());

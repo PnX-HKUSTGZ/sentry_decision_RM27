@@ -12,24 +12,26 @@
     <ReactiveFallback name="ResourcePriority">
       <Sequence name="InstantRevive">
         <IfCanInstantResurrect/>
-        <RequestInstantRevive/>
+        <RequestInstantRevive retry_ms="200" max_attempts="3"/>
       </Sequence>
       <Sequence name="FreeRevive">
         <IfCanFreeResurrect/>
-        <RequestFreeRevive/>
+        <RequestFreeRevive retry_ms="200" max_attempts="0"/>
       </Sequence>
       <!-- 远程兑换血量：暂时禁用（上一赛季打法，保留以便恢复）。 -->
       <!-- <Sequence name="RemoteHpExchange">
         <IfLowHp hp_key="resource.hp_exchange_threshold"/>
         <IfDisengaged/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
-        <RequestRemoteHpExchange times_key="resource.remote_hp_times"/>
+        <RequestRemoteHpExchange times_key="resource.remote_hp_times"
+                                 retry_ms="600" max_attempts="3"/>
       </Sequence> -->
       <Sequence name="LocalAmmoExchange">
         <IfLowAmmo ammo_key="nav.low_ammo"/>
         <IfOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.min_coins"/>
-        <RequestAmmoExchange amount_key="resource.exchange_ammo_step"/>
+        <RequestAmmoExchange amount_key="resource.exchange_ammo_step"
+                             retry_ms="600" max_attempts="3"/>
       </Sequence>
       <!-- 远程兑换发弹量：暂时禁用（上一赛季打法，保留以便恢复）。 -->
       <!-- <Sequence name="RemoteAmmoExchange">
@@ -37,7 +39,8 @@
         <IfDisengaged/>
         <IfNotOccupyingGainPoint/>
         <IfCoinsAtLeast coins_key="resource.remote_ammo_min_coins"/>
-        <RequestRemoteAmmoExchange times_key="resource.remote_ammo_times"/>
+        <RequestRemoteAmmoExchange times_key="resource.remote_ammo_times"
+                                   retry_ms="600" max_attempts="3"/>
       </Sequence> -->
     </ReactiveFallback>
   </BehaviorTree>

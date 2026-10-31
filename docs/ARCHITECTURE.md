@@ -127,9 +127,10 @@ ROS 图上收发。`sentry_interfaces` 是决策 ↔ auto-aim 的契约，auto-a
 - 下行值是裁判 0x0120 要求的**累计目标值 / 电平位**，不是本次增量：本地兑换发弹量 = 本场累计兑换量，
   远程兑换 = 累计请求次数，复活 = bit 0 / bit 1 的 0 或 1。重复下发同一目标是幂等的。
 - MCU **只转发**：维护一份 4 字节 0x0120 状态并更新对应字段，不回执、不判断成功。
-- 决策侧 `ActionDispatcher` 发出后等 `action.verify_delay_ms`，用 0x020D 的累计值 / 血量判断是否生效；
-  未生效重发同一目标，最多 `action.max_attempts` 次；复活动作按 `action.revive_verify_delay_ms`
-  持续置位，完成或放弃后补发 0 清零。
+- 动作的重试策略由行为树节点构造 `ActionRequest` 时传入（`retry_interval` / `max_attempts` /
+  `verify` / `level`），经 `ResourceIntent` 与仲裁带到 `ActionDispatcher`；dispatcher 只做通用的
+  「发送 → 等待 → 校验 → 重试 / 放弃」，不按 `kind` 分支。
+- 协议字段、累计值折算、最小兑换单位集中在 `core/action_factory`；复活动作完成或放弃后补发 0 清零。
 
 IMU 姿态（四元数）由下位机传感器提供，决策当前暂不使用，作为 `SelfState.imu` 保留。
 

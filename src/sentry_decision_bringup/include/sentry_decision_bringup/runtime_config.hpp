@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "sentry_decision_core/action_dispatcher.hpp"
 #include "sentry_decision_core/config.hpp"
 #include "sentry_decision_core/safety_supervisor.hpp"
 #include "sentry_decision_core/world_model.hpp"
@@ -59,18 +58,6 @@ inline sentry_decision::SafetyLimits safety_limits_from_config(
   limits.require_upstream = config_flag(config, "safety.require_upstream");
   limits.require_odometry = config_flag(config, "safety.require_odometry");
   return limits;
-}
-
-inline sentry_decision::ActionDispatcherConfig action_config_from_config(
-    const sentry_decision::PolicyConfig* config) {
-  sentry_decision::ActionDispatcherConfig action_config;
-  action_config.verify_delay = ms_from_config(config, "action.verify_delay_ms");
-  action_config.max_attempts =
-      static_cast<int>(config_number(config, "action.max_attempts"));
-  action_config.revive_verify_delay = ms_from_config(config, "action.revive_verify_delay_ms");
-  action_config.revive_max_attempts =
-      static_cast<int>(config_number(config, "action.revive_max_attempts"));
-  return action_config;
 }
 
 }  // namespace sentry_decision_bringup

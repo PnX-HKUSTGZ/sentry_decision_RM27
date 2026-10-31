@@ -2,6 +2,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include "sentry_decision_core/action_factory.hpp"
+
 #include <cctype>
 #include <cmath>
 #include <filesystem>
@@ -223,6 +225,20 @@ ConfigLoadResult load_policy_config(const std::string& profiles_path) {
     flatten_scalars(policy, "", &result.config, &result.errors);
   } catch (const std::exception& ex) {
     result.errors.push_back("读取策略配置失败(" + policy_path.string() + "): " + ex.what());
+  }
+
+  // 规则约束：17mm 增益点兑换最小 10 发；远程兑换每次只能 +1 次。
+  const auto ammo_step = result.config.number("resource.exchange_ammo_step");
+  if (ammo_step.has_value() &&
+      static_cast<int>(ammo_step.value()) % sentry_decision::kAmmoExchangeUnit != 0) {
+    result.errors.push_back("resource.exchange_ammo_step 必须是 " +
+                            std::to_string(sentry_decision::kAmmoExchangeUnit) + " 的倍数");
+  }
+  for (const char* key : {"resource.remote_ammo_times", "resource.remote_hp_times"}) {
+    const auto times = result.config.number(key);
+    if (times.has_value() && times.value() > 1.0) {
+      result.errors.push_back(std::string(key) + " 必须为 1（协议要求每次只能 +1）");
+    }
   }
 
   return result;

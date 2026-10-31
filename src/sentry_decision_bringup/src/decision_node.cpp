@@ -161,7 +161,6 @@ class DecisionNode : public rclcpp::Node {
       : Node("sentry_decision"),
         io_(std::move(io)),
         world_model_(*io_, *io_, *io_, sentry_decision_bringup::timeouts_from_config(config)),
-        dispatcher_(sentry_decision_bringup::action_config_from_config(config)),
         safety_(sentry_decision_bringup::safety_limits_from_config(config)),
         state_publisher_(*this),
         max_ticks_(options.ticks) {
@@ -346,9 +345,11 @@ class DecisionNode : public rclcpp::Node {
     }
   }
 
-  // 资源请求 -> 决策动作：派发器折算累计目标值，并用裁判上行做生效校验与重试。
+  // 资源请求 -> 决策动作：行为树已把目标值和重试策略放进 ActionRequest。
   void apply_actions(const sentry_decision::ArbiterResult& result, sentry_decision::TimePoint now) {
-    sentry_decision::submit_resource_requests(dispatcher_, result.output.resource);
+    if (result.output.action.kind != sentry_decision::DecisionActionKind::kNone) {
+      dispatcher_.submit(result.output.action);
+    }
     for (const auto& action : dispatcher_.poll(now, &context_.world.upstream)) {
       io_->send_action(action);
       if (action.value > 0) {

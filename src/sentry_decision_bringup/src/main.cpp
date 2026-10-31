@@ -118,11 +118,9 @@ int main(int argc, char** argv) {
   // 运行期参数（安全限幅 / 输入超时 / 动作超时）来自 config/policies yaml，缺项即启动失败。
   sentry_decision::WorldTimeouts runtime_timeouts;
   sentry_decision::SafetyLimits safety_limits;
-  sentry_decision::ActionDispatcherConfig action_config;
   try {
     runtime_timeouts = sentry_decision_bringup::timeouts_from_config(&loaded.config);
     safety_limits = sentry_decision_bringup::safety_limits_from_config(&loaded.config);
-    action_config = sentry_decision_bringup::action_config_from_config(&loaded.config);
   } catch (const std::exception& ex) {
     std::cerr << "运行参数加载失败: " << ex.what() << "\n";
     return 1;
@@ -184,7 +182,7 @@ int main(int argc, char** argv) {
   }();
 
   sentry_decision::IntentArbiter arbiter;
-  sentry_decision::ActionDispatcher dispatcher(action_config);
+  sentry_decision::ActionDispatcher dispatcher;
   sentry_decision::TacticalOverride tactical_override;
   sentry_decision::SafetySupervisor safety(safety_limits);
   sentry_decision_sim::DecisionActuatorSim actuator(2);
@@ -235,7 +233,9 @@ int main(int argc, char** argv) {
     }
 
     // 本地仿真没有裁判上行回填，按「不校验」模式只下发一次。
-    sentry_decision::submit_resource_requests(dispatcher, safe_result.output.resource);
+    if (safe_result.output.action.kind != sentry_decision::DecisionActionKind::kNone) {
+      dispatcher.submit(safe_result.output.action);
+    }
     for (const auto& action : dispatcher.poll(now, nullptr)) {
       actuator.send_action(action);
     }

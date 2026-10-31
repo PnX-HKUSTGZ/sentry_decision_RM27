@@ -21,6 +21,7 @@
 | v0.4.x 双仓库联调与决策树 | 真实导航接入、初版主决策树 | ✅ v0.4.0 / v0.4.1 |
 | v0.5.0 通信链路重构 | auto-aim 独占串口，决策 ↔ auto-aim 走 ROS | ✅ |
 | v0.5.1 通信简化 | 取消回执，下发累计目标值并用裁判上行校验重试 | ✅ |
+| v0.5.2 动作策略下沉 | 重试策略由行为树 `ActionRequest` 传入，dispatcher 通用化 | ✅ |
 | P4 切换与冻结 | 实车 / 仿真跑通，旧仓库归档 | ⏳ 进行中 |
 
 ## 已完成阶段（摘要）
@@ -98,6 +99,12 @@ core 确定性回放 `ReplaySource` 与 rosbag 读取 `load_replay_data`、本�
   未生效按配置重试，超过次数上限后放弃。
 - 串口 `DecisionCommand` 12 B → 9 B；删除本地兑换血量（0x0120 无对应字段）。
 - 详见 [CHANGELOG.md](CHANGELOG.md) v0.5.1 与 [INTERFACES.md](INTERFACES.md) §6。
+
+### v0.5.2 动作策略下沉
+
+- 新增 `ActionRequest` / `ResourceIntent` / `action_factory`；dispatcher 只做通用重试。
+- 行为树节点通过 `retry_ms` / `max_attempts` / `amount` / `times` 端口传入策略与数量。
+- 最小兑换单位（10 / 100）与 1000 发上限在工厂 / 配置加载层校验。
 
 ## P4 切换与冻结
 

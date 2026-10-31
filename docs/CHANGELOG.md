@@ -7,6 +7,26 @@
 > [注意] 本文档是项目历史的单一事实来源，应随项目演进保持更新。
 > [注意] 本文档不是所有变更的完整清单；只记录重要变更并保持简洁易读。完整变更见版本控制系统（如 Git）历史。
 
+## [v0.5.2] - 2026-10-31
+
+> 动作策略下沉：重试间隔 / 次数 / 生效判据不再由 dispatcher 按 `kind` 反推，
+> 改由行为树节点随动作一起传入；兑换数量与最小单位也在工厂层统一处理。
+
+### Added
+
+- `ActionRequest` / `ResourceIntent`：动作语义（`target` / `retry_interval` / `max_attempts` /
+  `verify` / `level`）随意图经仲裁带到 dispatcher。
+- `core/action_factory`：集中处理累计目标值、0x020D 判据、最小兑换单位（10 / 100）与 1000 发上限。
+- `Request*` 节点新增 `retry_ms` / `max_attempts` 端口，`RequestAmmoExchange` 新增 `amount`，
+  远程兑换节点新增 `times`；省略时回退到 config。
+
+### Changed
+
+- `ActionDispatcher` 变成通用重试引擎，删除 `ActionDispatcherConfig` 与按 `kind` 的
+  `delay_for` / `max_attempts_for` / `compute_target` / `action_effective`。
+- 配置加载新增规则校验：`resource.exchange_ammo_step` 必须是 10 的倍数；
+  `resource.remote_*_times` 必须为 1（协议要求每次只能 +1）。
+
 ## [v0.5.1] - 2026-10-31
 
 > 通信简化：取消执行回执，改为「下发累计目标值 → 用裁判上行校验 → 未生效重试」。

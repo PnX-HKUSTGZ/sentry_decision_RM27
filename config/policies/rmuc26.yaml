@@ -26,6 +26,8 @@ timeouts:
   odometry_ms: 500              # 里程计有效期：/odometry 由点云回调驱动、约 10Hz，过短会偶发判失效导致急停抖动
   navigation_ms: 500            # 导航状态有效期
 action:
+  # 注意：tree/resource/root.xml 的 Request* 节点已显式传 retry_ms / max_attempts；
+  # 删掉端口后才会回退到这里的值。
   verify_delay_ms: 600          # 普通动作发出后等待多久再查裁判数据（约 6 帧 10Hz 上行）
   max_attempts: 3               # 普通动作最多下发次数（含首次），仍无效则放弃
   revive_verify_delay_ms: 200   # 复活类电平位的检查 / 重发间隔

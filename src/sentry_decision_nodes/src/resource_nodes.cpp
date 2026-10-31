@@ -1,19 +1,62 @@
 #include "sentry_decision_nodes/resource_nodes.hpp"
 
+#include "sentry_decision_core/action_factory.hpp"
 #include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_nodes/detail/node_helpers.hpp"
 
 namespace sentry_decision {
 namespace {
 
-void emit_resource(DecisionContext* context, const ResourceRequest& request) {
+void emit_resource(DecisionContext* context, const ResourceRequest& request,
+                   const ActionRequest& action) {
+  ResourceIntent resource;
+  resource.request = request;
+  resource.action = action;
+
   Intent intent;
   intent.field = IntentField::kResourceRequest;
   intent.source = SourceId::kSkill;
   intent.priority = Priority::kTactical;
   intent.stamp = context->world.stamp;
-  intent.value = request;
+  intent.value = resource;
   context->emit(intent);
+}
+
+int int_port_or_negative(BT::TreeNode& node, const char* key) {
+  const auto value = node.getInput<int>(key);
+  return value ? value.value() : -1;
+}
+
+// 解析重试策略：树端口优先，其次 config key；两者都没有则失败（配置错误）。
+bool resolve_policy(const DecisionContext* context, const char* node, const char* retry_key,
+                    const char* attempts_key, int retry_override_ms, int attempts_override,
+                    Duration* retry, int* max_attempts) {
+  if (retry_override_ms >= 0) {
+    *retry = Duration{retry_override_ms};
+  } else if (context != nullptr && context->config != nullptr) {
+    const auto value = context->config->number(retry_key);
+    if (!value.has_value()) {
+      SD_LOG_WARN("resource", "%s 缺少配置 key: %s", node, retry_key);
+      return false;
+    }
+    *retry = Duration{static_cast<std::int64_t>(value.value())};
+  } else {
+    return false;
+  }
+
+  if (attempts_override >= 0) {
+    *max_attempts = attempts_override;
+  } else if (context != nullptr && context->config != nullptr) {
+    const auto value = context->config->number(attempts_key);
+    if (!value.has_value()) {
+      SD_LOG_WARN("resource", "%s 缺少配置 key: %s", node, attempts_key);
+      return false;
+    }
+    *max_attempts = static_cast<int>(value.value());
+  } else {
+    return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -163,17 +206,24 @@ RequestFreeRevive::RequestFreeRevive(const std::string& name, const BT::NodeConf
     : BT::SyncActionNode(name, config) {}
 
 BT::PortsList RequestFreeRevive::providedPorts() {
-  return {};
+  return {BT::InputPort<int>("retry_ms"), BT::InputPort<int>("max_attempts")};
 }
 
 BT::NodeStatus RequestFreeRevive::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr) {
+  if (context == nullptr || !context->world.upstream.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  Duration retry;
+  int max_attempts = 0;
+  if (!resolve_policy(context, "RequestFreeRevive", "action.revive_verify_delay_ms",
+                      "action.revive_max_attempts", int_port_or_negative(*this, "retry_ms"),
+                      int_port_or_negative(*this, "max_attempts"), &retry, &max_attempts)) {
     return BT::NodeStatus::FAILURE;
   }
   ResourceRequest request;
   request.revive = true;
-  emit_resource(context, request);
+  emit_resource(context, request, make_free_resurrect(retry, max_attempts));
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -203,19 +253,33 @@ RequestRemoteHpExchange::RequestRemoteHpExchange(const std::string& name,
     : BT::SyncActionNode(name, config) {}
 
 BT::PortsList RequestRemoteHpExchange::providedPorts() {
-  return {BT::InputPort<std::string>("times_key")};
+  return {BT::InputPort<std::string>("times_key"), BT::InputPort<int>("times"),
+          BT::InputPort<int>("retry_ms"), BT::InputPort<int>("max_attempts")};
 }
 
 BT::NodeStatus RequestRemoteHpExchange::tick() {
-  const auto key = getInput<std::string>("times_key");
-  int times = 0;
-  if (!key || !times_from_config(config(), key.value(), "RequestRemoteHpExchange", &times)) {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  DecisionContext* context = context_from(config());
+  int times = int_port_or_negative(*this, "times");
+  if (times < 0) {
+    const auto key = getInput<std::string>("times_key");
+    if (!key || !times_from_config(config(), key.value(), "RequestRemoteHpExchange", &times)) {
+      return BT::NodeStatus::FAILURE;
+    }
+  }
+  Duration retry;
+  int max_attempts = 0;
+  if (!resolve_policy(context, "RequestRemoteHpExchange", "action.verify_delay_ms",
+                      "action.max_attempts", int_port_or_negative(*this, "retry_ms"),
+                      int_port_or_negative(*this, "max_attempts"), &retry, &max_attempts)) {
+    return BT::NodeStatus::FAILURE;
+  }
   ResourceRequest request;
   request.remote_hp = times;
-  emit_resource(context, request);
+  emit_resource(context, request,
+                make_remote_hp_exchange(context->world.upstream, times, retry, max_attempts));
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -225,19 +289,33 @@ RequestRemoteAmmoExchange::RequestRemoteAmmoExchange(const std::string& name,
     : BT::SyncActionNode(name, config) {}
 
 BT::PortsList RequestRemoteAmmoExchange::providedPorts() {
-  return {BT::InputPort<std::string>("times_key")};
+  return {BT::InputPort<std::string>("times_key"), BT::InputPort<int>("times"),
+          BT::InputPort<int>("retry_ms"), BT::InputPort<int>("max_attempts")};
 }
 
 BT::NodeStatus RequestRemoteAmmoExchange::tick() {
-  const auto key = getInput<std::string>("times_key");
-  int times = 0;
-  if (!key || !times_from_config(config(), key.value(), "RequestRemoteAmmoExchange", &times)) {
+  DecisionContext* context = context_from(config());
+  if (context == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  DecisionContext* context = context_from(config());
+  int times = int_port_or_negative(*this, "times");
+  if (times < 0) {
+    const auto key = getInput<std::string>("times_key");
+    if (!key || !times_from_config(config(), key.value(), "RequestRemoteAmmoExchange", &times)) {
+      return BT::NodeStatus::FAILURE;
+    }
+  }
+  Duration retry;
+  int max_attempts = 0;
+  if (!resolve_policy(context, "RequestRemoteAmmoExchange", "action.verify_delay_ms",
+                      "action.max_attempts", int_port_or_negative(*this, "retry_ms"),
+                      int_port_or_negative(*this, "max_attempts"), &retry, &max_attempts)) {
+    return BT::NodeStatus::FAILURE;
+  }
   ResourceRequest request;
   request.remote_ammo = times;
-  emit_resource(context, request);
+  emit_resource(context, request,
+                make_remote_ammo_exchange(context->world.upstream, times, retry, max_attempts));
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -246,17 +324,24 @@ RequestInstantRevive::RequestInstantRevive(const std::string& name, const BT::No
     : BT::SyncActionNode(name, config) {}
 
 BT::PortsList RequestInstantRevive::providedPorts() {
-  return {};
+  return {BT::InputPort<int>("retry_ms"), BT::InputPort<int>("max_attempts")};
 }
 
 BT::NodeStatus RequestInstantRevive::tick() {
   DecisionContext* context = context_from(config());
-  if (context == nullptr) {
+  if (context == nullptr || !context->world.upstream.valid) {
+    return BT::NodeStatus::FAILURE;
+  }
+  Duration retry;
+  int max_attempts = 0;
+  if (!resolve_policy(context, "RequestInstantRevive", "action.revive_verify_delay_ms",
+                      "action.max_attempts", int_port_or_negative(*this, "retry_ms"),
+                      int_port_or_negative(*this, "max_attempts"), &retry, &max_attempts)) {
     return BT::NodeStatus::FAILURE;
   }
   ResourceRequest request;
   request.instant_revive = true;
-  emit_resource(context, request);
+  emit_resource(context, request, make_instant_resurrect(retry, max_attempts));
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -265,26 +350,39 @@ RequestAmmoExchange::RequestAmmoExchange(const std::string& name, const BT::Node
     : BT::SyncActionNode(name, config) {}
 
 BT::PortsList RequestAmmoExchange::providedPorts() {
-  return {BT::InputPort<std::string>("amount_key")};
+  return {BT::InputPort<std::string>("amount_key"), BT::InputPort<int>("amount"),
+          BT::InputPort<int>("retry_ms"), BT::InputPort<int>("max_attempts")};
 }
 
 BT::NodeStatus RequestAmmoExchange::tick() {
-  const auto key = getInput<std::string>("amount_key");
-  if (!key) {
-    return BT::NodeStatus::FAILURE;
-  }
   DecisionContext* context = context_from(config());
-  if (context == nullptr || context->config == nullptr) {
+  if (context == nullptr || context->config == nullptr || !context->world.upstream.valid) {
     return BT::NodeStatus::FAILURE;
   }
-  const auto amount = context->config->number(key.value());
-  if (!amount.has_value()) {
-    SD_LOG_WARN("resource", "RequestAmmoExchange 缺少配置 key: %s", key.value().c_str());
+  int amount = int_port_or_negative(*this, "amount");
+  if (amount < 0) {
+    const auto key = getInput<std::string>("amount_key");
+    if (!key) {
+      return BT::NodeStatus::FAILURE;
+    }
+    const auto configured = context->config->number(key.value());
+    if (!configured.has_value()) {
+      SD_LOG_WARN("resource", "RequestAmmoExchange 缺少配置 key: %s", key.value().c_str());
+      return BT::NodeStatus::FAILURE;
+    }
+    amount = static_cast<int>(configured.value());
+  }
+  Duration retry;
+  int max_attempts = 0;
+  if (!resolve_policy(context, "RequestAmmoExchange", "action.verify_delay_ms",
+                      "action.max_attempts", int_port_or_negative(*this, "retry_ms"),
+                      int_port_or_negative(*this, "max_attempts"), &retry, &max_attempts)) {
     return BT::NodeStatus::FAILURE;
   }
   ResourceRequest request;
-  request.ammo = static_cast<int>(amount.value());
-  emit_resource(context, request);
+  request.ammo = amount;
+  emit_resource(context, request,
+                make_ammo_exchange(context->world.upstream, amount, retry, max_attempts));
   return BT::NodeStatus::SUCCESS;
 }
 

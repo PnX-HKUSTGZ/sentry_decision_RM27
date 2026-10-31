@@ -93,10 +93,18 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 | 5 | 远程兑换血量 | 本次 1 次 | `当前次数 + 1` | bit 15-18 ≥ 目标值 |
 
 - 发弹量 / 远程次数必须**单调递增**；远程次数协议要求每次只能 +1。
-- 复活是**电平位**：待复活期间按 `action.revive_verify_delay_ms` 持续置 1；复活完成或放弃后补发 0。
-- 决策侧在 `action.verify_delay_ms` 后用上表判据检查；未生效则重发同一目标，最多 `action.max_attempts` 次。
+- 最小兑换单位（2027 表 5-8 / 5-9）：17mm 增益点 **10 发**，远程 **100 发**。
+  本地兑换的增量必须是 10 的整数倍；远程的 `value` 是次数，`+1` 就代表 100 发。
+- 复活是**电平位**：待复活期间持续置 1；复活完成或放弃后补发 0。
+- **重试策略由行为树随动作一起传入**：节点构造 `ActionRequest`（`target` / `retry_interval` /
+  `max_attempts` / `verify` / `level`），经 `ResourceIntent` 和仲裁原样带到 `ActionDispatcher`。
+  `ActionDispatcher` 不按 `kind` 猜策略。
+- 行为树端口：`retry_ms`、`max_attempts` 可直接写数字；省略时回退到 config 的
+  `action.verify_delay_ms` / `action.max_attempts`（复活用 `action.revive_verify_delay_ms` /
+  `action.revive_max_attempts`）。
+- 决策侧在 `retry_interval` 后用上表判据检查；未生效则重发同一目标，达到 `max_attempts` 后放弃。
   复活动作在拿到有效裁判数据前不会开始，避免无基线乱发。
-- 放弃后，只要同一个请求还在持续，就不再重试；请求消失或 `value` 变化后重新开始。
+- 放弃后，只要同一个请求还在持续，就不再重试；请求消失或增量 / 策略变化后重新开始。
 
 ## 7. 生效校验链路
 

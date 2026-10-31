@@ -111,10 +111,11 @@ class IfCanInstantResurrect : public BT::SyncActionNode {
 // Node:         RequestFreeRevive
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求确认免费复活。
-// Inputs:       -
+// Inputs:       retry_ms: int (可选，覆盖 action.revive_verify_delay_ms)
+//               max_attempts: int (可选，0 = 不限，覆盖 action.revive_max_attempts)
 // Blackboard:   read: context  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（revive = true）。
-// See:          tree/resource/root.xml -> Revive
+// Side Effects: 写入一条 kResourceRequest 意图（request.revive = true + action 策略）。
+// See:          tree/resource/root.xml -> FreeRevive
 class RequestFreeRevive : public BT::SyncActionNode {
  public:
   RequestFreeRevive(const std::string& name, const BT::NodeConfig& config);
@@ -125,9 +126,11 @@ class RequestFreeRevive : public BT::SyncActionNode {
 // Node:         RequestRemoteHpExchange
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求远程兑换血量（需脱战，规则只允许远程兑换）。
-// Inputs:       times_key: string (端口, 配置 key, 兑换次数)
-// Blackboard:   read: context(config)  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（remote_hp = 次数）。
+// Inputs:       times_key: string (配置 key, 兑换次数)
+//               times: int (可选，直接指定次数，优先于 times_key)
+//               retry_ms / max_attempts: int (可选，覆盖 action.verify_delay_ms / max_attempts)
+// Blackboard:   read: context(config, world.upstream)  write: context.intents
+// Side Effects: 写入一条 kResourceRequest 意图（request.remote_hp + action 策略）。
 // See:          tree/resource/root.xml -> RemoteHpExchange
 class RequestRemoteHpExchange : public BT::SyncActionNode {
  public:
@@ -139,9 +142,11 @@ class RequestRemoteHpExchange : public BT::SyncActionNode {
 // Node:         RequestRemoteAmmoExchange
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求远程兑换发弹量（脱战且不在增益点时）。
-// Inputs:       times_key: string (端口, 配置 key, 兑换次数)
-// Blackboard:   read: context(config)  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（remote_ammo = 次数）。
+// Inputs:       times_key: string (配置 key, 兑换次数)
+//               times: int (可选，直接指定次数，优先于 times_key)
+//               retry_ms / max_attempts: int (可选，覆盖 action.verify_delay_ms / max_attempts)
+// Blackboard:   read: context(config, world.upstream)  write: context.intents
+// Side Effects: 写入一条 kResourceRequest 意图（request.remote_ammo + action 策略）。
 // See:          tree/resource/root.xml -> RemoteAmmoExchange
 class RequestRemoteAmmoExchange : public BT::SyncActionNode {
  public:
@@ -153,9 +158,10 @@ class RequestRemoteAmmoExchange : public BT::SyncActionNode {
 // Node:         RequestInstantRevive
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求兑换立即复活。
-// Inputs:       -
+// Inputs:       retry_ms: int (可选，覆盖 action.revive_verify_delay_ms)
+//               max_attempts: int (可选，覆盖 action.max_attempts)
 // Blackboard:   read: context  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（instant_revive = true）。
+// Side Effects: 写入一条 kResourceRequest 意图（request.instant_revive + action 策略）。
 // See:          tree/resource/root.xml -> InstantRevive
 class RequestInstantRevive : public BT::SyncActionNode {
  public:
@@ -167,10 +173,12 @@ class RequestInstantRevive : public BT::SyncActionNode {
 // Node:         RequestAmmoExchange
 // Category:     Action (synchronous, writes one Intent)
 // Purpose:      请求兑换发弹量。
-// Inputs:       amount_key: string (端口, 配置 key, 兑换数量)
-// Blackboard:   read: context(config)  write: context.intents
-// Side Effects: 写入一条 kResourceRequest 意图（ammo = 数量）。
-// See:          tree/resource/root.xml -> AmmoExchange
+// Inputs:       amount_key: string (配置 key, 兑换数量)
+//               amount: int (可选，直接指定数量，优先于 amount_key)
+//               retry_ms / max_attempts: int (可选，覆盖 action.verify_delay_ms / max_attempts)
+// Blackboard:   read: context(config, world.upstream)  write: context.intents
+// Side Effects: 写入一条 kResourceRequest 意图（request.ammo + action 策略）。
+// See:          tree/resource/root.xml -> LocalAmmoExchange
 class RequestAmmoExchange : public BT::SyncActionNode {
  public:
   RequestAmmoExchange(const std::string& name, const BT::NodeConfig& config);

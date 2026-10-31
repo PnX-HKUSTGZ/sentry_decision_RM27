@@ -10,7 +10,7 @@
 
 ## 项目状态
 
-> :white_check_mark: **v0.5.1**：决策 ↔ auto-aim 的 ROS 上位机链路（`sentry_interfaces`）已落地，auto-aim 独占串口并实现协议 v1；取消执行回执，改由决策侧用裁判上行校验生效并重试。
+> :white_check_mark: **v0.5.2**：决策 ↔ auto-aim 的 ROS 上位机链路（`sentry_interfaces`）已落地；取消执行回执，改由决策侧用裁判上行校验生效并重试；动作的重试策略由行为树随 `ActionRequest` 传入。
 > 信念层完成一致性改名（`RefereeState` → `UpstreamState`），并移除未启用的雷达 / 变形字段。
 >
 > 下一步（v0.6.0 / P4）：实车与导航仓库联合跑通，MCU 侧实现协议 v1。完整历史见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，当前进度见 [docs/NOTE.md](docs/NOTE.md)。
