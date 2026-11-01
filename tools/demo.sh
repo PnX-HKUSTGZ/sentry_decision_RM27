@@ -5,13 +5,14 @@
 # 各进程的 stdout 汇到当前终端并按 [viz]/[sim]/[decision] 加前缀，
 # 同时各写一份到 .docker-build/demo_logs/<name>.log。Ctrl+C 停止全部。
 #
-# 用法（默认不弹任何图形界面，无头模式）：
-#   tools/demo.sh                    # 仿真 + 决策（无 RViz / 无 Gazebo 窗口）
+# 用法（默认启动网页面板 8080/9090；导航侧窗口默认关闭）：
+#   tools/demo.sh                    # 仿真 + 决策 + 网页面板
+#   tools/demo.sh --headless         # 无头模式：不启动网页面板，也不开任何窗口
 #   tools/demo.sh --with-nav         # 双仓库联调：额外起真实导航容器（导航 RViz/Gazebo 默认关闭）
-#   tools/demo.sh --viz              # 打开本仓库网页面板 + 决策 RViz
 #   tools/demo.sh --gazebo           # 打开导航侧 Gazebo 客户端窗口
 #   tools/demo.sh --with-nav --nav-viz  # 打开导航 RViz
-#   tools/demo.sh --no-viz           # 兼容旧写法：强制关闭网页面板
+#   tools/demo.sh --viz              # 兼容旧写法：显式打开网页面板（现在默认已开）
+#   tools/demo.sh --no-viz           # 兼容旧写法：只关闭网页面板
 #   tools/demo.sh --nav-silent       # 兼容旧写法：强制关闭导航 RViz
 #   tools/demo.sh --nav-gimbal-panel # 打开导航仿真里的云台控制面板（Tk 窗口）
 #   tools/demo.sh --build            # 先构建工作区
@@ -28,7 +29,8 @@ NAV_CONTAINER="${DEMO_NAV_CONTAINER:-rm27_nav_sim}"
 
 # 宿主：按是否要面板决定端口映射，按是否双仓库决定导航容器，再把参数交给容器内的自己。
 if [[ ! -f /.dockerenv ]]; then
-  need_viz=0        # 本仓库网页面板 + 决策 RViz，默认关闭
+  need_viz=1        # 本仓库网页面板（rosbridge :9090 + 页面 :8080），默认开启
+  headless=0        # --headless：关闭网页面板和所有导航窗口
   nav_viz=0         # 导航 RViz，默认关闭
   nav_gazebo=0      # 导航侧 Gazebo 客户端窗口，默认关闭
   nav_gimbal_panel=0
@@ -36,6 +38,7 @@ if [[ ! -f /.dockerenv ]]; then
   with_nav=0
   for arg in "$@"; do
     case "${arg}" in
+      --headless) headless=1 ;;
       --viz|--gui) need_viz=1 ;;
       --no-viz) need_viz=0 ;;
       --gazebo) nav_gazebo=1 ;;
@@ -46,6 +49,12 @@ if [[ ! -f /.dockerenv ]]; then
       --with-nav) with_nav=1 ;;
     esac
   done
+  if [[ "${headless}" == 1 ]]; then
+    need_viz=0
+    nav_viz=0
+    nav_gazebo=0
+    nav_gimbal_panel=0
+  fi
   [[ -f "${INSTALL}/setup.bash" ]] || need_build=1
   tty=(-i)
   if [[ -t 0 ]]; then tty+=(-t); fi
@@ -134,13 +143,14 @@ if [[ ! -f /.dockerenv ]]; then
 fi
 
 # ---- 以下在容器内执行 ----
-with_viz=0
+with_viz=1
 do_build=0
 with_nav=0
 scenario=""
 rate="20.0"
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --headless) with_viz=0; shift ;;
     --viz|--gui) with_viz=1; shift ;;
     --no-viz) with_viz=0; shift ;;
     --with-nav) with_nav=1; shift ;;
@@ -240,7 +250,7 @@ fi
 if [[ "${with_viz}" == 1 ]]; then
   echo "[demo] 面板 http://localhost:8080（rosbridge ws://localhost:9090）"
 else
-  echo "[demo] 无头模式：未启动网页面板/RViz，需要界面请加 --viz"
+  echo "[demo] 无头模式：未启动网页面板，也没有打开任何窗口"
 fi
 echo "[demo] Ctrl+C 停止全部"
 

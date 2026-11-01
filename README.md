@@ -41,11 +41,11 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27
   -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup decision_main"
 
 
-# 一键运行本地仿真（裁判 + 行为树 + 决策），默认无头
+# 一键运行本地仿真（裁判 + 行为树 + 决策 + 网页面板）
 tools/demo.sh --build # 首次运行需加 --build，后续可直接运行
 
-# 需要界面时按需打开
-tools/demo.sh --viz # 网页面板 + 决策 RViz
+# 无头模式（不启动网页面板，也不开任何窗口）
+tools/demo.sh --headless
 
 # 双仓库联合仿真（额外起真实导航容器，导航窗口默认关闭）
 tools/demo.sh --with-nav [--nav-viz] [--gazebo]
