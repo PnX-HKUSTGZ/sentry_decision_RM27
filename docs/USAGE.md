@@ -1,7 +1,6 @@
 # 使用说明
 
-> 面向使用者与拉车同学的命令速查：怎么构建、怎么跑、有哪些参数。
-> 本文只列命令与参数；仿真 / 场景 / 网页面板的操作细节见 [SIMULATION.md](SIMULATION.md)，
+> 命令速查；仿真 / 场景 / 网页面板的操作细节见 [SIMULATION.md](SIMULATION.md)，
 > 架构见 [ARCHITECTURE.md](ARCHITECTURE.md)，信念字段见 [BELIEF.md](BELIEF.md)。
 
 ## 1. 前置条件
@@ -12,6 +11,8 @@
 ## 2. 快速开始
 
 ### 使用 Docker 构建和运行（不依赖 LTS24.04 系统）
+
+初次运行需构建镜像和工作区，后续可直接运行仿真。
 
 ```bash
 # 构建镜像（首次，含 rosbridge 供网页面板）
@@ -31,14 +32,56 @@ docker run -it --rm -p 8080:8080 -p 9090:9090 \
   -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh \
   sentry_decision_rm27:jazzy shell
 source .docker-build/install/setup.bash
-
-# 脚本一键启动「网页面板 + 裁判仿真 + 决策节点」
-tools/demo.sh
 ```
 
-> 网页面板需要镜像含 `ros-jazzy-rosbridge-suite`；仓库 `docker/Dockerfile` 已包含。
-> 也可用 Compose：`docker compose -f docker/compose.yaml run --rm decision-dev test`。
-> 构建产物在宿主 `.docker-build/`（`install/` 安装空间、`compile_commands.json` 供 IntelliSense）。
+#### 本地仿真脚本
+
+```bash
+# 脚本一键启动「裁判仿真 + 决策节点 + 网页面板」，面板默认开启
+tools/demo.sh [--build] # 首次运行需加 --build，后续可直接运行
+
+# 无头模式：不启动网页面板，也不打开导航 RViz/Gazebo
+tools/demo.sh --headless
+
+# 需要导航侧界面时按需打开
+#   --gazebo        导航侧 Gazebo 客户端窗口
+#   --nav-viz       导航 RViz（等价旧写法 --nav-rviz）
+#   --nav-gimbal-panel  导航仿真里的云台控制面板
+#   --no-viz / --nav-silent  兼容旧写法，只关闭对应窗口
+
+# 双仓库联合仿真（额外起真实导航容器，导航窗口默认关闭）
+tools/demo.sh --with-nav [--nav-viz] [--gazebo]
+xhost +SI:localuser:root # 若遇到 RViz/Gazebo 无法显示，执行此命令允许容器访问宿主 X11
+```
+
+#### 启动导航仓库
+
+```bash
+docker run -it --rm --name nav_dev \
+  --network host \
+  -e DISPLAY="$DISPLAY" \
+  -e XAUTHORITY=/tmp/.Xauthority \
+  -v "${XAUTHORITY:-$HOME/.Xauthority}":/tmp/.Xauthority:ro \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v "$PWD/src":/ws/src \
+  -v "$PWD/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \
+  rm27_nav:jazzy bash
+```
+
+进入后：
+
+```bash
+source /ws/install/setup.bash
+
+ros2 launch rm_27_stimulation sim_with_nav.launch.py \
+  world:=RMUC2026 \
+  nav_world:=auto \
+  use_ground_truth_odom:=false \
+  navigation_mode:=minco \
+  enable_legacy_terrain:=auto \
+  gui:=true \
+  use_rviz:=true
+```
 
 ### 实机构建和运行
 
@@ -92,198 +135,7 @@ ros2 node list  # 应有 gimbal_decision_bridge / gimbal_decision_command_bridge
 ros2 topic list | grep -E 'sentry|decision|cmd_vel'
 ```
 
-## 3. 入口速查
 
-| 想做什么 | 命令 |
-| --- | --- |
-| 一键仿真演示（面板 + 仿真 + 决策） | `tools/demo.sh` |
-| 本地最小闭环（无需 ROS / MCU / 导航） | `ros2 run sentry_decision_bringup decision_main` |
-| 真实 IO 决策闭环（接 auto-aim / 导航） | `ros2 run sentry_decision_bringup decision_node` |
-| 只跑 IO 节点 | `ros2 run sentry_decision_io io_node` |
-| 裁判仿真（持续发布世界状态） | `ros2 run sentry_decision_sim referee_sim_node` |
-| 跑一个场景 | `ros2 run sentry_decision_sim referee_sim_node --scenario "$(ros2 pkg prefix sentry_decision_sim)/share/sentry_decision_sim/scenario/full_match.yaml"` |
-| 网页面板（rosbridge :9090 + 页面 :8080） | `ros2 launch sentry_decision_viz viz.launch.py` |
-| 离线回放 | `ros2 run sentry_decision_bringup replay_main --bag <bag>` |
-| 查看决策状态 | `ros2 topic echo /decision/state`（或 `/decision/world_state`、`/decision/tree_status`） |
-| 查询面板状态 | `ros2 service call /decision/debug sentry_decision_msgs/srv/DebugCommand "{command: 'list_state', args: ''}"` |
-| 宿主纯逻辑测试 | `tools/host_core_test.sh` |
-| 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
-| 格式检查 | `tools/format.sh --check` |
-
-## 4. 运行入口
-
-### 4.1 decision_main（本地最小闭环）
-
-```bash
-ros2 run sentry_decision_bringup decision_main
-```
-
-不依赖 ROS / 下位机 / 导航仓库，由 `sentry_decision_sim` 的 dummy 裁判系统与伪导航驱动信念层。
-演示行为：启动约 1 秒后血量从 400 掉到 50，行为树由巡逻抢占到撤退，伪导航朝新目标移动，
-ACT 日志显示 `mode`、`goal` 与当前位置变化。
-
-行为树源文件位于仓库根目录 `tree/`，构建后安装到 `share/sentry_decision_bringup/tree/`；
-`--tree` 默认指向安装后的 `tree/root.xml`。行为树按层组织：
-`root.xml`（组合）→ `mission/root.xml`（优先级）→ `mission/nav/*`（任务）+ `skill/*`（技能）。
-
-### 4.2 decision_node（真实 IO 闭环）
-
-```bash
-ros2 run sentry_decision_bringup decision_node
-```
-
-把 `RosIoNode`（订阅 `/sentry/*` 四条上行与 odom，发布 `/cmd_vel`、
-`/sentry/decision_command`）、行为树、`IntentArbiter` 与 `DecisionStatePublisher` 放在同一进程闭环。
-
-- **上游**：依赖 auto-aim 提供 `/sentry/game_info` 等话题；`GameInfo` 与 `SentryInfoOnline`
-  都出现过才判 `upstream.valid`。上行字段见 [BELIEF.md](BELIEF.md)。
-- **定位**：默认订阅 `/aft_mapped_to_init`，可用 `--ros-args` 覆盖（见 §5.2）。
-- **导航**：本节点是 Nav2 `navigate_to_pose` 的 **action client**，**不会启动导航栈**。
-  没有导航时启动仍正常，只是 `send_goal` 打印「导航 action server 未就绪」并丢弃目标、odom 判失效。
-  需另起导航仓库（或仿真里的 `referee_sim_node`）。
-- **下位机**：决策不接触串口；`DecisionCommand` 发给 auto-aim，由 auto-aim 经串口转 MCU。
-
-不接 MCU、只验证决策 ↔ auto-aim 的通信时，用 `referee_sim_node` 扮演上行（见 [SIMULATION.md](SIMULATION.md)），
-或让 auto-aim 正常连 MCU。
-
-### 4.3 io_node
-
-```bash
-ros2 run sentry_decision_io io_node
-ros2 node info /sentry_decision_io
-```
-
-只跑 IO 适配器，不跑行为树；用于单独检查话题接线。
-
-### 4.4 replay_main（离线回放）
-
-```bash
-ros2 bag record -o match_bag \
-  /sentry/game_info /sentry/online_info /sentry/offline_info /sentry/team_info \
-  /aft_mapped_to_init
-
-ros2 run sentry_decision_bringup replay_main --bag match_bag
-```
-
-读 `/sentry/*`（新格式）或旧标量话题，逐 tick 重跑行为树 / 仲裁 / 安全，以 ACT 日志输出现模式变化与统计。
-同一份 bag 两次回放逐 tick 一致（`replay_determinism`）。端到端冒烟：`tools/replay_smoke_test.sh`。
-
-### 4.5 裁判仿真与网页面板
-
-`referee_sim_node`、`viz.launch.py`、场景脚本、面板按钮与场地标定工具的操作与语义见
-[SIMULATION.md](SIMULATION.md)。
-
-## 5. 命令参数
-
-### 5.1 decision_main
-
-| 参数 | 默认 | 说明 |
-| --- | --- | --- |
-| `--ticks` | `50` | tick 次数 |
-| `--rate` | `20.0` | tick 频率（Hz） |
-| `--hp-drop` | `1.0` | 仿真中血量掉到 50 的秒数 |
-| `--tree` | 安装后的 `tree/root.xml` | 行为树入口 XML 路径 |
-| `--config` | 安装后的 `config/profiles.yaml` | 配置入口 YAML 路径 |
-| `--plugin` | 空 | 节点插件 `.so` 路径；为空时按 `tree_manifest.yaml` 注册 |
-
-```bash
-ros2 run sentry_decision_bringup decision_main --ticks 500 --rate 20
-```
-
-### 5.2 decision_node
-
-| 参数 | 默认 | 说明 |
-| --- | --- | --- |
-| `--rate` | `20.0` | tick 频率（Hz），取值 `(0, 1000]` |
-| `--ticks` | `0` | 运行 tick 数，`0` 表示一直运行 |
-| `--tree` | 安装后的 `tree/root.xml` | 行为树入口 XML 路径 |
-| `--config` | 安装后的 `config/profiles.yaml` | 配置入口 YAML 路径 |
-| `--plugin` | 空 | 节点插件 `.so` 路径 |
-| `--groot2-port` | `0` | Groot2 监听端口，`0` 表示关闭（范围 `[0, 65535]`） |
-
-内部 `RosIoNode` 的 ROS 参数（见 §5.3）可在 `--ros-args` 之后透传：
-```bash
-ros2 run sentry_decision_bringup decision_node --ros-args -p odom_topic:=/odometry -p odom_frame:=odom
-```
-
-### 5.3 io_node
-
-均为 ROS 参数，可用 `--ros-args -p name:=value` 覆盖。
-
-| 参数 | 默认 | 说明 |
-| --- | --- | --- |
-| `map_frame` | `map` | 导航目标坐标系 |
-| `game_info_topic` | `/sentry/game_info` | 比赛宏观信息（GameInfo） |
-| `online_info_topic` | `/sentry/online_info` | 自身在线状态（SentryInfoOnline） |
-| `offline_info_topic` | `/sentry/offline_info` | 自身视觉 / 形态（SentryInfoOffline） |
-| `team_info_topic` | `/sentry/team_info` | 队伍信息（TeamInfo） |
-| `decision_command_topic` | `/sentry/decision_command` | 决策下行（DecisionCommand） |
-| `odom_topic` | `/aft_mapped_to_init` | 里程计（Odometry） |
-| `odom_frame` | 空 | 非空时用 TF `map->odom` 把 odom 位姿转 map 系（双仓库设 `odom`） |
-| `cmd_vel_topic` | `cmd_vel` | 速度指令（Twist） |
-| `navigate_action` | `navigate_to_pose` | 导航 action（NavigateToPose） |
-
-```bash
-ros2 run sentry_decision_io io_node --ros-args \
-  -p odom_topic:=/sentry/odom -p navigate_action:=/navigate_to_pose
-```
-
-### 5.4 referee_sim_node
-
-上行 / 下行话题与 `io_node` 同名同默认；数值参数来自 `config/sim.yaml`，可用 `-p` 逐项覆盖。
-完整的命令行参数、服务与场景说明见 [SIMULATION.md](SIMULATION.md#3-裁判仿真-referee_sim_node)。
-
-### 5.5 replay_main
-
-| 参数 | 默认 | 说明 |
-| --- | --- | --- |
-| `--bag` | 必填 | rosbag2 路径（含 `/sentry/*` 上行） |
-| `--ticks` | `0` | 最多回放 tick 数，`0` 表示回放到数据结束 |
-| `--rate` | `20.0` | 回放步长频率（Hz），取值 `(0, 1000]` |
-| `--odom-topic` | `/aft_mapped_to_init` | 里程计话题 |
-| `--tree` / `--config` | 安装后的路径 | 行为树 / 配置入口 |
-
-## 6. 决策状态话题
-
-`DecisionStatePublisher` 发布决策快照，供可视化与 rosbag：
-
-| 话题 | 类型 | 说明 |
-| --- | --- | --- |
-| `/decision/state` | `sentry_decision_msgs/DecisionState` | 每 tick 的仲裁输出、冲突与告警 |
-| `/decision/world_state` | `sentry_decision_msgs/WorldState` | 信念快照摘要 |
-| `/decision/tree_status` | `sentry_decision_msgs/TreeStatus` | 行为树节点状态与 active path（transient local） |
-
-```bash
-ros2 bag record /decision/state /decision/world_state /decision/tree_status
-```
-
-`decision_node` 已接线以上发布；`decision_main` 无 ROS，不发布。
-
-## 7. 配置
-
-配置采用「单一入口 + 按职责分文件」（详见 [ARCHITECTURE.md](ARCHITECTURE.md) §15）：
-
-```text
-config/
-├── profiles.yaml           # 入口：map_profile / strategy_profile / pre_match
-├── maps/<MAP>.yaml         # 命名点（可选第 4 位区域半径）、frame
-├── policies/<POLICY>.yaml  # 阈值、时间窗、兑换步长、安全限幅、超时
-└── sim.yaml                # 仿真参数：max_hp / 导航速度 / 阶段时长 / 区域与效果
-```
-
-XML 不写数值：坐标用命名点（`point="home"`），阈值用配置 key（`hp_key="nav.retreat_hp"`）。
-启动时校验配置与行为树引用的完整性与取值范围，缺失或越界即启动报错并列出缺项，生效配置打印为 ACT 日志。
-
-## 8. 测试
-
-| 范围 | 命令 |
-| --- | --- |
-| 宿主 core 单测（无需 ROS） | `tools/host_core_test.sh` |
-| 容器全量 | `docker/entrypoint.sh test` |
-| io 冒烟 | 容器内 `tools/io_smoke_test.sh` |
-| 场景 / 回放 / 面板 / 比赛阶段 / 世界结算冒烟 | `tools/scenario_smoke_test.sh`、`tools/replay_smoke_test.sh`、`tools/viz_smoke_test.sh`、`tools/match_smoke_test.sh`、`tools/sim_effects_smoke_test.sh` |
-| 网页面板纯逻辑单测 | `node src/sentry_decision_viz/web/test/format.test.mjs` |
-| 格式检查 | `tools/format.sh --check` |
 
 ## 9. 环境变量
 
