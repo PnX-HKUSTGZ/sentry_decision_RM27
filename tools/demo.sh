@@ -74,7 +74,7 @@ if [[ ! -f /.dockerenv ]]; then
     if [[ "${nav_gimbal_panel}" == 1 ]]; then
       nav_gimbal=true
     fi
-    if [[ "${nav_use_rviz}" == 1 || "${nav_use_gui}" == 1 || "${nav_gimbal}" == 1 ]]; then
+    if [[ "${nav_use_rviz}" == true || "${nav_use_gui}" == true || "${nav_gimbal}" == true ]]; then
       if [[ -z "${DISPLAY:-}" || -z "$(ls -A /tmp/.X11-unix 2>/dev/null)" ]]; then
         # 窗口连不上显示会退出，而 RViz 的死亡会触发 Gazebo 整套 launch 关闭。
         echo "[demo] 未检测到可用 X11（DISPLAY 或 /tmp/.X11-unix），关闭导航侧全部图形窗口"
@@ -95,7 +95,7 @@ if [[ ! -f /.dockerenv ]]; then
     fi
     docker run -d --name "${NAV_CONTAINER}" --network "${NETWORK}" "${nav_display[@]}" \
       -v "${NAV_REPO}/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \
-      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2026 slam:=False gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2026.pcd"
+      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2026 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2026.pcd"
     echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
     cleanup_nav() { docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true; }
     trap cleanup_nav EXIT INT TERM
