@@ -7,24 +7,21 @@ CORE="$ROOT/src/sentry_decision_core"
 SIM="$ROOT/src/sentry_decision_sim"
 OUT="$(mktemp -d)"
 
-NODES="$ROOT/src/sentry_decision_nodes"
-CORE_SOURCES=("$CORE/src/action_dispatcher.cpp" "$CORE/src/arbiter.cpp" "$CORE/src/tactical_override.cpp"
-  "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/referee_protocol.cpp"
-  "$CORE/src/replay.cpp" "$CORE/src/safety_supervisor.cpp" "$CORE/src/world_model.cpp")
+CORE_SOURCES=("$CORE/src/action_dispatcher.cpp" "$CORE/src/action_factory.cpp"
+  "$CORE/src/heal_task.cpp" "$CORE/src/resource_task.cpp"
+  "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/navigate_task.cpp"
+  "$CORE/src/outpost_task.cpp" "$CORE/src/referee_protocol.cpp" "$CORE/src/respawn_task.cpp"
+  "$CORE/src/scan_task.cpp" "$CORE/src/safety_supervisor.cpp" "$CORE/src/task_factory.cpp"
+  "$CORE/src/task_policy.cpp" "$CORE/src/task_runner.cpp" "$CORE/src/task_runtime.cpp"
+  "$CORE/src/world_model.cpp")
 SIM_SOURCES=("$SIM/src/referee_simulator.cpp" "$SIM/src/nav_simulator.cpp"
   "$SIM/src/decision_actuator_sim.cpp" "$SIM/src/sim_world.cpp" "$SIM/src/match_stage.cpp")
 
-for test in test_arbiter test_logging test_world_model test_referee_protocol test_replay test_config test_action_dispatcher test_safety_supervisor test_tactical_override test_nav_goal_tracker; do
+for test in test_logging test_world_model test_referee_protocol test_config test_action_dispatcher test_safety_supervisor test_nav_goal_tracker test_task_runtime test_navigate_scan test_outpost_respawn test_heal_resource test_task_policy test_task_runner; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" "${CORE_SOURCES[@]}" \
     "$CORE/test/$test.cpp" -o "$OUT/$test"
   "$OUT/$test"
 done
-
-# 战略策略为纯逻辑（不依赖 BT），一并做宿主测试。
-g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" -I"$NODES/include" \
-  "$NODES/src/rule_based_strategic_policy.cpp" "$NODES/test/test_strategic_policy.cpp" \
-  -o "$OUT/test_strategic_policy"
-"$OUT/test_strategic_policy"
 
 for test in test_referee_simulator test_nav_simulator test_decision_actuator_sim test_sim_world test_match_stage; do
   g++ -std=c++17 -Wall -Wextra -Werror -I"$CORE/include" -I"$SIM/include" \

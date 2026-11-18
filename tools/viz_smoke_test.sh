@@ -21,7 +21,7 @@ if ! ros2 pkg executables rosbridge_server 2>/dev/null | grep -q rosbridge_webso
   exit 0
 fi
 
-DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/decision_node"
+DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/task_node"
 SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_sim_node"
 WEB_DIR="$(ros2 pkg prefix sentry_decision_viz)/share/sentry_decision_viz/web"
 

@@ -2,13 +2,13 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "sentry_decision_core/action_factory.hpp"
-
 #include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <map>
 #include <sstream>
+
+#include "sentry_decision_core/action_factory.hpp"
 
 namespace sentry_decision_bringup {
 namespace {
@@ -27,6 +27,8 @@ struct NumericRule {
 
 const std::map<std::string, NumericRule>& numeric_rules() {
   static const std::map<std::string, NumericRule> rules = {
+      {"self.max_hp", {true, true}},
+      {"match.duration_s", {true, true}},
       {"nav.retreat_hp", {true, true}},
       {"nav.recovery_hp", {true, true}},
       {"nav.low_ammo", {true, true}},
@@ -45,10 +47,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"timeouts.upstream_ms", {true, true}},
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
-      {"action.verify_delay_ms", {true, true}},
-      {"action.max_attempts", {true, true}},
-      {"action.revive_verify_delay_ms", {true, true}},
-      {"action.revive_max_attempts", {true, true}},
+
   };
   return rules;
 }

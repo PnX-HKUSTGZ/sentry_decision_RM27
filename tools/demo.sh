@@ -242,7 +242,7 @@ if [[ "${with_viz}" == 1 ]]; then
   start viz ros2 launch sentry_decision_viz viz.launch.py
 fi
 start sim ros2 run sentry_decision_sim referee_sim_node --scenario "${scenario}" --hold --rate "${rate}" "${sim_args[@]}"
-start decision ros2 run sentry_decision_bringup decision_node "${decision_args[@]}"
+start decision ros2 run sentry_decision_bringup task_node "${decision_args[@]}"
 
 if [[ "${with_nav}" == 1 ]]; then
   echo "[demo] 双仓库联调模式：导航容器提供 /navigate_to_pose，位姿经 map->odom 变换"

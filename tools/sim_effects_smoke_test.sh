@@ -79,7 +79,7 @@ sleep 0.5
 call_stage 4
 sleep 0.5
 
-# 兑换发弹：金币 200、发弹量保持 100（高于低弹阈值，避免任务树也发起兑换）。
+# 兑换发弹：金币 200、发弹量保持 100（高于低弹阈值，避免 Task 层也发起兑换）。
 set_world coins 200.0
 set_world self_ammo 100.0
 sleep 1

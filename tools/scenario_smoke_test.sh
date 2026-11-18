@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 容器内场景冒烟：启动 decision_node，再用 referee_sim_node 跑一个场景时间轴并断言。
+# 容器内场景冒烟：启动 task_node，再用 referee_sim_node 跑一个场景时间轴并断言。
 set -euo pipefail
 
 # 使用独立 ROS_DOMAIN_ID，避免与同批次其它集成测试的节点互相干扰。
@@ -21,7 +21,7 @@ if [[ -f "${OVERLAY}/setup.bash" ]]; then
 fi
 set -u
 
-DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/decision_node"
+DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/task_node"
 SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_sim_node"
 
 "${DECISION_BIN}" --rate 20 >/tmp/scenario_decision.log 2>&1 &
@@ -37,7 +37,7 @@ set -e
 if [[ "${rc}" -ne 0 ]]; then
   echo "场景失败，referee_sim_node 日志:" >&2
   cat /tmp/scenario_sim.log >&2
-  echo "decision_node 日志（尾部）:" >&2
+  echo "task_node 日志（尾部）:" >&2
   tail -40 /tmp/scenario_decision.log >&2
   exit "${rc}"
 fi
