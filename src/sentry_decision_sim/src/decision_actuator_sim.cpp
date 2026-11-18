@@ -17,6 +17,10 @@ void DecisionActuatorSim::send_task_state(sentry_decision::TaskState state) {
 }
 
 void DecisionActuatorSim::send_action(const sentry_decision::DecisionAction& action) {
+  // kind=0 是 task_state 心跳携带的空动作，不是裁判动作，直接忽略。
+  if (action.kind == sentry_decision::DecisionActionKind::kNone) {
+    return;
+  }
   in_flight_.push_back(InFlight{action, latency_ticks_});
 }
 

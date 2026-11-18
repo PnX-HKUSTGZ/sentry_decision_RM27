@@ -51,6 +51,18 @@ void test_apply_after_latency_and_idempotent() {
   CHECK(world.coins == 50);
 }
 
+// 空动作（task_state 心跳）不应进入裁判结算。
+void test_none_action_is_ignored() {
+  SimWorld world;
+  DecisionActuatorSim actuator(0);
+  actuator.bind_world(&world, 400);
+
+  DecisionAction action;
+  action.kind = DecisionActionKind::kNone;
+  actuator.send_action(action);
+  CHECK(actuator.in_flight() == 0);
+}
+
 // 非法动作不修改世界。
 void test_rejected_action_keeps_world() {
   SimWorld world;
@@ -109,6 +121,7 @@ void test_dispatch_verify_roundtrip() {
 
 int main() {
   test_apply_after_latency_and_idempotent();
+  test_none_action_is_ignored();
   test_rejected_action_keeps_world();
   test_dispatch_verify_roundtrip();
   if (g_failures == 0) {
