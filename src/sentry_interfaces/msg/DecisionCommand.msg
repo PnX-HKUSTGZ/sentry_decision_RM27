@@ -3,4 +3,5 @@
 std_msgs/Header header
 
 uint32 request_id
+uint8 task_state            # 0 idle / 1 navigate / 2 scan / 3 outpost / 4 resource / 5 heal / 6 respawn
 DecisionAction action

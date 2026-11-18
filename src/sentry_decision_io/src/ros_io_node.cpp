@@ -23,6 +23,9 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
     : rclcpp::Node("sentry_decision_io", options) {
   map_frame_ = declare_parameter<std::string>("map_frame", "map");
   odom_frame_ = declare_parameter<std::string>("odom_frame", "");
+  const auto own_color = declare_parameter<std::string>("own_color", "red");
+  own_color_ =
+      own_color == "blue" ? sentry_decision::TeamColor::kBlue : sentry_decision::TeamColor::kRed;
   const auto game_info_topic =
       declare_parameter<std::string>("game_info_topic", "/sentry/game_info");
   const auto online_info_topic =
@@ -41,7 +44,7 @@ RosIoNode::RosIoNode(const rclcpp::NodeOptions& options)
   game_info_sub_ = create_subscription<sentry_interfaces::msg::GameInfo>(
       game_info_topic, 10, [this](sentry_interfaces::msg::GameInfo::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(upstream_mutex_);
-        merge(*msg, &upstream_);
+        merge(*msg, &upstream_, own_color_);
         upstream_.stamp = sentry_decision::SteadyClock::now();
         upstream_.valid = true;
         has_game_info_ = true;
@@ -226,6 +229,15 @@ void RosIoNode::set_velocity(const sentry_decision::Twist& cmd) {
 
 void RosIoNode::send_action(const sentry_decision::DecisionAction& action) {
   auto msg = to_msg(action);
+  msg.task_state = static_cast<std::uint8_t>(task_state_);
+  msg.header.stamp = now();
+  decision_pub_->publish(msg);
+}
+
+void RosIoNode::send_task_state(sentry_decision::TaskState state) {
+  task_state_ = state;
+  auto msg = to_msg(sentry_decision::DecisionAction{});
+  msg.task_state = static_cast<std::uint8_t>(state);
   msg.header.stamp = now();
   decision_pub_->publish(msg);
 }

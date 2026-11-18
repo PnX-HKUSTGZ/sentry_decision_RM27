@@ -28,7 +28,7 @@ void test_decision_output_conversion() {
   DecisionOutput output;
   output.nav_goal = Point2D{1.5, -2.5, 0.75};
   output.cmd_vel = Twist{0.1, 0.2, 0.3};
-  output.tactical_mode = TacticalMode::kRetreat;
+  output.task_state = TaskState::kHeal;
   output.stance = SentryStance::kDefense;
   output.resource.ammo = 17;
   output.resource.revive = true;
@@ -43,7 +43,7 @@ void test_decision_output_conversion() {
   CHECK(msg.cmd_vel.linear.x == 0.1);
   CHECK(msg.cmd_vel.linear.y == 0.2);
   CHECK(msg.cmd_vel.angular.z == 0.3);
-  CHECK(msg.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kRetreat));
+  CHECK(msg.task_state == static_cast<std::uint8_t>(TaskState::kHeal));
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kDefense));
   CHECK(msg.resource_ammo == 17);
   CHECK(msg.resource_revive);
@@ -118,20 +118,18 @@ void test_fill_state() {
   world.upstream.valid = true;
   world.self.valid = true;
 
-  ArbiterResult result;
-  result.output.nav_goal = Point2D{1.0, 2.0, 0.0};
-  result.output.tactical_mode = TacticalMode::kPatrol;
-  result.conflicts.push_back(Conflict{});
-  result.warnings.push_back("non-owner submit");
+  DecisionOutput output;
+  output.nav_goal = Point2D{1.0, 2.0, 0.0};
+  output.task_state = TaskState::kScan;
 
   DecisionStateMsg msg;
-  fill_state(&msg, world, result, 42);
+  fill_state(&msg, world, output, 42);
 
   CHECK(msg.tick == 42);
   CHECK(msg.output.has_nav_goal);
-  CHECK(msg.output.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kPatrol));
-  CHECK(msg.conflict_count == 1);
-  CHECK(msg.warnings.size() == 1);
+  CHECK(msg.output.task_state == static_cast<std::uint8_t>(TaskState::kScan));
+  CHECK(msg.conflict_count == 0);
+  CHECK(msg.warnings.empty());
   CHECK(msg.upstream_valid);
   CHECK(msg.self_valid);
   CHECK(!msg.nav_valid);

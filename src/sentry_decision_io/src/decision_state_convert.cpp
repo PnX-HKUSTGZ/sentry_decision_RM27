@@ -17,7 +17,7 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
     msg.cmd_vel.linear.y = output.cmd_vel->vy;
     msg.cmd_vel.angular.z = output.cmd_vel->wz;
   }
-  msg.tactical_mode = static_cast<std::uint8_t>(output.tactical_mode);
+  msg.task_state = static_cast<std::uint8_t>(output.task_state);
   msg.stance = static_cast<std::uint8_t>(output.stance);
   msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
   msg.resource_revive = output.resource.revive;
@@ -70,11 +70,11 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
 }
 
 void fill_state(DecisionStateMsg* msg, const sentry_decision::WorldState& world,
-                const sentry_decision::ArbiterResult& result, std::uint32_t tick) {
+                const sentry_decision::DecisionOutput& output, std::uint32_t tick) {
   msg->tick = tick;
-  msg->output = to_msg(result.output);
-  msg->conflict_count = static_cast<std::uint32_t>(result.conflicts.size());
-  msg->warnings = result.warnings;
+  msg->output = to_msg(output);
+  msg->conflict_count = 0;
+  msg->warnings.clear();
   msg->upstream_valid = world.upstream.valid;
   msg->self_valid = world.self.valid;
   msg->nav_valid = world.nav.valid;

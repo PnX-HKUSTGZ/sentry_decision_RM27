@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "sentry_decision_core/arbiter.hpp"
+#include "sentry_decision_core/types.hpp"
 #include "sentry_decision_core/world_state.hpp"
 #include "sentry_decision_msgs/msg/decision_output.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
@@ -21,6 +21,6 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world);
 
 // 把仲裁结果与信念快照填入 DecisionState（不含 header，由发布方补时间戳）。
 void fill_state(DecisionStateMsg* msg, const sentry_decision::WorldState& world,
-                const sentry_decision::ArbiterResult& result, std::uint32_t tick);
+                const sentry_decision::DecisionOutput& output, std::uint32_t tick);
 
 }  // namespace sentry_decision_io

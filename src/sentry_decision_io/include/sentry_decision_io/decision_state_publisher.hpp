@@ -4,7 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <string>
 
-#include "sentry_decision_core/arbiter.hpp"
+#include "sentry_decision_core/types.hpp"
 #include "sentry_decision_core/world_state.hpp"
 #include "sentry_decision_msgs/msg/decision_state.hpp"
 #include "sentry_decision_msgs/msg/world_state.hpp"
@@ -21,7 +21,7 @@ class DecisionStatePublisher {
 
   // 发布一次决策快照；header 时间戳取节点当前时间。
   void publish(const sentry_decision::WorldState& world,
-               const sentry_decision::ArbiterResult& result, std::uint32_t tick);
+               const sentry_decision::DecisionOutput& output, std::uint32_t tick);
 
  private:
   rclcpp::Node& node_;

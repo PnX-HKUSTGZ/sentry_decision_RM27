@@ -12,12 +12,12 @@ DecisionStatePublisher::DecisionStatePublisher(rclcpp::Node& node, const std::st
 }
 
 void DecisionStatePublisher::publish(const sentry_decision::WorldState& world,
-                                     const sentry_decision::ArbiterResult& result,
+                                     const sentry_decision::DecisionOutput& output,
                                      std::uint32_t tick) {
   const auto stamp = node_.now();
   sentry_decision_msgs::msg::DecisionState state;
   state.header.stamp = stamp;
-  fill_state(&state, world, result, tick);
+  fill_state(&state, world, output, tick);
   state_pub_->publish(state);
 
   sentry_decision_msgs::msg::WorldState world_msg = to_msg(world);
