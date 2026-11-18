@@ -8,12 +8,9 @@ namespace sentry_decision {
 
 namespace {
 
-ActionRequest make_base(DecisionActionKind kind, Duration retry_interval, int max_attempts,
-                        ActionVerify verify, bool level) {
+ActionRequest make_base(DecisionActionKind kind, ActionVerify verify, bool level) {
   ActionRequest request;
   request.kind = kind;
-  request.retry_interval = retry_interval.count() < 0 ? Duration{0} : retry_interval;
-  request.max_attempts = max_attempts < 0 ? 0 : max_attempts;
   request.verify = verify;
   request.level = level;
   return request;
@@ -33,10 +30,9 @@ bool valid_remote_times(int times, const char* action) {
 
 }  // namespace
 
-ActionRequest make_ammo_exchange(const UpstreamState& upstream, int delta,
-                                 Duration retry_interval, int max_attempts) {
-  ActionRequest request = make_base(DecisionActionKind::kAmmoExchange, retry_interval,
-                                    max_attempts, ActionVerify::kAmmoExchangedLocal, false);
+ActionRequest make_ammo_exchange(const UpstreamState& upstream, int delta) {
+  ActionRequest request =
+      make_base(DecisionActionKind::kAmmoExchange, ActionVerify::kAmmoExchangedLocal, false);
   if (delta <= 0) {
     return request;
   }
@@ -50,51 +46,47 @@ ActionRequest make_ammo_exchange(const UpstreamState& upstream, int delta,
   }
   request.delta = rounded;
   request.monotonic = true;
-  request.target =
-      std::min(kAmmoExchangeCap, upstream.info1.ammo_exchanged_local + rounded);
+  request.target = std::min(kAmmoExchangeCap, upstream.info1.ammo_exchanged_local + rounded);
   return request;
 }
 
-ActionRequest make_remote_ammo_exchange(const UpstreamState& upstream, int times,
-                                        Duration retry_interval, int max_attempts) {
-  ActionRequest request = make_base(DecisionActionKind::kRemoteAmmoExchange, retry_interval,
-                                    max_attempts, ActionVerify::kRemoteAmmoCount, false);
+ActionRequest make_remote_ammo_exchange(const UpstreamState& upstream, int times) {
+  ActionRequest request =
+      make_base(DecisionActionKind::kRemoteAmmoExchange, ActionVerify::kRemoteAmmoCount, false);
   if (!valid_remote_times(times, "远程兑换发弹量")) {
     return request;
   }
   request.delta = times;
   request.monotonic = true;
   // 每次 = 100 发；协议字段是累计次数，不是发数。
-  request.target =
-      std::min(kRemoteCountCap, static_cast<int>(upstream.info1.remote_ammo_exchange_count) + times);
+  request.target = std::min(kRemoteCountCap,
+                            static_cast<int>(upstream.info1.remote_ammo_exchange_count) + times);
   return request;
 }
 
-ActionRequest make_remote_hp_exchange(const UpstreamState& upstream, int times,
-                                      Duration retry_interval, int max_attempts) {
-  ActionRequest request = make_base(DecisionActionKind::kRemoteHpExchange, retry_interval,
-                                    max_attempts, ActionVerify::kRemoteHpCount, false);
+ActionRequest make_remote_hp_exchange(const UpstreamState& upstream, int times) {
+  ActionRequest request =
+      make_base(DecisionActionKind::kRemoteHpExchange, ActionVerify::kRemoteHpCount, false);
   if (!valid_remote_times(times, "远程兑换血量")) {
     return request;
   }
   request.delta = times;
   request.monotonic = true;
-  request.target =
-      std::min(kRemoteCountCap, static_cast<int>(upstream.info1.remote_health_exchange_count) + times);
+  request.target = std::min(kRemoteCountCap,
+                            static_cast<int>(upstream.info1.remote_health_exchange_count) + times);
   return request;
 }
 
-ActionRequest make_free_resurrect(Duration retry_interval, int max_attempts) {
-  ActionRequest request = make_base(DecisionActionKind::kFreeResurrect, retry_interval,
-                                    max_attempts, ActionVerify::kAlive, true);
+ActionRequest make_free_resurrect() {
+  ActionRequest request = make_base(DecisionActionKind::kFreeResurrect, ActionVerify::kAlive, true);
   request.target = 1;
   request.delta = 1;
   return request;
 }
 
-ActionRequest make_instant_resurrect(Duration retry_interval, int max_attempts) {
-  ActionRequest request = make_base(DecisionActionKind::kInstantResurrect, retry_interval,
-                                    max_attempts, ActionVerify::kAlive, true);
+ActionRequest make_instant_resurrect() {
+  ActionRequest request =
+      make_base(DecisionActionKind::kInstantResurrect, ActionVerify::kAlive, true);
   request.target = 1;
   request.delta = 1;
   return request;

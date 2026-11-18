@@ -1,0 +1,66 @@
+#include "sentry_decision_core/task_runner.hpp"
+
+#include <algorithm>
+
+#include "sentry_decision_core/task_factory.hpp"
+
+namespace sentry_decision {
+namespace {
+constexpr Duration kPlanValidFor{1000};
+}
+
+TaskRunner::TaskRunner(const PolicyConfig& config, int max_hp, Duration match_duration)
+    : runtime_(registry_), policy_(config), match_duration_(match_duration) {
+  register_default_tasks(registry_, config, max_hp, match_duration);
+}
+
+void TaskRunner::tick(const WorldState& world, TimePoint now) {
+  WorldState view = world;
+  view.supply_claimed_minutes = supply_claimed_minutes_;
+
+  if (world.upstream.valid) {
+    if (!belief_initialized_) {
+      belief_initialized_ = true;
+      last_self_ammo_ = world.upstream.self_ammo;
+      last_local_exchange_ = world.upstream.info1.ammo_exchanged_local;
+    } else if (world.upstream.game_status != GameStatus::kRunning) {
+      last_self_ammo_ = world.upstream.self_ammo;
+      last_local_exchange_ = world.upstream.info1.ammo_exchanged_local;
+      supply_claimed_minutes_ = 0;
+    } else if (world.upstream.event.supply_zone_occupied &&
+               world.upstream.self_ammo > last_self_ammo_ &&
+               world.upstream.info1.ammo_exchanged_local == last_local_exchange_) {
+      const int match_seconds = static_cast<int>(match_duration_.count() / 1000);
+      const int elapsed = match_seconds - world.upstream.game_time_remaining;
+      if (elapsed >= 0) {
+        supply_claimed_minutes_ = std::max(supply_claimed_minutes_, elapsed / 60);
+      }
+    }
+    last_self_ammo_ = world.upstream.self_ammo;
+    last_local_exchange_ = world.upstream.info1.ammo_exchanged_local;
+    view.supply_claimed_minutes = supply_claimed_minutes_;
+  }
+
+  TaskPlan plan = policy_.decide(view, runtime_.snapshot(), history_);
+  plan.created_at = now;
+  plan.valid_for = kPlanValidFor;
+  runtime_.apply(plan, now);
+  runtime_.tick(view, now);
+
+  std::optional<TaskResult> result = runtime_.take_result();
+  if (result.has_value()) {
+    history_.previous_task = *result;
+    last_result_ = std::move(result);
+  }
+}
+
+std::optional<TaskResult> TaskRunner::take_result() {
+  if (!last_result_.has_value()) {
+    return std::nullopt;
+  }
+  TaskResult result = std::move(*last_result_);
+  last_result_.reset();
+  return result;
+}
+
+}  // namespace sentry_decision

@@ -42,20 +42,53 @@ SentryStance decode_stance(std::uint8_t raw) {
   }
 }
 
-EventCode decode_event_code(std::uint32_t raw) {
+namespace {
+
+OutpostControl decode_outpost_control(std::uint32_t raw) {
+  switch (raw) {
+    case 0:
+      return OutpostControl::kOwnFull;
+    case 1:
+      return OutpostControl::kOwnTemporary;
+    default:
+      return OutpostControl::kNotOwned;
+  }
+}
+
+}  // namespace
+
+EventCode decode_event_code(std::uint32_t event_data, std::uint32_t event_data_2,
+                            TeamColor own_color) {
+  const bool red = own_color == TeamColor::kRed;
+  const std::uint8_t r_fort = static_cast<std::uint8_t>(bits(event_data, 5, 3));
+  const std::uint8_t b_fort = static_cast<std::uint8_t>(bits(event_data, 8, 3));
+  const std::uint8_t r_base = static_cast<std::uint8_t>(bits(event_data, 11, 3));
+  const std::uint8_t b_base = static_cast<std::uint8_t>(bits(event_data, 14, 3));
+  const std::uint8_t r_central = static_cast<std::uint8_t>(bits(event_data, 18, 2));
+  const std::uint8_t b_central = static_cast<std::uint8_t>(bits(event_data, 20, 2));
+  const std::uint8_t r_outpost_buff = static_cast<std::uint8_t>(bits(event_data, 22, 3));
+  const std::uint8_t b_outpost_buff = static_cast<std::uint8_t>(bits(event_data, 25, 3));
+  const std::uint8_t r_outpost_ctrl = static_cast<std::uint8_t>(bits(event_data, 28, 2));
+  const std::uint8_t b_outpost_ctrl = static_cast<std::uint8_t>(bits(event_data, 30, 2));
+
   EventCode out;
-  out.supply_zone_occupied = bits(raw, 0, 1) != 0;
-  out.supply_zone_occupied_rmul = bits(raw, 2, 1) != 0;
-  out.small_energy_status = static_cast<std::uint8_t>(bits(raw, 3, 2));
-  out.big_energy_status = static_cast<std::uint8_t>(bits(raw, 5, 2));
-  out.central_highland_status = static_cast<std::uint8_t>(bits(raw, 7, 2));
-  out.trapezoid_highland_status = static_cast<std::uint8_t>(bits(raw, 9, 2));
-  out.enemy_dart_last_hit_time_s = static_cast<std::uint16_t>(bits(raw, 11, 9));
-  out.enemy_dart_last_target = static_cast<std::uint8_t>(bits(raw, 20, 3));
-  out.center_buff_status = static_cast<std::uint8_t>(bits(raw, 23, 2));
-  out.fort_occupation_status = static_cast<std::uint8_t>(bits(raw, 25, 2));
-  out.our_outpost_buff_status = static_cast<std::uint8_t>(bits(raw, 27, 2));
-  out.base_buff_occupied = bits(raw, 29, 1) != 0;
+  out.supply_zone_occupied = bits(event_data, 0, 1) != 0;
+  out.small_energy_status = static_cast<std::uint8_t>(bits(event_data, 1, 2));
+  out.big_energy_status = static_cast<std::uint8_t>(bits(event_data, 3, 2));
+  out.own_fort_buff_status = red ? r_fort : b_fort;
+  out.enemy_fort_buff_status = red ? b_fort : r_fort;
+  out.own_base_buff_status = red ? r_base : b_base;
+  out.enemy_base_buff_status = red ? b_base : r_base;
+  out.high_point_buff_active = bits(event_data, 17, 1) != 0;
+  out.own_central_highland_status = red ? r_central : b_central;
+  out.enemy_central_highland_status = red ? b_central : r_central;
+  out.our_outpost_buff_status = red ? r_outpost_buff : b_outpost_buff;
+  out.enemy_outpost_buff_status = red ? b_outpost_buff : r_outpost_buff;
+  out.our_outpost_control = decode_outpost_control(red ? r_outpost_ctrl : b_outpost_ctrl);
+  out.enemy_outpost_control = decode_outpost_control(red ? b_outpost_ctrl : r_outpost_ctrl);
+  out.enemy_dart_last_hit_time_s = static_cast<std::uint16_t>(bits(event_data_2, 4, 9));
+  out.enemy_dart_last_target = static_cast<std::uint8_t>(bits(event_data_2, 13, 3));
+  out.base_buff_occupied = EventCode::own_active(out.own_base_buff_status);
   return out;
 }
 

@@ -15,13 +15,20 @@ find_package(ament_cmake REQUIRED)
 add_library(${PROJECT_NAME}
   src/action_dispatcher.cpp
   src/action_factory.cpp
-  src/arbiter.cpp
-  src/tactical_override.cpp
+  src/heal_task.cpp
+  src/resource_task.cpp
   src/logging.cpp
   src/nav_goal_tracker.cpp
+  src/navigate_task.cpp
+  src/outpost_task.cpp
   src/referee_protocol.cpp
-  src/replay.cpp
+  src/respawn_task.cpp
+  src/scan_task.cpp
   src/safety_supervisor.cpp
+  src/task_factory.cpp
+  src/task_policy.cpp
+  src/task_runner.cpp
+  src/task_runtime.cpp
   src/world_model.cpp)
 # core 以静态库被 nodes 等共享库链接，必须编译为位置无关代码。
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -38,10 +45,6 @@ install(TARGETS ${PROJECT_NAME}
 install(DIRECTORY include/ DESTINATION include)
 
 if(BUILD_TESTING)
-  add_executable(test_arbiter test/test_arbiter.cpp)
-  target_link_libraries(test_arbiter ${PROJECT_NAME})
-  add_test(NAME test_arbiter COMMAND test_arbiter)
-
   add_executable(test_logging test/test_logging.cpp)
   target_link_libraries(test_logging ${PROJECT_NAME})
   add_test(NAME test_logging COMMAND test_logging)
@@ -53,10 +56,6 @@ if(BUILD_TESTING)
   add_executable(test_referee_protocol test/test_referee_protocol.cpp)
   target_link_libraries(test_referee_protocol ${PROJECT_NAME})
   add_test(NAME test_referee_protocol COMMAND test_referee_protocol)
-
-  add_executable(test_replay test/test_replay.cpp)
-  target_link_libraries(test_replay ${PROJECT_NAME})
-  add_test(NAME test_replay COMMAND test_replay)
 
   add_executable(test_config test/test_config.cpp)
   target_link_libraries(test_config ${PROJECT_NAME})
@@ -70,13 +69,33 @@ if(BUILD_TESTING)
   target_link_libraries(test_safety_supervisor ${PROJECT_NAME})
   add_test(NAME test_safety_supervisor COMMAND test_safety_supervisor)
 
-  add_executable(test_tactical_override test/test_tactical_override.cpp)
-  target_link_libraries(test_tactical_override ${PROJECT_NAME})
-  add_test(NAME test_tactical_override COMMAND test_tactical_override)
-
   add_executable(test_nav_goal_tracker test/test_nav_goal_tracker.cpp)
   target_link_libraries(test_nav_goal_tracker ${PROJECT_NAME})
   add_test(NAME test_nav_goal_tracker COMMAND test_nav_goal_tracker)
+
+  add_executable(test_task_runtime test/test_task_runtime.cpp)
+  target_link_libraries(test_task_runtime ${PROJECT_NAME})
+  add_test(NAME test_task_runtime COMMAND test_task_runtime)
+
+  add_executable(test_task_policy test/test_task_policy.cpp)
+  target_link_libraries(test_task_policy ${PROJECT_NAME})
+  add_test(NAME test_task_policy COMMAND test_task_policy)
+
+  add_executable(test_task_runner test/test_task_runner.cpp)
+  target_link_libraries(test_task_runner ${PROJECT_NAME})
+  add_test(NAME test_task_runner COMMAND test_task_runner)
+
+  add_executable(test_navigate_scan test/test_navigate_scan.cpp)
+  target_link_libraries(test_navigate_scan ${PROJECT_NAME})
+  add_test(NAME test_navigate_scan COMMAND test_navigate_scan)
+
+  add_executable(test_outpost_respawn test/test_outpost_respawn.cpp)
+  target_link_libraries(test_outpost_respawn ${PROJECT_NAME})
+  add_test(NAME test_outpost_respawn COMMAND test_outpost_respawn)
+
+  add_executable(test_heal_resource test/test_heal_resource.cpp)
+  target_link_libraries(test_heal_resource ${PROJECT_NAME})
+  add_test(NAME test_heal_resource COMMAND test_heal_resource)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

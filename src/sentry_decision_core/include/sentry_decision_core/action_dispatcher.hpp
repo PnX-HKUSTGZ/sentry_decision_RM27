@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <map>
 #include <optional>
 #include <vector>
@@ -10,15 +9,13 @@
 
 namespace sentry_decision {
 
-// 决策动作派发器：只做通用的「下发 -> 等待 -> 校验 -> 重试 / 放弃」。
-// 动作语义（目标值、判据、最小单位）由 action_factory 构造，dispatcher 不按 kind 分支。
+// 决策动作派发器：每个请求只下发一次，不重试。
+// 任务层负责检测窗口与失败判定；dispatcher 只做「去重发送 + 观测报告」。
 //
 // 语义：
-//   - 每段请求只在开始时取一次 target；请求持续期间忽略 target 变化（避免累计值
-//     随成功结算而变化时被误判成新请求）。
-//   - 发出后等待 request.retry_interval，再用 request.verify 判断；未生效重发同一
-//     target，达到 request.max_attempts 后放弃。
-//   - request.level 为 true 时，完成 / 放弃 / 请求消失后补发一条 value=0。
+//   - 每段请求只在开始时取一次 target；请求持续期间忽略 target 变化。
+//   - 发出后不再重发；后续 poll 只用 verify 观测是否生效。
+//   - request.level 为 true 时，完成 / 请求消失后补发一条 value=0。
 //
 // 用法（同一 tick 线程内）：
 //   dispatcher.submit(action_request);                      // 每 tick 提交期望
@@ -32,7 +29,7 @@ class ActionDispatcher {
   void submit(const ActionRequest& request);
 
   // upstream == nullptr：不校验，每次「由无到有」只下发一次（回放 / 无裁判数据的演示）。
-  // upstream->valid == false：暂停，等待有效数据后再判定或重发。
+  // upstream->valid == false：暂停，等待有效数据后再发送。
   std::vector<DecisionAction> poll(TimePoint now, const UpstreamState* upstream);
 
   // 清除某个动作的「已满足」记忆，使下一次提交视为新请求。
@@ -49,18 +46,16 @@ class ActionDispatcher {
     ActionRequest request{};  // 当前这一段请求（target / 策略已锁定）
     bool desired_this_tick = false;
     bool started = false;
-    bool satisfied = false;
-    bool gave_up = false;
+    bool sent = false;
+    bool done = false;
     bool cleared = false;
     int target = 0;
-    int attempts = 0;
     std::uint32_t request_id = 0;
-    TimePoint last_sent{};
     UpstreamState baseline{};
   };
 
   bool same_request(const ActionRequest& a, const ActionRequest& b) const;
-  void send(Slot& slot, TimePoint now, std::vector<DecisionAction>* outgoing);
+  void send(Slot& slot, std::vector<DecisionAction>* outgoing);
   void send_clear(DecisionActionKind kind, std::vector<DecisionAction>* outgoing);
 
   std::map<DecisionActionKind, Slot> slots_;

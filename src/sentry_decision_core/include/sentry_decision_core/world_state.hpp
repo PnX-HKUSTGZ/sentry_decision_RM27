@@ -34,6 +34,10 @@ struct UpstreamState {
   int enemy_base_hp = 0;
   bool can_rebuild_outpost = false;
 
+  // 2027 前哨阵地控制状态（由 event_data bit 28-31 映射）。
+  OutpostControl our_outpost_control = OutpostControl::kNotOwned;
+  OutpostControl enemy_outpost_control = OutpostControl::kNotOwned;
+
   // 自身状态（SentryInfoOnline + SentryInfoOffline）
   int self_hp = 0;
   int self_ammo = 0;
@@ -92,6 +96,8 @@ struct WorldState {
   NavState nav;
   EnemyState enemy;
   std::vector<AllyRobot> allies;
+  // 补给区免费发弹：已领取到第几个整分钟（0 = 尚未领取）。
+  int supply_claimed_minutes = 0;
   TimePoint stamp{};
 };
 
