@@ -40,8 +40,7 @@ source .docker-build/install/setup.bash
 # 脚本一键启动「裁判仿真 + 决策节点 + 网页面板」，面板默认开启
 tools/demo.sh [--build] # 首次运行需加 --build，后续可直接运行
 
-# 2027 配置（RMUC27.yaml 标定后）
-# 容器内路径；宿主运行时同样传相对 /ws 的路径
+# 默认已是 RMUC27；需要显式指定时：
 tools/demo.sh --config config/profiles_rmuc27.yaml
 
 # 无头模式：不启动网页面板，也不打开导航 RViz/Gazebo
@@ -68,7 +67,7 @@ docker run -it --rm --name nav_dev \
   -v "${XAUTHORITY:-$HOME/.Xauthority}":/tmp/.Xauthority:ro \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   -v "$PWD/src":/ws/src \
-  -v "$PWD/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \
+  -v "$PWD/src/pnx-launch/launch_bringup/pcd/simulation":/pcd:ro \
   rm27_nav:jazzy bash
 ```
 
@@ -78,7 +77,7 @@ docker run -it --rm --name nav_dev \
 source /ws/install/setup.bash
 
 ros2 launch rm_27_stimulation sim_with_nav.launch.py \
-  world:=RMUC2026 \
+  world:=RMUC2027 \
   nav_world:=auto \
   use_ground_truth_odom:=false \
   navigation_mode:=minco \
@@ -127,7 +126,7 @@ source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 run sentry_decision_bringup task_node
 
-# 2027 配置（先完成 config/maps/RMUC27.yaml 标定）
+# 默认配置已是 RMUC27；显式指定时：
 ros2 run sentry_decision_bringup task_node --config config/profiles_rmuc27.yaml
 # 或
 ros2 launch sentry_decision_bringup task.launch.py \

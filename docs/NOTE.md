@@ -22,7 +22,7 @@
 - `SentryInfoOffline` 视觉锁定字段（`is_get` / `armor_pos` / `armor_num`）与
   `TeamInfo.allies[4]` 接入 `EnemyState` / `WorldState.allies`。
 - 实机验证：Task 层、Nav2、`Heal` 免费发弹确认、`Resource` 到账与复活确认。
-- 2027 场地命名点坐标、yaw 与区域半径标定。
+- 2027 场地命名点已完成标定，`config/profiles.yaml` 默认使用 RMUC27。
 
 ## 注意事项
 

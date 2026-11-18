@@ -30,9 +30,47 @@
 | `enemy_outpost_opposite` | strike_highland | 对方前哨站对面打击点：对侧高地增益点内，较远、较安全 |
 
 > `side` 和 `opposite` 都在高地增益点内，享有 25% 防御增益；`front` 不在增益点内。
+> 四个 `*_outpost_front/side/opposite` 都是打击点，不需要区域半径。
 > “同侧 / 对侧”以中央高地为参照：同侧 = 靠近该前哨站的一侧高地，对侧 = 跨过中央高地的另一侧高地。
 
-## 3. 地图配置格式
+## 3. 标定底图
+
+标定工具已切换为 RMUC 2027 底图：
+
+```text
+src/sentry_decision_viz/web/assets/field-rmuc2027.png
+```
+
+来源是导航仓库最新版：
+
+```text
+src/pnx-launch/launch_bringup/map/simulation/RMUC2027.pgm
+src/pnx-launch/launch_bringup/map/simulation/RMUC2027.yaml
+```
+
+当前参数：
+
+- 图像尺寸：583 × 300 px
+- `resolution`：0.05 m/px
+- `origin`：`[-14.6, -5.86, 0]`
+
+导航地图更新后，重新生成 PNG：
+
+```bash
+python3 - <<'PY'
+from PIL import Image
+src = "../sentry_navgation_RM27/src/pnx-launch/launch_bringup/map/simulation/RMUC2027.pgm"
+dst = "src/sentry_decision_viz/web/assets/field-rmuc2027.png"
+Image.open(src).save(dst)
+PY
+```
+
+`pcd` 不是标定底图的必需文件；它是导航侧的点云先验，标定只用 `.pgm` / PNG。
+
+标定工具的 2027 点位默认从本地存储 `sentry.fieldPoints.rmuc2027.v1` 读取；旧 2026
+点位存在旧键中，不会自动载入。需要时点「重置为默认」，或从文本导入 2027 YAML。
+
+## 4. 地图配置格式
 
 沿用当前地图格式：`[x, y, yaw, radius]`，`radius` 可省略。
 
@@ -46,13 +84,13 @@ points:
   enemy_outpost_buff:   [x, y, yaw, radius]
   own_outpost_front:    [x, y, yaw]
   enemy_outpost_front:  [x, y, yaw]
-  own_outpost_side:     [x, y, yaw, radius]
-  enemy_outpost_side:   [x, y, yaw, radius]
-  own_outpost_opposite: [x, y, yaw, radius]
-  enemy_outpost_opposite: [x, y, yaw, radius]
+  own_outpost_side:     [x, y, yaw]
+  enemy_outpost_side:   [x, y, yaw]
+  own_outpost_opposite: [x, y, yaw]
+  enemy_outpost_opposite: [x, y, yaw]
 ```
 
-## 4. 使用约定
+## 5. 使用约定
 
 | Task | 允许的点 |
 |---|---|
@@ -63,10 +101,9 @@ points:
 `Heal` / `Resource` 通过点名区分补给区类型，不额外传 `zone_kind`。
 新增补给点时必须同时更新 `TASK_CATALOG.md` 与本表。
 
-## 5. 待办
+## 6. 当前状态
 
-- `config/maps/RMUC27.yaml` 已提供 11 个命名点占位（坐标全为 0，禁止直接实车）。
-- 用 web 标定工具填入 11 个点的坐标、yaw 与区域半径，覆盖该文件。
-- 标定完成后可直接用 `task_node --config config/profiles_rmuc27.yaml`；或把 `config/profiles.yaml` 的 `map_profile` / `strategy_profile` 改为 `RMUC27` / `rmuc27`。
+- `config/maps/RMUC27.yaml` 已完成 11 个命名点标定，并作为 `config/profiles.yaml` 的默认地图。
+- `config/sim.yaml` 已同步使用 RMUC27 的补给区 / 增益点。
 - `RosIoNode` 参数 `own_color`（red/blue）用于把 2027 R/B 事件位映射为 own/enemy。
-- 清理 RMUC26 遗留点（`home` / `patrol_*` / `highland_*` 等）与 2027 配置的引用关系。
+- RMUC26 地图仅保留为历史配置，不再作为默认入口。

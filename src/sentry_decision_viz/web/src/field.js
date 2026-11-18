@@ -1,9 +1,9 @@
-// RMUC 2026 场地底图与坐标换算。
-// 数据来源：导航仓库 pb2025_nav_bringup/map/simulation/RMUC2026.{pgm,yaml}
+// RMUC 2027 场地底图与坐标换算。
+// 数据来源：导航仓库 src/pnx-launch/launch_bringup/map/simulation/RMUC2027.{pgm,yaml}
 // （resolution 0.05 m/px，origin [-14.6, -5.86]）。本文件为纯函数，可在 node 下单测。
 
 export const FIELD = {
-  image: 'assets/field-rmuc2026.png',
+  image: 'assets/field-rmuc2027.png',
   resolution: 0.05, // m/px
   origin: { x: -14.6, y: -5.86 },
   widthPx: 583,

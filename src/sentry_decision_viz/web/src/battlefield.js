@@ -1,7 +1,7 @@
 import { worldToCanvas } from './format.js';
 import { FIELD } from './field.js';
 
-// 场地底图：RMUC2026（由导航仓库 RMUC2026.pgm 转换）。世界坐标 -> 像素映射见 field.js。
+// 场地底图：RMUC2027（由导航仓库 RMUC2027.pgm 转换）。世界坐标 -> 像素映射见 field.js。
 // 半场：RMUC 长边为 x 轴，己方在 x<0（左）。
 const fieldImage = new Image();
 fieldImage.src = FIELD.image;

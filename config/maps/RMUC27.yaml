@@ -1,17 +1,15 @@
-# RMUC 2027 地图点位（map 坐标系，单位米）。
-# 坐标尚未标定：当前值全部为 0，仅用于占位，禁止直接用于实车。
-# 用 /calibrate.html 标定后覆盖本文件，再把 config/profiles.yaml 的 map_profile 改为 RMUC27。
-# 区域点第 4 位为半径；打击点半径填 0 或省略。名字与语义见 docs/POINTS_2027.md。
+# RMUC 地图点位（map 坐标系，单位米）。
+# 由网页面板「场地标定」生成：/calibrate.html
 frame_id: map
 points:
-  own_base_supply:      [0.0, 0.0, 0.0, 0.5]
-  own_fort:             [0.0, 0.0, 0.0, 0.5]
-  enemy_fort:           [0.0, 0.0, 0.0, 0.5]
-  own_outpost_buff:     [0.0, 0.0, 0.0, 0.5]
-  enemy_outpost_buff:   [0.0, 0.0, 0.0, 0.5]
-  own_outpost_front:    [0.0, 0.0, 0.0]
-  enemy_outpost_front:  [0.0, 0.0, 0.0]
-  own_outpost_side:     [0.0, 0.0, 0.0, 0.5]
-  enemy_outpost_side:   [0.0, 0.0, 0.0, 0.5]
-  own_outpost_opposite: [0.0, 0.0, 0.0, 0.5]
-  enemy_outpost_opposite: [0.0, 0.0, 0.0, 0.5]
+  own_base_supply:        [-12.37, -3.35, 0.00, 0.50]
+  own_fort:               [-7.37, 1.65, 0.00, 0.50]
+  enemy_fort:             [7.42, 1.60, 0.00, 0.50]
+  own_outpost_buff:       [-2.43, -2.21, 0.00, 0.50]
+  enemy_outpost_buff:     [2.31, 5.44, 0.00, 0.50]
+  own_outpost_front:      [-0.92, -2.68, 0.00]
+  enemy_outpost_front:    [0.63, 5.99, 0.00]
+  own_outpost_side:       [-3.24, -0.06, 0.00]
+  enemy_outpost_side:     [3.16, 3.30, 0.00]
+  own_outpost_opposite:   [1.67, -2.33, 0.00]
+  enemy_outpost_opposite: [-1.90, 5.54, 0.00]

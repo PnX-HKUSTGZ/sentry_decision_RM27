@@ -17,7 +17,7 @@
 #   tools/demo.sh --nav-gimbal-panel # 打开导航仿真里的云台控制面板（Tk 窗口）
 #   tools/demo.sh --build            # 先构建工作区
 #   tools/demo.sh --scenario <path>  # 指定场景（容器内路径）
-#   tools/demo.sh --config <path>    # 指定 profiles.yaml（默认 RMUC26）
+#   tools/demo.sh --config <path>    # 指定 profiles.yaml（默认 RMUC27）
 #   tools/demo.sh --rate 20          # 仿真频率
 set -euo pipefail
 
@@ -104,8 +104,8 @@ if [[ ! -f /.dockerenv ]]; then
       fi
     fi
     docker run -d --name "${NAV_CONTAINER}" --network "${NETWORK}" "${nav_display[@]}" \
-      -v "${NAV_REPO}/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \
-      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2026 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2026.pcd"
+      -v "${NAV_REPO}/src/pnx-launch/launch_bringup/pcd/simulation":/pcd:ro \
+      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2027 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2027.pcd"
     echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
     cleanup_nav() { docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true; }
     trap cleanup_nav EXIT INT TERM

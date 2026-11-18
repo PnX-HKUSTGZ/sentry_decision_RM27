@@ -1,7 +1,7 @@
 # 裁判仿真参数（referee_sim_node）。默认值集中在此，源码不再硬编码；
 # 命令行 `--ros-args -p <name>:=<value>` 仍可逐项覆盖。
 # map 相对本文件目录；其命名点用于供给补给区 / 增益点圆心。
-map: maps/RMUC26.yaml
+map: maps/RMUC27.yaml
 
 max_hp: 400
 nav:
@@ -14,8 +14,8 @@ match:
   running_s: 420
   settling_s: 10
 supply:
-  point: sim_home
-  # 半径取自地图点的第 4 位（maps/RMUC26.yaml 的 sim_home）。
+  point: own_base_supply
+  # 半径取自地图点的第 4 位（config/maps/RMUC27.yaml 的 own_base_supply）。
   # 规则 5.2.1：占领补给区每秒回上限血量 10%，比赛 4 分钟后 25%。
   # 仿真额外加 1s 进入延时，模拟场地交互模块的检测建立时间。
   enter_delay_s: 1.0
@@ -23,15 +23,15 @@ supply:
   heal_ratio_late: 0.25
   heal_late_after_s: 240
 # 双仓库模式：重置时由仿真侧下发「回起点」导航目标（仿真无法瞬移真实机器人）。
-# 坐标取自 map 的命名点（默认 RMUC2026 spawn）。
+# 2027 回己方基地补给区。
 nav_start:
-  point: start
+  point: own_base_supply
 gain_zones:
-  # 补给区（sim_home）会回血；以下三者只用于本地兑换，不回血。
+  # 补给区（own_base_supply）会回血；以下三者只用于本地兑换，不回血。
   # 半径同样取自各地图点的第 4 位。
-  base_buff:   { point: sim_base }
-  our_outpost: { point: sim_our_outpost }
-  fort_buff:   { point: sim_fort }
+  base_buff:   { point: own_base_supply }
+  our_outpost: { point: own_outpost_buff }
+  fort_buff:   { point: own_fort }
 # 面板「仿真效果」按钮的步长：对仿真世界真实值做减法（摧毁类直接置 0，无需步长）。
 effects:
   self_damage: 100
