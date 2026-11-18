@@ -40,6 +40,10 @@ source .docker-build/install/setup.bash
 # 脚本一键启动「裁判仿真 + 决策节点 + 网页面板」，面板默认开启
 tools/demo.sh [--build] # 首次运行需加 --build，后续可直接运行
 
+# 2027 配置（RMUC27.yaml 标定后）
+# 容器内路径；宿主运行时同样传相对 /ws 的路径
+tools/demo.sh --config config/profiles_rmuc27.yaml
+
 # 无头模式：不启动网页面板，也不打开导航 RViz/Gazebo
 tools/demo.sh --headless
 
@@ -122,6 +126,13 @@ cd ~/pnx_autoaim_sp/sentry_decision_RM27
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 ros2 run sentry_decision_bringup task_node
+
+# 2027 配置（先完成 config/maps/RMUC27.yaml 标定）
+ros2 run sentry_decision_bringup task_node --config config/profiles_rmuc27.yaml
+# 或
+ros2 launch sentry_decision_bringup task.launch.py \
+  config:=$HOME/pnx_autoaim_sp/sentry_decision_RM27/config/profiles_rmuc27.yaml
+
 # 若导航用的不是 /aft_mapped_to_init：
 #   task_node --ros-args -p odom_topic:=/odometry -p odom_frame:=odom
 # 蓝方：
@@ -133,7 +144,7 @@ ros2 run sentry_decision_bringup task_node
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/pnx_autoaim_sp/sentry_decision_RM27/install/setup.bash
-ros2 node list  # 应有 gimbal_decision_bridge / gimbal_decision_command_bridge / sentry_decision_io / sentry_decision
+ros2 node list  # 应有 gimbal_decision_bridge / gimbal_decision_command_bridge / sentry_decision_io / sentry_task_decision
 ros2 topic list | grep -E 'sentry|decision|cmd_vel'
 ```
 

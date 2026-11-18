@@ -17,6 +17,7 @@
 #   tools/demo.sh --nav-gimbal-panel # 打开导航仿真里的云台控制面板（Tk 窗口）
 #   tools/demo.sh --build            # 先构建工作区
 #   tools/demo.sh --scenario <path>  # 指定场景（容器内路径）
+#   tools/demo.sh --config <path>    # 指定 profiles.yaml（默认 RMUC26）
 #   tools/demo.sh --rate 20          # 仿真频率
 set -euo pipefail
 
@@ -147,6 +148,7 @@ with_viz=1
 do_build=0
 with_nav=0
 scenario=""
+config=""
 rate="20.0"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -158,6 +160,7 @@ while [[ $# -gt 0 ]]; do
     --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel) shift ;;
     --build) do_build=1; shift ;;
     --scenario) scenario="$2"; shift 2 ;;
+    --config) config="$2"; shift 2 ;;
     --rate) rate="$2"; shift 2 ;;
     -h|--help) sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知参数: $1" >&2; exit 2 ;;
@@ -200,6 +203,10 @@ if [[ "${with_nav}" == 1 ]]; then
   # 决策订阅真实导航的 /odometry（odom 系）并用 TF map->odom 转成 map 系。
   sim_args=(--ros-args -p provide_nav:=false)
   decision_args=(--ros-args -p odom_topic:=/odometry -p odom_frame:=odom)
+fi
+if [[ -n "${config}" ]]; then
+  # task_node 在 --ros-args 处停止解析自有参数，--config 必须放在它前面。
+  decision_args=(--config "${config}" "${decision_args[@]}")
 fi
 
 LOG_DIR="${DEMO_LOG_DIR:-${ROOT}/.docker-build/demo_logs}"
