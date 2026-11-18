@@ -9,7 +9,7 @@
 - **上行**：把裁判与自身 / 队友信息，从 auto-aim 统一成结构化消息发给决策，取代原来「一个标量一个话题」。
 - **下行**：把决策动作统一成结构化命令发给 auto-aim，由 auto-aim 经串口转给 MCU。
 - **不做回执**：MCU 只把动作转成裁判 `0x0120` 指令，不判断成功、不回传；决策侧用裁判 `0x020D` 上行
-  校验是否生效，未生效则重发（有次数上限）。下发值是累计目标值，重发天然幂等。
+  校验是否生效。未生效只在任务内记录失败，回到动作层重新决策，**不重发**。下发值是累计目标值，单次下发天然幂等。
 - **文档化**：字段、单位、来源、版本、校验、语义集中在这里。
 
 ## 2. 分层与依赖
@@ -49,7 +49,7 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 
 | 话题 | 消息 | 关键字段 | 来源 |
 | --- | --- | --- | --- |
-| `/sentry/game_info` | `GameInfo` | 阶段、时间、金币、`event_code`、`detect_color`、`can_rebuild_outpost`、手动点、敌基地 / 前哨 | 裁判 |
+| `/sentry/game_info` | `GameInfo` | 阶段、时间、金币、`event_code` / `event_code_2`、`detect_color`、`can_rebuild_outpost`、手动点、敌基地 / 前哨 | 裁判 |
 | `/sentry/online_info` | `SentryInfoOnline` | 自身血量 / 弹量 / 热量 / 能量、`sentry_info_1/2/3` | 裁判 |
 | `/sentry/offline_info` | `SentryInfoOffline` | 视觉锁定、装甲板、电容 | auto-aim 视觉 / 本机 |
 | `/sentry/team_info` | `TeamInfo` | `allies[4]`、己方基地 / 前哨血量 | 裁判 |
@@ -68,7 +68,7 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 | --- | --- | --- |
 | `/sentry/decision_command` | `DecisionCommand` | 决策 → auto-aim |
 
-`DecisionCommand` = `header` + `request_id` + `DecisionAction action`。
+`DecisionCommand` = `header` + `request_id` + `task_state` + `DecisionAction action`。
 
 `DecisionAction`：
 
@@ -77,7 +77,21 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 | `kind` | 动作类型，见常量（兑换发弹、确认免费复活、立即复活、远程兑换） |
 | `value` | **0x0120 的累计目标值 / 电平位**，不是本次增量（见 §6） |
 
-`request_id` 只用于日志关联；同一目标的重试复用同一个 id。
+`task_state`：
+
+| 值 | 含义 |
+| --- | --- |
+| 0 | `kIdle`：非比赛中 / 无 active Task |
+| 1 | `kNavigate` |
+| 2 | `kScan` |
+| 3 | `kOutpost` |
+| 4 | `kResource` |
+| 5 | `kHeal` |
+| 6 | `kRespawn` |
+
+`task_state` 变化时立即发送，并以 10 Hz 心跳重发；MCU 只锁存，不写入 `0x0120`。
+`action.kind=0` 表示本帧只更新 `task_state`，不携带动作。
+`request_id` 只用于日志关联；每个请求只发一次，不复用 id 做重试。
 
 ## 6. 动作语义
 
@@ -96,26 +110,22 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 - 最小兑换单位（2027 表 5-8 / 5-9）：17mm 增益点 **10 发**，远程 **100 发**。
   本地兑换的增量必须是 10 的整数倍；远程的 `value` 是次数，`+1` 就代表 100 发。
 - 复活是**电平位**：待复活期间持续置 1；复活完成或放弃后补发 0。
-- **重试策略由行为树随动作一起传入**：节点构造 `ActionRequest`（`target` / `retry_interval` /
-  `max_attempts` / `verify` / `level`），经 `ResourceIntent` 和仲裁原样带到 `ActionDispatcher`。
-  `ActionDispatcher` 不按 `kind` 猜策略。
-- 行为树端口：`retry_ms`、`max_attempts` 可直接写数字；省略时回退到 config 的
-  `action.verify_delay_ms` / `action.max_attempts`（复活用 `action.revive_verify_delay_ms` /
-  `action.revive_max_attempts`）。
-- 决策侧在 `retry_interval` 后用上表判据检查；未生效则重发同一目标，达到 `max_attempts` 后放弃。
-  复活动作在拿到有效裁判数据前不会开始，避免无基线乱发。
-- 放弃后，只要同一个请求还在持续，就不再重试；请求消失或增量 / 策略变化后重新开始。
+- **所有动作只发一次，不重试**。任务内只等待检测窗口；窗口结束仍未生效就返回失败，由动作层重新决策。
+- `Resource`：发送 `kind=1`，目标为 `baseline + amount`；5 s 内等 `info1.ammo_exchanged_local >= target`。
+- `Heal` 的基地免费发弹没有 `ActionRequest`：存活在补给区即自动领取；`Heal` 只做 5 s 到账确认。
+- 旧 `ActionRequest.retry_interval` / `max_attempts`、`ActionDispatcher` 重发状态机、resource BT 的
+  `retry_ms` / `max_attempts` 端口、配置项及相关测试全部移除。
 
 ## 7. 生效校验链路
 
 ```text
-决策 --DecisionCommand(request_id=N, value=目标累计值)--> auto-aim --0x02--> MCU
+决策 --DecisionCommand(request_id=N, task_state, value=目标累计值)--> auto-aim --0x02--> MCU
 MCU --0x0120--> 裁判
 决策 <--0x020D(sentry_info_1 / self_hp)-- 裁判
 ```
 
 - MCU 不需要回执，也不需要判断成功；它只维护 0x0120 的字段状态并按节拍转发。
-- 决策侧 `ActionDispatcher` 维护「发送 → 等待 → 校验 → 重试 / 放弃」状态机。
+- 决策侧只做「发送一次 → 5 s 检测窗口 → 成功 / 失败」；不再维护重试状态机。
 - 累计目标在同一局内单调不减；离开「比赛中」视为新一局，重置下界。
 
 ## 8. 实现现状
@@ -123,9 +133,9 @@ MCU --0x0120--> 裁判
 | 环节 | 状态 |
 | --- | --- |
 | 决策侧订阅 4 条上行、发布 `DecisionCommand` | ✅ `RosIoNode` |
-| 决策侧校验 / 重试状态机（`ActionDispatcher`） | ✅ core + `DecisionActuatorSim` 离线闭环 |
+| 决策侧单次下发 + 检测窗口 | ✅ `ActionDispatcher` 已改为单次发送；任务层做 5 s 检测 |
 | auto-aim 上行（`Publish2DecisionMaking` 发布 4 条消息） | ✅ 已迁到 `sentry_interfaces` |
-| auto-aim 下行（`Subscribe2Decision`） | ✅ 收到命令按 v1 组帧经串口下发 |
+| auto-aim 下行（`Subscribe2Decision`） | ✅ 已按 10 B 组帧并转发 `task_state` |
 | auto-aim 串口字节帧 v1 | ✅ 帧收发已实现（见 `serial_protocol.md`） |
 | MCU 侧实现 v1 帧 | ⛔ 待电控 / MCU（当前面向上位机联调） |
 | `SentryInfoOffline` 视觉锁定字段接入决策 | ⛔ 待 auto-aim 侧补齐 |
@@ -133,7 +143,11 @@ MCU --0x0120--> 裁判
 
 ## 9. 未决项
 
-- `detect_color` 编码含义。
+- `GameInfo.event_code_2` 已新增；auto-aim 已转发，MCU 固件待按 33 B 上行实现，未填充时基地控制状态按 0 处理。
+- `own_color` 由 `RosIoNode` 参数 `own_color`（red / blue）提供，用于 R/B → own/enemy 映射。
+- `DecisionCommand.task_state` 已加入 ROS 消息与 auto-aim；待 `TaskRuntime` 填充并同步 MCU 固件。
+- `DecisionOutput.tactical_mode` 已删除，面板 / 回放改用 `task_state`。
+- `detect_color` 编码含义（当前不依赖；颜色由 `RosIoNode` 的 `own_color` 参数给出）。
 - MCU 合并 0x0120 状态时的姿态位（bit 21-23）由谁维护。
 - 串口帧的 `magic` / 发送节拍是否最终确认。
 - 是否纳入更多上行字段（金币、能力机关、`sentry_info_3` / 电容 / 热量等）。

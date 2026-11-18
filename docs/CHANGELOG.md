@@ -7,6 +7,32 @@
 > [注意] 本文档是项目历史的单一事实来源，应随项目演进保持更新。
 > [注意] 本文档不是所有变更的完整清单；只记录重要变更并保持简洁易读。完整变更见版本控制系统（如 Git）历史。
 
+## [Unreleased]
+
+> 2027 Task 层：原子 Task + TaskRuntime，逐步替代 TacticalMode / Mission 树。
+
+### Added
+
+- `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
+- `core/task_runtime`：`TaskRegistry`、Task 生命周期、超时、抢占、结果与 `DecisionEpoch`。
+- `core/task_policy` / `core/task_runner`：手写 Task 选择 + Policy/Runtime 组合根。
+- `task_node`：TaskRunner + RosIoNode + SafetySupervisor 的 2027 主程序；`decision_node.launch.py` 与 `tools/demo.sh` 默认已切到 `task_node`。
+- 2027 原子 Task：`Navigate`、`Scan`、`Outpost`、`Respawn`、`Heal`、`Resource`，含宿主单测。
+- `points_2027.hpp`：11 个 2027 命名点常量。
+- `WorldState`：`OutpostControl`、`supply_claimed_minutes`。
+- 2027 `0x0101` 事件解码：`EventCode` 按 `own_color` 映射 R/B → own/enemy；`GameInfo.event_code_2` 上行字段。
+
+### Changed
+
+- 所有 Task 不重试；裁判兑换类任务只设 5 s 检测窗口。
+- `Heal`：基地补给区按每分钟 100 发累积确认；前哨站只回血。
+- `Resource`：状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账。
+
+### Removed
+
+- `ActionRequest.retry_interval` / `max_attempts`、`ActionReport.attempts`、`ActionDispatcher` 重发状态机、resource BT 的 `retry_ms` / `max_attempts` 端口与 `action.*attempts` 配置。
+- 旧 Task 架构：`TacticalMode`、Intent/Arbiter、Mission 树、`sentry_decision_nodes`、`decision_node` / `decision_main` / `replay_main`、面板战术层覆盖。
+
 ## [v0.5.2] - 2026-10-31
 
 > 动作策略下沉：重试间隔 / 次数 / 生效判据不再由 dispatcher 按 `kind` 反推，

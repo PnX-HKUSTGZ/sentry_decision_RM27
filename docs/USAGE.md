@@ -117,13 +117,15 @@ make -C build -j"$(nproc)"
 cd ~/pnx_autoaim_sp/auto-aim-new
 ./launch.sh
 
-# 终端 B：决策
+# 终端 B：2027 Task 层（新）
 cd ~/pnx_autoaim_sp/sentry_decision_RM27
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 run sentry_decision_bringup decision_node
+ros2 run sentry_decision_bringup task_node
 # 若导航用的不是 /aft_mapped_to_init：
-#   decision_node --ros-args -p odom_topic:=/odometry -p odom_frame:=odom
+#   task_node --ros-args -p odom_topic:=/odometry -p odom_frame:=odom
+# 蓝方：
+#   task_node --ros-args -p own_color:=blue
 ```
 
 **查看节点**
@@ -152,8 +154,8 @@ ros2 topic list | grep -E 'sentry|decision|cmd_vel'
 
 ## 11. 常见问题
 
-- `decision_main: command not found`：未 source overlay，执行 `source .docker-build/install/setup.bash`。
-- `decision_node` 报「导航 action server 未就绪」：没有启动导航栈，决策不会下发目标；接上 Nav2 或仿真即可（见 §4.2）。
+- `task_node: command not found`：未 source overlay，执行 `source .docker-build/install/setup.bash`。
+- `task_node` 报「导航 action server 未就绪」：没有启动导航栈，决策不会下发目标；接上 Nav2 或仿真即可（见 §4.2）。
 - 上游一直是 invalid：auto-aim 未启动或没收到 MCU 串口帧；`referee_sim_node` 可替代上行（见 [SIMULATION.md](SIMULATION.md)）。
 - IntelliSense 报头文件找不到：宿主缺少 Jazzy / BT.CPP 头文件，请用 Dev Container 打开，或检查 `.vscode/c_cpp_properties.json`。
 - 镜像中没有 `nav2_behavior_tree`：本项目不依赖它，`nav_executor` 直接使用 `nav2_msgs/action/NavigateToPose`。

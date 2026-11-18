@@ -3,8 +3,27 @@
 > 短期临时文档：只记录**当前 sprint** 的进度、已锁定决策与 TODO，不保留历史。
 > 历史变更见 [CHANGELOG.md](CHANGELOG.md)，阶段状态见 [ROADMAP.md](ROADMAP.md)。
 > 仅作为开发草稿纸，不属于项目正式文档。
+>
+> **2027 战略层重构后，本页“重试 / ActionDispatcher”部分已废弃；以 [STRATEGY_LAYER.md](STRATEGY_LAYER.md) 与 [TASK_CATALOG.md](TASK_CATALOG.md) 为准。**
 
-## 当前 sprint：v0.5.2 通信简化 + 动作策略下沉
+## 2027 Task 层迁移（当前）
+
+### 已完成
+
+- 纯逻辑 `Task` / `TaskRuntime` / `TaskRegistry`：`src/sentry_decision_core/{include,task*.hpp,src/task_runtime.cpp}`。
+- `Navigate`、`Scan`、`Outpost`、`Respawn`、`Heal`、`Resource` 六个 Task 的纯逻辑实现与宿主测试。
+- `WorldState` 增加 `OutpostControl` 与 `supply_claimed_minutes`；点位常量见 `points_2027.hpp`。
+- 2027 `0x0101` 事件解码：`EventCode` 按 `own_color` 映射 R/B；`GameInfo.event_code_2` 与 auto-aim 33 B 上行已接通。
+- `TaskRunner` 组合根：`RuleBasedTaskPolicy` + `TaskRuntime` + 默认 Task 表。
+- 宿主测试：`tools/host_core_test.sh` 已纳入 `task_runtime`、`navigate_scan`、`outpost_respawn`、`heal_resource`、`task_policy`、`task_runner`。
+
+### 下一步
+
+- MCU 按 33 B 上行实现 `event_code_2`（auto-aim 已转发，决策侧 2027 解码已完成）。
+- `task_node` 已接入 `TaskRunner` + `RosIoNode` + `SafetySupervisor`；默认 launch / demo 已切换。
+- 旧 `TacticalMode` / Mission 树 / `decision_node` / `sentry_decision_nodes` 已删除。
+
+## 旧 sprint：v0.5.2 通信简化 + 动作策略下沉
 
 ### 目标
 
