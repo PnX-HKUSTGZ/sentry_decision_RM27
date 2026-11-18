@@ -1,4 +1,4 @@
-#include "sentry_decision_core/resource_task.hpp"
+#include "sentry_decision_core/tasks/resource_task.hpp"
 
 #include <string_view>
 #include <variant>

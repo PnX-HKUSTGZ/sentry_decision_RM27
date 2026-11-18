@@ -1,11 +1,11 @@
 #include "sentry_decision_core/task_factory.hpp"
 
-#include "sentry_decision_core/heal_task.hpp"
-#include "sentry_decision_core/navigate_task.hpp"
-#include "sentry_decision_core/outpost_task.hpp"
-#include "sentry_decision_core/resource_task.hpp"
-#include "sentry_decision_core/respawn_task.hpp"
-#include "sentry_decision_core/scan_task.hpp"
+#include "sentry_decision_core/tasks/heal_task.hpp"
+#include "sentry_decision_core/tasks/navigate_task.hpp"
+#include "sentry_decision_core/tasks/outpost_task.hpp"
+#include "sentry_decision_core/tasks/resource_task.hpp"
+#include "sentry_decision_core/tasks/respawn_task.hpp"
+#include "sentry_decision_core/tasks/scan_task.hpp"
 
 namespace sentry_decision {
 

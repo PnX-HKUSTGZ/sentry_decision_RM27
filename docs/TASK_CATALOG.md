@@ -311,7 +311,7 @@ RespawnTask
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `heal_point` | named point | 否 | 默认 `own_base_supply`；只允许 `own_base_supply` / `own_outpost_buff` |
+| `heal_point` | named point | 否 | 默认 `own_base_supply`；只允许 `own_base_supply` / `own_outpost_buff` / `enemy_outpost_buff` |
 | `claim_free_ammo` | bool | 否 | 默认 `true`；仅基地补给区有效，前哨站忽略 |
 | `timeout` | Duration | 否 | 0 = 不超时 |
 | `task_state` | 固定 | — | `TaskState::kHeal` |
@@ -319,8 +319,9 @@ RespawnTask
 ### 5.3 前置条件
 
 - 机器人存活。
-- `heal_point` 只能是 `own_base_supply` 或 `own_outpost_buff`，且地图配置必须给出 `radius > 0`。
-- `own_outpost_buff`：己方前哨站必须由己方完全控制；任务完成前失去完全控制立即失败。
+- `heal_point` 只能是 `own_base_supply`、`own_outpost_buff` 或 `enemy_outpost_buff`，且地图配置必须给出 `radius > 0`。
+- `own_outpost_buff`：己方半场前哨站必须由己方完全控制；任务完成前失去完全控制立即失败。
+- `enemy_outpost_buff`：敌方半场前哨站必须由己方完全控制；任务完成前失去完全控制立即失败。
 - `own_base_supply`：存活机器人位于补给区即自动激活补给区增益点，裁判自动发放累积的免费发弹量；没有额外 `ActionRequest`。
 - `claim_free_ammo=false` 只表示“不等待/不校验到账”，不会阻止裁判自动发弹。
 
@@ -349,7 +350,8 @@ HealTask
 - `claimable_minutes = floor(elapsed_s / 60) - supply_claimed_minutes`。
 - `supply_claimed_minutes` 由 `TaskRunner` 的信念跟踪维护：机器人在己方补给区内、观测到 `self_ammo` 正增量、且 `info1.ammo_exchanged_local` 未同步增加时，更新到当前分钟；跨 Task 保留。
 - `claimable_minutes <= 0`：无待领取，立即通过。
-- `claimable_minutes > 0`：进入补给区后 5 s 内等待 `supply_claimed_minutes` 追平当前分钟；未追平则失败。
+- `claimable_minutes > 0`：进入补给区后 5 s 内等待 `supply_claimed_minutes` 追平当前已累积分钟数（`entitled_minutes = floor(elapsed_s / 60)`）；未追平则失败。
+- 例：`elapsed_s = 125` → `entitled_minutes = 2`，表示已累积 2 个 100 发批次；若 `supply_claimed_minutes = 1`，说明只确认领到第 1 批，仍需等第 2 批到账。
 - 不比较精确增量：开火会减少 `self_ammo`，只看“是否发生了领取”。
 
 ### 5.6 打断

@@ -1,7 +1,7 @@
 #include <cstdio>
 
-#include "sentry_decision_core/outpost_task.hpp"
-#include "sentry_decision_core/respawn_task.hpp"
+#include "sentry_decision_core/tasks/outpost_task.hpp"
+#include "sentry_decision_core/tasks/respawn_task.hpp"
 
 using namespace sentry_decision;
 

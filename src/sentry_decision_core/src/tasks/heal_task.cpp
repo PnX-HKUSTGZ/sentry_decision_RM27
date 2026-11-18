@@ -1,4 +1,4 @@
-#include "sentry_decision_core/heal_task.hpp"
+#include "sentry_decision_core/tasks/heal_task.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +30,7 @@ void HealTask::start(const TaskCall& call, TimePoint now) {
   invalid_ = false;
   invalid_reason_.clear();
   target_ = nullptr;
+  zone_ = ZoneKind::kBaseSupply;
   zone_radius_ = 0.0;
   in_zone_ = false;
   in_zone_since_ = now;
@@ -45,11 +46,19 @@ void HealTask::start(const TaskCall& call, TimePoint now) {
   params_ = *params;
 
   const bool base = params_.heal_point == point_name(points2027::kOwnBaseSupply);
-  const bool outpost = params_.heal_point == point_name(points2027::kOwnOutpostBuff);
-  if (!base && !outpost) {
+  const bool own_outpost = params_.heal_point == point_name(points2027::kOwnOutpostBuff);
+  const bool enemy_outpost = params_.heal_point == point_name(points2027::kEnemyOutpostBuff);
+  if (!base && !own_outpost && !enemy_outpost) {
     invalid_ = true;
-    invalid_reason_ = "Heal 点必须是 own_base_supply 或 own_outpost_buff";
+    invalid_reason_ = "Heal 点必须是 own_base_supply、own_outpost_buff 或 enemy_outpost_buff";
     return;
+  }
+  if (base) {
+    zone_ = ZoneKind::kBaseSupply;
+  } else if (own_outpost) {
+    zone_ = ZoneKind::kOwnOutpost;
+  } else {
+    zone_ = ZoneKind::kEnemyOutpost;
   }
 
   target_ = config_.find_point(params_.heal_point);
@@ -82,11 +91,16 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
     return out;
   }
 
-  const bool base = params_.heal_point == point_name(points2027::kOwnBaseSupply);
-  const bool outpost = params_.heal_point == point_name(points2027::kOwnOutpostBuff);
-  if (outpost && world.upstream.our_outpost_control != OutpostControl::kOwnFull) {
+  if (zone_ == ZoneKind::kOwnOutpost &&
+      world.upstream.our_outpost_control != OutpostControl::kOwnFull) {
     out.status = TaskStatus::kFailure;
     out.detail = "己方前哨站未完全控制";
+    return out;
+  }
+  if (zone_ == ZoneKind::kEnemyOutpost &&
+      world.upstream.enemy_outpost_control != OutpostControl::kOwnFull) {
+    out.status = TaskStatus::kFailure;
+    out.detail = "敌方前哨站未完全控制";
     return out;
   }
 
@@ -121,7 +135,7 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
     return out;
   }
 
-  if (!base || !params_.claim_free_ammo) {
+  if (zone_ != ZoneKind::kBaseSupply || !params_.claim_free_ammo) {
     out.status = TaskStatus::kSuccess;
     out.progress = 1.0f;
     out.detail = "血量已满";
@@ -130,8 +144,10 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
 
   const int match_seconds = static_cast<int>(match_duration_.count() / 1000);
   const int elapsed_seconds = std::max(0, match_seconds - world.upstream.game_time_remaining);
-  const int current_minute = elapsed_seconds / 60;
-  if (world.supply_claimed_minutes >= current_minute) {
+  // 每满 1 分钟累积 100 发；entitled_minutes 是当前已经累积的分钟批次数。
+  // supply_claimed_minutes 是已确认领取到的最高分钟批次（0 = 尚未领取）。
+  const int entitled_minutes = elapsed_seconds / 60;
+  if (world.supply_claimed_minutes >= entitled_minutes) {
     out.status = TaskStatus::kSuccess;
     out.progress = 1.0f;
     out.detail = "血量已满，免费发弹已领取";

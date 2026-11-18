@@ -1,4 +1,4 @@
-#include "sentry_decision_core/navigate_task.hpp"
+#include "sentry_decision_core/tasks/navigate_task.hpp"
 
 #include <cmath>
 #include <utility>

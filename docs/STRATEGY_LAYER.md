@@ -248,8 +248,8 @@ else: switch
   2. 先击毁，转为敌方临时控制，再等待敌方离开且未占点 5 s。
 - 己方完全控制的前哨站可作为补给区使用，但不能领取免费发弹量。
 - 战略优先级：先保全己方半场的前哨站；己方前哨站完全控制且安全后，再尝试敌方前哨站。
-- 对 Task 的影响：`Outpost` 只负责下发攻击状态和监测目标；`Heal` 需要根据控制状态选择基地补给区或己方完全控制的前哨站。
-- `Heal` 在己方半场前哨站只回血：`claim_free_ammo` 默认 `true` 但在前哨站忽略，不领免费弹、也不因此失败。
+- 对 Task 的影响：`Outpost` 只负责下发攻击状态和监测目标；`Heal` 需要根据控制状态选择基地补给区，或己方完全控制的任一前哨站（己方/敌方半场均可用）。
+- `Heal` 在前哨站只回血：`claim_free_ammo` 默认 `true` 但在前哨站忽略，不领免费弹、也不因此失败。
 - 基地补给区免费发弹是“存活且在区内”自动触发；`Heal` 只负责 5 s 到账确认，见 [TASK_CATALOG.md](TASK_CATALOG.md) §5.5。
 
 ## 10. 协议与字段
@@ -314,7 +314,7 @@ struct ScanParams {};
 struct OutpostParams { Side target_side = Side::kEnemy; };
 struct RespawnParams {};
 struct HealParams {
-  std::string heal_point = "own_base_supply";
+  std::string heal_point = "own_base_supply";  // 或 own/enemy_outpost_buff
   bool claim_free_ammo = true;        // 仅基地补给区有效
 };
 struct ResourceParams {
@@ -472,7 +472,7 @@ using Strategy = std::function<TaskPlan(
 - 所有 Task 不做内部重试；失败/超时交给动作层。裁判兑换类任务只设 5 s 检测窗口，不重发。`ActionDispatcher` 已改为单次发送，旧重试字段已删除。
 - `Scan` / `Outpost` 是同级、互斥的 state-only 主任务；`Outpost` 不含导航。
 - `Respawn`：只等待免费复活；成功后结束，`Heal` 由动作层另选。整个任务保持 `TaskState = kRespawn`。
-- `Heal`：基地补给区自动领取累积免费发弹（每满 1 分钟 100 发），5 s 内确认；`claim_free_ammo` 默认 true，前哨站忽略；己方前哨站只回血。
+- `Heal`：基地补给区自动领取累积免费发弹（每满 1 分钟 100 发），5 s 内确认；`claim_free_ammo` 默认 true，前哨站忽略；前哨站（己方或敌方半场，只要己方完全控制）只回血。
 - `Resource`：状态型任务，不导航；在 `own_base_supply` / `own_outpost_buff` 花金币兑换；只发一次，5 s 等 `info1.ammo_exchanged_local` 追上目标。
 - `Tunnel`、`Rune` 2027 第一版不做。
 - 2027 `0x0101`：`event_data` / `event_data_2` 解码；R/B 用 `own_color` 映射为 own/enemy；`GameInfo.event_code_2` 已加。

@@ -1,7 +1,7 @@
 #include <cstdio>
 
-#include "sentry_decision_core/heal_task.hpp"
-#include "sentry_decision_core/resource_task.hpp"
+#include "sentry_decision_core/tasks/heal_task.hpp"
+#include "sentry_decision_core/tasks/resource_task.hpp"
 
 using namespace sentry_decision;
 
@@ -24,6 +24,8 @@ PolicyConfig make_config() {
   config.point_radius["own_base_supply"] = 0.5;
   config.points["own_outpost_buff"] = Point2D{5.0, 0.0, 0.0};
   config.point_radius["own_outpost_buff"] = 0.5;
+  config.points["enemy_outpost_buff"] = Point2D{-5.0, 0.0, 0.0};
+  config.point_radius["enemy_outpost_buff"] = 0.5;
   return config;
 }
 
@@ -96,6 +98,25 @@ void test_heal_outpost_requires_full_control() {
   CHECK(out.detail == "己方前哨站未完全控制");
 }
 
+void test_heal_enemy_outpost_requires_full_control() {
+  const PolicyConfig config = make_config();
+  const TimePoint now{};
+
+  HealTask contested(config, 400, Duration{420000});
+  contested.start(heal_call("enemy_outpost_buff"), now);
+  WorldState world = make_world(-5.0, 0.0);
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnTemporary;
+  TaskOutput blocked = contested.tick(world, now);
+  CHECK(blocked.status == TaskStatus::kFailure);
+  CHECK(blocked.detail == "敌方前哨站未完全控制");
+
+  HealTask controlled(config, 400, Duration{420000});
+  controlled.start(heal_call("enemy_outpost_buff"), now);
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  TaskOutput full = controlled.tick(world, now);
+  CHECK(full.status == TaskStatus::kSuccess);
+}
+
 void test_heal_without_claim_succeeds_at_full_hp() {
   const PolicyConfig config = make_config();
   HealTask task(config, 400, Duration{420000});
@@ -164,6 +185,7 @@ int main() {
   test_heal_navigates_and_waits_for_ammo();
   test_heal_ammo_timeout();
   test_heal_outpost_requires_full_control();
+  test_heal_enemy_outpost_requires_full_control();
   test_heal_without_claim_succeeds_at_full_hp();
   test_resource_sends_once_and_waits();
   test_resource_timeout();

@@ -8,12 +8,12 @@ SIM="$ROOT/src/sentry_decision_sim"
 OUT="$(mktemp -d)"
 
 CORE_SOURCES=("$CORE/src/action_dispatcher.cpp" "$CORE/src/action_factory.cpp"
-  "$CORE/src/heal_task.cpp" "$CORE/src/resource_task.cpp"
-  "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/navigate_task.cpp"
-  "$CORE/src/outpost_task.cpp" "$CORE/src/referee_protocol.cpp" "$CORE/src/respawn_task.cpp"
-  "$CORE/src/scan_task.cpp" "$CORE/src/safety_supervisor.cpp" "$CORE/src/task_factory.cpp"
-  "$CORE/src/task_policy.cpp" "$CORE/src/task_runner.cpp" "$CORE/src/task_runtime.cpp"
-  "$CORE/src/world_model.cpp")
+  "$CORE/src/logging.cpp" "$CORE/src/nav_goal_tracker.cpp" "$CORE/src/referee_protocol.cpp"
+  "$CORE/src/safety_supervisor.cpp" "$CORE/src/task_factory.cpp" "$CORE/src/task_policy.cpp"
+  "$CORE/src/task_runner.cpp" "$CORE/src/task_runtime.cpp" "$CORE/src/world_model.cpp"
+  "$CORE/src/tasks/heal_task.cpp" "$CORE/src/tasks/navigate_task.cpp"
+  "$CORE/src/tasks/outpost_task.cpp" "$CORE/src/tasks/resource_task.cpp"
+  "$CORE/src/tasks/respawn_task.cpp" "$CORE/src/tasks/scan_task.cpp")
 SIM_SOURCES=("$SIM/src/referee_simulator.cpp" "$SIM/src/nav_simulator.cpp"
   "$SIM/src/decision_actuator_sim.cpp" "$SIM/src/sim_world.cpp" "$SIM/src/match_stage.cpp")
 

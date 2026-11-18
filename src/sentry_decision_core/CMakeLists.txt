@@ -15,16 +15,16 @@ find_package(ament_cmake REQUIRED)
 add_library(${PROJECT_NAME}
   src/action_dispatcher.cpp
   src/action_factory.cpp
-  src/heal_task.cpp
-  src/resource_task.cpp
   src/logging.cpp
   src/nav_goal_tracker.cpp
-  src/navigate_task.cpp
-  src/outpost_task.cpp
   src/referee_protocol.cpp
-  src/respawn_task.cpp
-  src/scan_task.cpp
   src/safety_supervisor.cpp
+  src/tasks/heal_task.cpp
+  src/tasks/navigate_task.cpp
+  src/tasks/outpost_task.cpp
+  src/tasks/resource_task.cpp
+  src/tasks/respawn_task.cpp
+  src/tasks/scan_task.cpp
   src/task_factory.cpp
   src/task_policy.cpp
   src/task_runner.cpp

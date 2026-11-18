@@ -96,7 +96,8 @@ struct WorldState {
   NavState nav;
   EnemyState enemy;
   std::vector<AllyRobot> allies;
-  // 补给区免费发弹：已领取到第几个整分钟（0 = 尚未领取）。
+  // 补给区免费发弹：已确认领取到的最高分钟批次（0 = 尚未领取）。
+  // 与 entitled_minutes = floor(elapsed_s / 60) 比较，>= 表示当前累积批次都已领取。
   int supply_claimed_minutes = 0;
   TimePoint stamp{};
 };

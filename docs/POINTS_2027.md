@@ -21,7 +21,7 @@
 | `own_fort` | fort | 己方堡垒增益点 |
 | `enemy_fort` | fort | 对方堡垒增益点 |
 | `own_outpost_buff` | outpost_buff | 己方前哨站正下方增益点；己方完全控制时可用于 `Heal` / `Resource` |
-| `enemy_outpost_buff` | outpost_buff | 对方前哨站正下方增益点；己方完全控制时可用于 `Heal` / `Resource` |
+| `enemy_outpost_buff` | outpost_buff | 对方前哨站正下方增益点；己方完全控制时可用于 `Heal` |
 | `own_outpost_front` | strike | 己方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
 | `enemy_outpost_front` | strike | 对方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
 | `own_outpost_side` | strike_highland | 己方前哨站侧方打击点：同侧高地增益点内，较近但危险 |
@@ -57,7 +57,7 @@ points:
 | Task | 允许的点 |
 |---|---|
 | `Navigate` | 以上任意 11 个点 |
-| `Heal` | `own_base_supply` 或 `own_outpost_buff` |
+| `Heal` | `own_base_supply`、`own_outpost_buff` 或 `enemy_outpost_buff`（后两者要求己方完全控制） |
 | `Resource` | `own_base_supply` 或 `own_outpost_buff`（后者要求己方完全控制） |
 
 `Heal` / `Resource` 通过点名区分补给区类型，不额外传 `zone_kind`。

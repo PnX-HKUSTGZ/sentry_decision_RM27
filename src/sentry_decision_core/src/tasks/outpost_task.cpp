@@ -1,4 +1,4 @@
-#include "sentry_decision_core/outpost_task.hpp"
+#include "sentry_decision_core/tasks/outpost_task.hpp"
 
 #include <variant>
 

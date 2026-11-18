@@ -1,4 +1,4 @@
-#include "sentry_decision_core/scan_task.hpp"
+#include "sentry_decision_core/tasks/scan_task.hpp"
 
 #include <variant>
 

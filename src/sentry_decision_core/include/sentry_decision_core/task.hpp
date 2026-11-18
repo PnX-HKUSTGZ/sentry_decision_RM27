@@ -58,6 +58,7 @@ struct RespawnParams {
 };
 
 struct HealParams {
+  // own_base_supply / own_outpost_buff / enemy_outpost_buff
   std::string heal_point = "own_base_supply";
   bool claim_free_ammo = true;
   bool operator==(const HealParams& other) const {
