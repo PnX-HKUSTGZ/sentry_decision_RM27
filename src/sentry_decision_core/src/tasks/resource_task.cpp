@@ -29,6 +29,7 @@ void ResourceTask::start(const TaskCall& call, TimePoint now) {
   invalid_reason_.clear();
   baseline_ = 0;
   target_ = 0;
+  request_ = ActionRequest{};
   sent_at_ = now;
 
   const auto* params = std::get_if<ResourceParams>(&call.params);
@@ -62,15 +63,16 @@ TaskOutput ResourceTask::tick(const WorldState& world, TimePoint now) {
     return out;
   }
 
+  if (!world.upstream.valid) {
+    out.status = TaskStatus::kFailure;
+    out.detail = "裁判数据无效";
+    return out;
+  }
+
   const bool base = params_.exchange_point == point_name(points2027::kOwnBaseSupply);
   const bool outpost = params_.exchange_point == point_name(points2027::kOwnOutpostBuff);
 
   if (!sent_) {
-    if (!world.upstream.valid) {
-      out.status = TaskStatus::kFailure;
-      out.detail = "裁判数据无效";
-      return out;
-    }
     if (base && !world.upstream.event.supply_zone_occupied) {
       out.status = TaskStatus::kFailure;
       out.detail = "不在己方基地补给区";
@@ -102,13 +104,13 @@ TaskOutput ResourceTask::tick(const WorldState& world, TimePoint now) {
     }
 
     target_ = baseline_ + params_.amount;
-    ActionRequest request;
-    request.kind = DecisionActionKind::kAmmoExchange;
-    request.target = target_;
-    request.delta = params_.amount;
-    request.monotonic = true;
-    request.verify = ActionVerify::kAmmoExchangedLocal;
-    out.action = request;
+    request_ = ActionRequest{};
+    request_.kind = DecisionActionKind::kAmmoExchange;
+    request_.target = target_;
+    request_.delta = params_.amount;
+    request_.monotonic = true;
+    request_.verify = ActionVerify::kAmmoExchangedLocal;
+    out.action = request_;
     sent_ = true;
     sent_at_ = now;
     out.metrics["target"] = static_cast<double>(target_);
@@ -117,6 +119,9 @@ TaskOutput ResourceTask::tick(const WorldState& world, TimePoint now) {
     return out;
   }
 
+  // 继续提交同一请求：dispatcher 负责去重；若上一拍因上游无效没有真正发出，
+  // 这里还能把它保留下来，而不是在下一拍被清理掉。
+  out.action = request_;
   out.metrics["current"] = static_cast<double>(world.upstream.info1.ammo_exchanged_local);
   out.metrics["target"] = static_cast<double>(target_);
   if (world.upstream.info1.ammo_exchanged_local >= target_) {

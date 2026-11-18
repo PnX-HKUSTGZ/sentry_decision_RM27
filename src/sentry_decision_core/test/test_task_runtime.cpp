@@ -224,6 +224,38 @@ void test_non_abortable_is_deferred() {
   CHECK(second->starts == 1);
 }
 
+void test_resuming_active_task_clears_pending() {
+  TaskRegistry registry;
+  FakeTask* first = nullptr;
+  FakeTask* second = nullptr;
+  int created = 0;
+  registry.register_task("Fake", [&] {
+    auto task = std::make_unique<FakeTask>();
+    if (created++ == 0) {
+      first = task.get();
+    } else {
+      second = task.get();
+    }
+    return task;
+  });
+
+  TaskRuntime runtime(registry);
+  const TimePoint now{};
+  const TaskPlan current = make_plan(now, make_call("Fake"));
+  runtime.apply(current, now);
+  first->abortable = false;
+
+  // 先请求切换到 Heal，再改回当前 Navigate；旧的 pending 必须撤销。
+  runtime.apply(make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}}), now);
+  runtime.apply(current, now);
+  CHECK(runtime.snapshot()->abort_block_reason.empty());
+
+  first->abortable = true;
+  runtime.tick(WorldState{}, now + Duration{10});
+  CHECK(!first->aborted);
+  CHECK(second == nullptr);
+}
+
 void test_expired_plan() {
   TaskRegistry registry;
   registry.register_task("Fake", [] { return std::make_unique<FakeTask>(); });
@@ -263,6 +295,7 @@ int main() {
   test_task_timeout();
   test_preemption_aborts_old_task();
   test_non_abortable_is_deferred();
+  test_resuming_active_task_clears_pending();
   test_expired_plan();
   test_unknown_task();
 

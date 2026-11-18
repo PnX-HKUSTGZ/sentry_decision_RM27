@@ -4,7 +4,7 @@
 
 namespace sentry_decision {
 
-// Respawn：只等待免费复活；复活成功即结束，不包含 Heal / 导航。
+// Respawn：待复活期间发送免费复活确认，复活成功即结束，不包含 Heal / 导航。
 class RespawnTask : public Task {
  public:
   bool can_start(const WorldState& world) const override;

@@ -119,7 +119,7 @@ struct TaskResult {
   std::map<std::string, double> metrics;
 };
 
-// 一次 tick 的输出。Task 不直接写 Intent，由 TaskRuntime 统一投影。
+// 一次 tick 的输出。Task 不直接写 DecisionOutput，由 TaskRuntime 统一投影。
 struct TaskOutput {
   TaskStatus status = TaskStatus::kRunning;
   TaskState task_state = TaskState::kIdle;

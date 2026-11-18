@@ -31,6 +31,8 @@ using sentry_decision::Duration;
 using sentry_decision::SteadyClock;
 using sentry_decision::TimePoint;
 
+constexpr Duration kTaskStateHeartbeat{100};
+
 struct Options {
   double rate_hz = 20.0;
   int ticks = 0;
@@ -119,7 +121,8 @@ class TaskDecisionNode : public rclcpp::Node {
             << ",\"y\":" << entry.second.y << ",\"r\":" << radius << "}";
       }
     }
-    out << "],\"task_state\":" << task_state_json_.load() << ",\"safety_emergency\":false}";
+    out << "],\"task_state\":" << task_state_json_.load()
+        << ",\"safety_emergency\":" << (safety_emergency_json_.load() ? "true" : "false") << "}";
     return out.str();
   }
 
@@ -136,11 +139,13 @@ class TaskDecisionNode : public rclcpp::Node {
       SD_LOG_DEBUG("task", "DecisionEpoch reason=%d", static_cast<int>(epoch->reason));
     }
 
+    const sentry_decision::TaskState state = runner_.task_state();
     sentry_decision::DecisionOutput output;
     output.nav_goal = runner_.nav_goal();
     output.action = runner_.action().value_or(sentry_decision::ActionRequest{});
-    output.task_state = runner_.task_state();
+    output.task_state = state;
     const sentry_decision::SafetyResult safe = safety_.apply(world, output);
+    safety_emergency_json_ = safe.emergency;
 
     const auto nav_step = nav_tracker_.update(safe.output.nav_goal);
     if (nav_step.decision == sentry_decision::NavGoalTracker::Decision::kSend &&
@@ -157,11 +162,11 @@ class TaskDecisionNode : public rclcpp::Node {
       io_->send_action(action);
     }
 
-    const sentry_decision::TaskState state = runner_.task_state();
     task_state_json_ = static_cast<int>(state);
-    if (state != last_task_state_) {
+    if (state != last_task_state_ || now - last_task_state_sent_ >= kTaskStateHeartbeat) {
       io_->send_task_state(state);
       last_task_state_ = state;
+      last_task_state_sent_ = now;
     }
 
     const std::uint32_t tick = tick_count_++;
@@ -182,7 +187,9 @@ class TaskDecisionNode : public rclcpp::Node {
   sentry_decision::NavGoalTracker nav_tracker_;
   sentry_decision::ActionDispatcher dispatcher_;
   sentry_decision::TaskState last_task_state_ = sentry_decision::TaskState::kIdle;
+  TimePoint last_task_state_sent_{};
   std::atomic<int> task_state_json_{0};
+  std::atomic<bool> safety_emergency_json_{false};
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
   rclcpp::TimerBase::SharedPtr timer_;

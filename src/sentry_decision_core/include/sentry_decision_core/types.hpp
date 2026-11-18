@@ -95,7 +95,7 @@ enum class ActionVerify : std::uint8_t {
 };
 
 // 一个动作请求：语义 + 下发策略。
-// 由行为树节点构造，经 Intent / 仲裁原样带到 dispatcher；dispatcher 不再按 kind 猜策略。
+// 由 Task 构造，经 TaskRuntime 原样带到 dispatcher；dispatcher 不按 kind 猜策略。
 struct ActionRequest {
   DecisionActionKind kind = DecisionActionKind::kNone;
   int target = 0;          // 协议绝对目标值（累计值 / 电平位）

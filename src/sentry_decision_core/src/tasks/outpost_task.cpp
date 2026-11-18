@@ -26,6 +26,12 @@ TaskOutput OutpostTask::tick(const WorldState& world, TimePoint) {
     return out;
   }
 
+  if (!world.upstream.valid) {
+    out.status = TaskStatus::kFailure;
+    out.detail = "裁判数据无效";
+    return out;
+  }
+
   const int hp = params_.target_side == Side::kOwn ? world.upstream.our_outpost_hp
                                                    : world.upstream.enemy_outpost_hp;
   const OutpostControl control = params_.target_side == Side::kOwn

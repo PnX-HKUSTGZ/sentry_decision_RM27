@@ -8,7 +8,7 @@
 - 战略层成为一个纯函数：输入信念/任务状态/宏观指令，输出 `TaskPlan`。
 - 任务状态、生命周期、打断时机由 `TaskRuntime` 维护，战略层不持有运行时状态。
 - 任务都是原子行为，不内嵌其他 Task；组合目标由动作层根据新状态连续选择。
-- 指令层（IntentArbiter + SafetySupervisor）保持不变。
+- 指令层保留 `SafetySupervisor`；旧 `IntentArbiter` 已在本次重构中删除。
 
 ## 2. 分层
 
@@ -30,12 +30,12 @@ TaskRuntime（有状态）
    频率：10–20 Hz
         │
         ▼
-Task（行为树子树 / 状态机）
-   职责：封装导航、交战、买弹、复活等模块任务
-        │ Intent
+Task（状态机 / 行为树内部步骤）
+   职责：封装导航、交战、买弹、复活等原子任务
+        │ TaskOutput
         ▼
-IntentArbiter + SafetySupervisor（指令层）
-   职责：字段级仲裁、限幅、互锁、安全否决
+SafetySupervisor（指令层）
+   职责：限幅、安全否决
    频率：20 Hz
         │
         ▼
@@ -46,8 +46,8 @@ DecisionOutput
 |---|---|---|---|---|
 | MacroPlanner（可选） | 定方向：阶段、目标权重、风险、重点区域 | 宏观快照、历史、事件 | `MacroDirective` | 5–20 s |
 | Task Selection | 定任务：选哪个 Task、参数、是否打断 | `WorldState`、`TaskSnapshot`、`HistoryView`、`MacroDirective` | `TaskPlan` | 事件触发 + 1 s 超时 |
-| TaskRuntime | 定执行：tick、状态、抢占、超时、应用计划 | `TaskPlan`、`WorldState` | `Intent`、`TaskSnapshot` | 10–20 Hz |
-| Command（下游指令层，不属于本战术层） | 定输出：字段级仲裁与安全 | `Intent`、安全状态 | `DecisionOutput` | 20 Hz |
+| TaskRuntime | 定执行：tick、状态、抢占、超时、应用计划 | `TaskPlan`、`WorldState` | `TaskOutput`、`TaskSnapshot` | 10–20 Hz |
+| Command（下游指令层，不属于本战术层） | 定输出：安全限幅与急停 | `TaskOutput`、安全状态 | `DecisionOutput` | 20 Hz |
 
 > 本文的战术层 = MacroPlanner（可选）+ Task Selection + TaskRuntime/Task；Command 是下游指令层，列在此处只为说明交接关系。
 
@@ -98,7 +98,7 @@ DecisionOutput
   - 执行任务级 `can_abort()` 与 `TaskCall.timeout`；
   - 在定时/事件发生时产生 `DecisionEpoch`；
   - 应用新 `TaskPlan`，halt 旧任务、启动新任务；
-  - 收集 `Intent` 和 `TaskSnapshot`；
+  - 收集 `TaskOutput` 和 `TaskSnapshot`；
   - 记录计划、状态迁移、拒绝原因。
 - 不负责：
   - 不选任务；
@@ -111,9 +111,9 @@ DecisionOutput
 
 ### 4.4 Command（下游指令层，不属于本战术层）
 
-- `IntentArbiter`：字段级仲裁、来源优先级、lease、限幅、互锁。
-- `SafetySupervisor`：最高优先级 veto / 覆盖。
-- `TaskRuntime` 只产生 `Intent`，不产生 `DecisionOutput`。
+- `SafetySupervisor`：最高优先级 veto / 覆盖、限幅。
+- 当前没有 `IntentArbiter`；`TaskOutput` 直接投影成 `DecisionOutput`，再交给 `SafetySupervisor`。
+- `TaskRuntime` 只产生 `TaskOutput`，不产生 `DecisionOutput`。
 
 ### 4.5 TaskState（下行）
 
@@ -130,7 +130,6 @@ DecisionOutput
 | 当前应该跑哪个 Task？ | Task Selection |
 | 计划过期，继续还是重规划？ | TaskRuntime 发 `DecisionEpoch`，Task Selection 决定 |
 | 任务失败，重试还是换任务？ | Task Selection（不重试，直接重新选 Task） |
-| 两个 Intent 争同一个输出字段？ | IntentArbiter |
 | 安全层要求急停/覆盖？ | SafetySupervisor |
 
 ### 5.1 并发
@@ -237,7 +236,7 @@ else: switch
 | `Outpost` | 主任务 | 目标前哨站血量归零；进入时目标必为敌方占领 | 只下发 `TaskState=kOutpost`；不含导航；`target_side` 只表示位于己方/敌方半场 |
 | `Resource` | 主任务 | 兑换累计值到账/失败 | 状态型，不导航；基地补给区或己方完全控制前哨站增益点；5 s 检测；一般 `Heal` 后选择 |
 | `Heal` | 主任务 | 血量回满；基地补给区按需确认免费发弹到账 | 导航至基地补给区/己方完全控制前哨站；默认领取免费发弹；前哨站只回血 |
-| `Respawn` | 主任务 | 免费复活成功 | 只等待免费复活；`Heal` 由动作层另选 |
+| `Respawn` | 主任务 | 免费复活成功 | 发送免费复活确认并等待；`Heal` 由动作层另选 |
 
 > `Tunnel`、`Rune` 2027 第一版不做，不设 `TaskState`。姿态 / 强化姿态暂缓，不进入当前 Task 清单。
 
@@ -419,11 +418,11 @@ class Task {
  public:
   virtual ~Task() = default;
   virtual bool can_start(const WorldState& world) const = 0;
-  virtual void start(const TaskCall& call) = 0;
-  virtual TaskStatus tick(const WorldState& world) = 0;
+  virtual void start(const TaskCall& call, TimePoint now) = 0;
+  virtual TaskOutput tick(const WorldState& world, TimePoint now) = 0;
   virtual bool can_abort() const = 0;
   virtual void abort() = 0;
-  virtual TaskSnapshot snapshot() const = 0;
+  virtual TaskState task_state() const = 0;
 };
 ```
 
@@ -434,7 +433,6 @@ class TaskRuntime {
  public:
   void apply(const TaskPlan& plan, TimePoint now);
   void tick(const WorldState& world, TimePoint now);
-  std::vector<Intent> take_intents();
   std::optional<TaskSnapshot> snapshot() const;
   std::optional<Point2D> nav_goal() const;
   std::optional<ActionRequest> action() const;
@@ -463,7 +461,7 @@ using Strategy = std::function<TaskPlan(
 
 ### 10.10 已讨论结论
 
-- `Command` 是下游指令层，不属于本战术层；本层只到 `TaskRuntime` / `Intent`。
+- `Command` 是下游指令层，不属于本战术层；本层只到 `TaskRuntime` / `TaskOutput`。
 - 动作层无固定周期：事件触发；无事件时最长 1 s 触发一次。`TaskRuntime` 仍为 `10–20 Hz`。
 - 打断默认允许；仅特定任务不可中断，由任务级 `Task::can_abort()` 决定；不设 `min_commit` / `abort_if` / `lease`。
 - 当前只有主任务栏；每时刻最多一个 active Task，资源任务也在主任务栏，远程兑换暂不做。
@@ -471,7 +469,7 @@ using Strategy = std::function<TaskPlan(
 - `HistoryView` 只保留上一次任务及结果；`TacticalMode` 完全删除，调试改用 `task_state`。
 - 所有 Task 不做内部重试；失败/超时交给动作层。裁判兑换类任务只设 5 s 检测窗口，不重发。`ActionDispatcher` 已改为单次发送，旧重试字段已删除。
 - `Scan` / `Outpost` 是同级、互斥的 state-only 主任务；`Outpost` 不含导航。
-- `Respawn`：只等待免费复活；成功后结束，`Heal` 由动作层另选。整个任务保持 `TaskState = kRespawn`。
+- `Respawn`：待复活期间发送免费复活确认（`kFreeResurrect`）；成功后结束，`Heal` 由动作层另选。整个任务保持 `TaskState = kRespawn`。
 - `Heal`：基地补给区自动领取累积免费发弹（每满 1 分钟 100 发），5 s 内确认；`claim_free_ammo` 默认 true，前哨站忽略；前哨站（己方或敌方半场，只要己方完全控制）只回血。
 - `Resource`：状态型任务，不导航；在 `own_base_supply` / `own_outpost_buff` 花金币兑换；只发一次，5 s 等 `info1.ammo_exchanged_local` 追上目标。
 - `Tunnel`、`Rune` 2027 第一版不做。

@@ -29,6 +29,7 @@ class ResourceTask : public Task {
   std::string invalid_reason_;
   int baseline_ = 0;
   int target_ = 0;
+  ActionRequest request_{};
   TimePoint sent_at_{};
 };
 

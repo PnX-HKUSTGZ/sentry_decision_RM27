@@ -71,6 +71,27 @@ void test_heal_navigates_and_waits_for_ammo() {
   CHECK(done.status == TaskStatus::kSuccess);
 }
 
+void test_heal_ammo_window_resets_after_leaving() {
+  const PolicyConfig config = make_config();
+  HealTask task(config, 400, Duration{420000});
+  const TimePoint now{};
+  task.start(heal_call("own_base_supply"), now);
+
+  WorldState in_zone = make_world(0.0, 0.0);
+  CHECK(task.tick(in_zone, now).status == TaskStatus::kRunning);
+  CHECK(task.tick(in_zone, now + Duration{4000}).status == TaskStatus::kRunning);
+
+  WorldState outside = make_world(2.0, 0.0);
+  CHECK(task.tick(outside, now + Duration{4100}).status == TaskStatus::kRunning);
+
+  CHECK(task.tick(in_zone, now + Duration{4200}).status == TaskStatus::kRunning);
+  CHECK(task.tick(in_zone, now + Duration{9000}).status == TaskStatus::kRunning);
+
+  TaskOutput out = task.tick(in_zone, now + Duration{9200});
+  CHECK(out.status == TaskStatus::kFailure);
+  CHECK(out.detail == "基地补给区免费发弹 5 s 内未到账");
+}
+
 void test_heal_ammo_timeout() {
   const PolicyConfig config = make_config();
   HealTask task(config, 400, Duration{420000});
@@ -142,8 +163,13 @@ void test_resource_sends_once_and_waits() {
   CHECK(sent.action->target == 50);
   CHECK(sent.action->verify == ActionVerify::kAmmoExchangedLocal);
 
+  // 动作尚未到账时要继续提交，避免 dispatcher 因上游暂停后把请求清掉。
+  TaskOutput pending = task.tick(world, now + Duration{1000});
+  CHECK(pending.status == TaskStatus::kRunning);
+  CHECK(pending.action.has_value());
+
   world.upstream.info1.ammo_exchanged_local = 50;
-  TaskOutput done = task.tick(world, now + Duration{1000});
+  TaskOutput done = task.tick(world, now + Duration{2000});
   CHECK(done.status == TaskStatus::kSuccess);
 }
 
@@ -184,6 +210,7 @@ void test_resource_rejects_bad_amount_and_coins() {
 int main() {
   test_heal_navigates_and_waits_for_ammo();
   test_heal_ammo_timeout();
+  test_heal_ammo_window_resets_after_leaving();
   test_heal_outpost_requires_full_control();
   test_heal_enemy_outpost_requires_full_control();
   test_heal_without_claim_succeeds_at_full_hp();

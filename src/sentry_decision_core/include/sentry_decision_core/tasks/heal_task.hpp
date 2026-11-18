@@ -41,8 +41,6 @@ class HealTask : public Task {
   bool started_ = false;
   bool invalid_ = false;
   std::string invalid_reason_;
-  bool in_zone_ = false;
-  TimePoint in_zone_since_{};
   bool ammo_wait_started_ = false;
   TimePoint ammo_wait_since_{};
 };

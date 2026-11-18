@@ -74,6 +74,54 @@ void test_dead_starts_respawn() {
   CHECK(runner.task_state() == TaskState::kRespawn);
 }
 
+void test_supply_claim_updates_belief() {
+  const PolicyConfig config = make_config();
+  TaskRunner runner(config, 400, Duration{420000});
+  WorldState world = make_world();
+  world.self.pose = Point2D{0.0, 0.0, 0.0};
+  world.upstream.self_ammo = 10;
+  world.upstream.game_time_remaining = 330;  // elapsed 90 s -> 1 minute
+  world.upstream.event.supply_zone_occupied = true;
+
+  runner.tick(world, TimePoint{});
+  CHECK(runner.task_state() == TaskState::kHeal);
+
+  // 补给区自动发放 100 发，且本地兑换值未变化 -> 认为第 1 分钟批次已领取。
+  world.upstream.self_ammo = 110;
+  runner.tick(world, TimePoint{} + Duration{1000});
+
+  const auto result = runner.take_result();
+  CHECK(result.has_value());
+  CHECK(result->task == "Heal");
+  CHECK(result->status == TaskStatus::kSuccess);
+}
+
+void test_history_reset_between_matches() {
+  const PolicyConfig config = make_config();
+  TaskRunner runner(config, 400, Duration{420000});
+  WorldState world = make_world();
+  world.self.pose = Point2D{0.0, 0.0, 0.0};
+  world.upstream.self_ammo = 10;
+  world.upstream.coins = 200;
+  world.upstream.game_time_remaining = 420;
+  world.upstream.enemy_outpost_hp = 0;
+
+  // 低弹 -> 基地 Heal；满血且没有待领取分钟，立即成功。
+  runner.tick(world, TimePoint{});
+  const auto heal = runner.take_result();
+  CHECK(heal.has_value());
+  CHECK(heal->task == "Heal");
+  CHECK(heal->status == TaskStatus::kSuccess);
+
+  // 离开比赛中再重新开始：上一局 Heal 的成功不应触发本局 Resource。
+  world.upstream.game_status = GameStatus::kPreparation;
+  runner.tick(world, TimePoint{} + Duration{1000});
+  world.upstream.game_status = GameStatus::kRunning;
+  world.upstream.self_ammo = 100;
+  runner.tick(world, TimePoint{} + Duration{2000});
+  CHECK(runner.task_state() == TaskState::kScan);
+}
+
 void test_low_hp_starts_heal() {
   const PolicyConfig config = make_config();
   TaskRunner runner(config, 400, Duration{420000});
@@ -91,6 +139,8 @@ int main() {
   test_navigate_then_success();
   test_dead_starts_respawn();
   test_low_hp_starts_heal();
+  test_supply_claim_updates_belief();
+  test_history_reset_between_matches();
 
   if (g_failures == 0) {
     std::printf("all task_runner tests passed\n");

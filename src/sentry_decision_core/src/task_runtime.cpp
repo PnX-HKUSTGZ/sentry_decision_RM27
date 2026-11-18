@@ -114,6 +114,10 @@ void TaskRuntime::apply(const TaskPlan& plan, TimePoint now) {
   }
 
   if (active_ && active_->call == *plan.call) {
+    // 策略可能先请求切换、随后又决定继续当前任务；此时要撤销旧的 pending，
+    // 否则当前任务结束后会意外启动已经过时的计划。
+    pending_plan_.reset();
+    active_->snapshot.abort_block_reason.clear();
     return;
   }
 

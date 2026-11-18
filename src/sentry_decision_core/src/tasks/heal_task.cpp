@@ -32,8 +32,6 @@ void HealTask::start(const TaskCall& call, TimePoint now) {
   target_ = nullptr;
   zone_ = ZoneKind::kBaseSupply;
   zone_radius_ = 0.0;
-  in_zone_ = false;
-  in_zone_since_ = now;
   ammo_wait_started_ = false;
   ammo_wait_since_ = now;
 
@@ -112,6 +110,9 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
   out.metrics["supply_claimed_minutes"] = static_cast<double>(world.supply_claimed_minutes);
 
   if (distance > zone_radius_) {
+    // 离开目标区域后，5 s 领取确认窗口重新计时；否则短暂离开再回来会
+    // 沿用上一次的计时，导致提前失败。
+    ammo_wait_started_ = false;
     if (world.nav.failed) {
       out.status = TaskStatus::kFailure;
       out.detail = "导航失败";
@@ -121,11 +122,6 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
     out.nav_goal = *target_;
     out.status = TaskStatus::kRunning;
     return out;
-  }
-
-  if (!in_zone_) {
-    in_zone_ = true;
-    in_zone_since_ = now;
   }
 
   out.phase = "wait";
@@ -170,7 +166,6 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
 
 void HealTask::abort() {
   started_ = false;
-  in_zone_ = false;
   ammo_wait_started_ = false;
   target_ = nullptr;
 }

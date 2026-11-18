@@ -27,6 +27,8 @@ void TaskRunner::tick(const WorldState& world, TimePoint now) {
       last_self_ammo_ = world.upstream.self_ammo;
       last_local_exchange_ = world.upstream.info1.ammo_exchanged_local;
       supply_claimed_minutes_ = 0;
+      // 上一局的任务结果不能影响新一局的 Resource 选择。
+      history_.previous_task.reset();
     } else if (world.upstream.event.supply_zone_occupied &&
                world.upstream.self_ammo > last_self_ammo_ &&
                world.upstream.info1.ammo_exchanged_local == last_local_exchange_) {

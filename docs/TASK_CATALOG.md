@@ -254,7 +254,7 @@ OutpostTask
 
 ### 4.1 目的
 
-阵亡后：只等待免费复活；复活成功即结束。
+阵亡后：发送免费复活确认并等待；复活成功即结束。
 ### 4.2 参数
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -270,7 +270,8 @@ OutpostTask
 
 ```text
 RespawnTask
-  WaitForFreeRevive
+  ConfirmFreeResurrect
+  WaitForRevive
 ```
 
 ### 4.5 完成条件
@@ -294,7 +295,8 @@ RespawnTask
 
 ### 4.8 实现约定
 
-- 免费复活不可用时交由动作层策略处理；暂不考虑立即复活。
+- `info1.can_free_resurrect` 为 true 时每 tick 提交 `kFreeResurrect`；`ActionDispatcher` 负责单次下发与电平清零。
+- 免费复活不可用时继续等待；暂不考虑立即复活。
 - 等待复活期间保持 `TaskState = kRespawn`。
 
 ---

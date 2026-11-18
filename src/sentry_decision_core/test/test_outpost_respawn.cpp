@@ -29,6 +29,7 @@ void test_outpost_running_and_success() {
 
   WorldState world;
   world.self.valid = true;
+  world.upstream.valid = true;
   world.upstream.enemy_outpost_hp = 1000;
   world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
   TaskOutput running = task.tick(world, now);
@@ -48,6 +49,7 @@ void test_outpost_fails_if_owned() {
 
   WorldState world;
   world.self.valid = true;
+  world.upstream.valid = true;
   world.upstream.our_outpost_hp = 1000;
   world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
   TaskOutput out = task.tick(world, now);
@@ -62,6 +64,7 @@ void test_outpost_own_side_uses_own_hp() {
 
   WorldState world;
   world.self.valid = true;
+  world.upstream.valid = true;
   world.upstream.our_outpost_hp = 500;
   world.upstream.enemy_outpost_hp = 0;
   world.upstream.our_outpost_control = OutpostControl::kNotOwned;
@@ -87,14 +90,32 @@ void test_respawn_waits_then_succeeds() {
   CHECK(!task.can_abort());
 
   WorldState world;
+  world.upstream.valid = true;
   world.upstream.self_hp = 0;
   TaskOutput waiting = task.tick(world, now);
   CHECK(waiting.status == TaskStatus::kRunning);
   CHECK(waiting.task_state == TaskState::kRespawn);
+  CHECK(!waiting.action.has_value());
+
+  world.upstream.info1.can_free_resurrect = true;
+  TaskOutput confirming = task.tick(world, now);
+  CHECK(confirming.status == TaskStatus::kRunning);
+  CHECK(confirming.action.has_value());
+  CHECK(confirming.action->kind == DecisionActionKind::kFreeResurrect);
+  CHECK(confirming.action->target == 1);
 
   world.upstream.self_hp = 400;
   TaskOutput done = task.tick(world, now);
   CHECK(done.status == TaskStatus::kSuccess);
+}
+
+void test_respawn_fails_without_referee_data() {
+  RespawnTask task;
+  const TimePoint now{};
+  task.start(TaskCall{"Respawn", RespawnParams{}, Duration{0}}, now);
+  TaskOutput out = task.tick(WorldState{}, now);
+  CHECK(out.status == TaskStatus::kFailure);
+  CHECK(out.detail == "裁判数据无效");
 }
 
 void test_respawn_rejects_wrong_params() {
@@ -114,6 +135,7 @@ int main() {
   test_outpost_rejects_wrong_params();
   test_respawn_waits_then_succeeds();
   test_respawn_rejects_wrong_params();
+  test_respawn_fails_without_referee_data();
 
   if (g_failures == 0) {
     std::printf("all outpost_respawn tests passed\n");
