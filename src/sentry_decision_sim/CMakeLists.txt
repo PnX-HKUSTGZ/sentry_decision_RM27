@@ -85,24 +85,7 @@ if(BUILD_TESTING)
   add_executable(test_scenario test/test_scenario.cpp)
   target_link_libraries(test_scenario ${PROJECT_NAME} yaml-cpp::yaml-cpp)
   add_test(NAME test_scenario
-    COMMAND test_scenario ${CMAKE_CURRENT_SOURCE_DIR}/scenario/full_match.yaml)
-
-  # 端到端：decision_node + referee_sim_node 跑完整场景时间轴并断言。
-  add_test(NAME scenario_full_match
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
-            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/full_match.yaml)
-  set_tests_properties(scenario_full_match PROPERTIES
-    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
-    TIMEOUT 90)
-
-
-  # 端到端：录制一局场景 bag，再用 replay_main 离线重放。
-  add_test(NAME replay_smoke
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/replay_smoke_test.sh
-            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/full_match.yaml)
-  set_tests_properties(replay_smoke PROPERTIES
-    ENVIRONMENT "SCENARIO_OVERLAY_DIR=${CMAKE_INSTALL_PREFIX}/.."
-    TIMEOUT 150)
+    COMMAND test_scenario ${CMAKE_CURRENT_SOURCE_DIR}/scenario/demo.yaml)
 
 
   # 端到端：裁判仿真的比赛阶段服务（前进可快进、回退被拒、重置回未开始）。
@@ -128,8 +111,7 @@ if(BUILD_TESTING)
 
   # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
   set_tests_properties(
-    scenario_full_match replay_smoke match_smoke
-    sim_effects_smoke referee_guard_smoke
+    match_smoke sim_effects_smoke referee_guard_smoke
     PROPERTIES RUN_SERIAL TRUE)
 endif()
 

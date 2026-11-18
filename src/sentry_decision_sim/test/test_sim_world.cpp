@@ -143,12 +143,12 @@ void test_occupancy() {
 
   SimWorld world;
   apply_occupancy(&world, home);
-  EventCode event = decode_event_code(world.event_code);
+  EventCode event = decode_event_code(world.event_code, 0, TeamColor::kRed);
   CHECK(event.supply_zone_occupied);
   CHECK(event.local_ammo_exchange_point());
 
   apply_occupancy(&world, enemy_side);
-  event = decode_event_code(world.event_code);
+  event = decode_event_code(world.event_code, 0, TeamColor::kRed);
   CHECK(!event.supply_zone_occupied);
   CHECK(!event.local_ammo_exchange_point());
 }

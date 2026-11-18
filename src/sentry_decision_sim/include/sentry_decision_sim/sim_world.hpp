@@ -16,8 +16,8 @@ struct PendingRemoteExchange {
   int remaining_ms = 0;  // 距离生效还剩的毫秒
 };
 
-// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区增益点或己方基地血量 <4000 时每秒
-// +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
+// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区增益点或己方基地血量 <4000
+// 时每秒 +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
 struct RespawnState {
   bool pending = false;      // 处于待复活（战亡且未复活）状态
   bool confirmed = false;    // 哨兵已确认复活（协议 0x0120 bit 0 = 1）
@@ -78,7 +78,7 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
 
 // 决策输出的纯视图，供 expect 断言，避免依赖 ROS 消息。
 struct DecisionView {
-  int tactical_mode = 0;
+  int task_state = 0;
   int stance = 0;
   bool has_nav_goal = false;
   double nav_goal_x = 0.0;

@@ -1,5 +1,3 @@
-import { tacticalModeName } from '../format.js';
-
 function row(label, value) {
   return '<tr><th>' + label + '</th><td>' + value + '</td></tr>';
 }

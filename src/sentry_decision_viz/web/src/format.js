@@ -4,7 +4,7 @@
 import { fieldExtent } from './field.js';
 
 export const NODE_STATUS = ['IDLE', 'RUNNING', 'SUCCESS', 'FAILURE', 'SKIPPED'];
-export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn', 'idle'];
+export const TASK_STATES = ['idle', 'navigate', 'scan', 'outpost', 'resource', 'heal', 'respawn'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 // 比赛阶段：0 未开始 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中 / 5 结算。
 export const GAME_STAGES = ['未开始', '准备', '15s自检', '5s倒计时', '比赛中', '比赛结算'];
@@ -13,8 +13,8 @@ export function nodeStatusName(status) {
   return NODE_STATUS[status] || '#' + status;
 }
 
-export function tacticalModeName(mode) {
-  return TACTICAL_MODES[mode] || '#' + mode;
+export function taskStateName(state) {
+  return TASK_STATES[state] || '#' + state;
 }
 
 export function stanceName(stance) {
@@ -88,11 +88,11 @@ export function worldStateToView(msg) {
 
 export function decisionToView(msg) {
   const out = msg.output || {};
-  const mode = out.tactical_mode || 0;
+  const mode = out.task_state || 0;
   return {
     tick: msg.tick,
     mode: mode,
-    modeName: tacticalModeName(mode),
+    modeName: taskStateName(mode),
     stance: out.stance || 0,
     stanceName: stanceName(out.stance || 0),
     hasNavGoal: !!out.has_nav_goal,

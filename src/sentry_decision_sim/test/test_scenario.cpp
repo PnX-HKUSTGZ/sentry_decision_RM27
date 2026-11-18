@@ -57,7 +57,7 @@ void test_apply_world_field() {
 
 void test_check_expect() {
   DecisionView view;
-  view.tactical_mode = 4;
+  view.task_state = 5;
   view.has_nav_goal = true;
   view.nav_goal_x = -5.0;
   view.nav_goal_y = 3.0;
@@ -66,10 +66,10 @@ void test_check_expect() {
   std::string error;
   CHECK(check_expect(view, "stance", text("defense"), 0.05, &error));
   CHECK(!check_expect(view, "stance", text("attack"), 0.05, &error));
-  CHECK(check_expect(view, "tactical_mode", text("retreat"), 0.05, &error));
-  CHECK(check_expect(view, "tactical_mode", number(4), 0.05, &error));
-  CHECK(!check_expect(view, "tactical_mode", number(2), 0.05, &error));
-  CHECK(!check_expect(view, "tactical_mode", text("bogus"), 0.05, &error));
+  CHECK(check_expect(view, "task_state", text("heal"), 0.05, &error));
+  CHECK(check_expect(view, "task_state", number(5), 0.05, &error));
+  CHECK(!check_expect(view, "task_state", number(2), 0.05, &error));
+  CHECK(!check_expect(view, "task_state", text("bogus"), 0.05, &error));
   CHECK(check_expect(view, "has_nav_goal", boolean(true), 0.05, &error));
   CHECK(check_expect(view, "nav_goal_x", number(-5.0), 0.05, &error));
   CHECK(!check_expect(view, "nav_goal_x", number(1.0), 0.05, &error));
@@ -86,13 +86,13 @@ void test_load_scenario(const std::string& path) {
     std::printf("scenario load error: %s\n", error.c_str());
   }
   CHECK(loaded.ok());
-  CHECK(loaded.scenario.name == "full_match");
-  CHECK(loaded.scenario.events.size() == 12);
-  CHECK(loaded.scenario.end == sentry_decision::Duration{26000});
+  CHECK(loaded.scenario.name == "demo");
+  CHECK(loaded.scenario.events.size() == 1);
+  CHECK(loaded.scenario.end == sentry_decision::Duration{0});
   CHECK(loaded.scenario.initial_world.count("self_hp") == 1);
   if (!loaded.scenario.events.empty()) {
-    CHECK(loaded.scenario.events.front().at == sentry_decision::Duration{2000});
-    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{26000});
+    CHECK(loaded.scenario.events.front().at == sentry_decision::Duration{0});
+    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{0});
   }
 }
 

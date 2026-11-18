@@ -36,12 +36,9 @@ export function createIntentsPanel(el) {
       if (!report) {
         html += '-';
       } else if (report.effective) {
-        html +=
-          escapeHtml(report.kind) + ' #' + report.request_id +
-          (report.attempts > 0 ? ' 已生效（第 ' + report.attempts + ' 次）' : ' 已达成，无需下发');
+        html += escapeHtml(report.kind) + ' #' + report.request_id + ' 已生效';
       } else {
-        html +=
-          escapeHtml(report.kind) + ' #' + report.request_id + ' 已放弃（共 ' + report.attempts + ' 次）';
+        html += escapeHtml(report.kind) + ' #' + report.request_id + ' 未生效';
       }
       html += '</td></tr>';
 

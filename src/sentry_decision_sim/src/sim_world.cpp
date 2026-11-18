@@ -24,23 +24,21 @@ bool parse_stance_name(const std::string& name, int* out) {
   return true;
 }
 
-bool parse_tactical_mode(const std::string& name, int* out) {
-  if (name == "unknown") {
+bool parse_task_state(const std::string& name, int* out) {
+  if (name == "idle") {
     *out = 0;
-  } else if (name == "patrol") {
+  } else if (name == "navigate") {
     *out = 1;
-  } else if (name == "attack") {
+  } else if (name == "scan") {
     *out = 2;
-  } else if (name == "defend") {
+  } else if (name == "outpost") {
     *out = 3;
-  } else if (name == "retreat") {
+  } else if (name == "resource") {
     *out = 4;
   } else if (name == "heal") {
     *out = 5;
   } else if (name == "respawn") {
     *out = 6;
-  } else if (name == "idle") {
-    *out = 7;
   } else {
     return false;
   }
@@ -179,19 +177,19 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
   const bool expected_bool =
       expected.type == ScenarioValue::Type::kBool ? expected.boolean : (expected.number != 0.0);
 
-  if (field == "tactical_mode") {
+  if (field == "task_state") {
     int want = 0;
     if (expected.type == ScenarioValue::Type::kString) {
-      if (!parse_tactical_mode(expected.text, &want)) {
-        *error = "未知战术模式: " + expected.text;
+      if (!parse_task_state(expected.text, &want)) {
+        *error = "未知 TaskState: " + expected.text;
         return false;
       }
     } else {
       want = static_cast<int>(expected_number);
     }
-    if (view.tactical_mode != want) {
-      *error = "期望 tactical_mode=" + std::to_string(want) +
-               "，实际=" + std::to_string(view.tactical_mode);
+    if (view.task_state != want) {
+      *error =
+          "期望 task_state=" + std::to_string(want) + "，实际=" + std::to_string(view.task_state);
       return false;
     }
     return true;
@@ -528,11 +526,11 @@ void apply_occupancy(SimWorld* world, const Occupancy& occupancy) {
     return;
   }
   unsigned int event = world->event_code;
-  set_bits(&event, 0, 1, occupancy.supply ? 1u : 0u);  // 己方补给区已占领
-  set_bits(&event, 2, 1, occupancy.supply ? 1u : 0u);  // RMUL 同义位
-  set_bits(&event, 25, 2, occupancy.fort_buff ? 1u : 0u);
-  set_bits(&event, 27, 2, occupancy.our_outpost_buff ? 1u : 0u);
-  set_bits(&event, 29, 1, occupancy.base_buff ? 1u : 0u);
+  // 仿真默认己方为红方：R 堡垒 / 基地 / 前哨增益点分别写 bit 5-7 / 11-13 / 22-24。
+  set_bits(&event, 0, 1, occupancy.supply ? 1u : 0u);  // 己方补给区激活
+  set_bits(&event, 5, 3, occupancy.fort_buff ? 1u : 0u);
+  set_bits(&event, 11, 3, occupancy.base_buff ? 1u : 0u);
+  set_bits(&event, 22, 3, occupancy.our_outpost_buff ? 1u : 0u);
   world->event_code = event;
 }
 
@@ -545,8 +543,8 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
   }
   // 先把复活状态与死活同步（含 info1.bit19），保证下面的前置校验读到最新状态。
   sync_respawn(world);
-  const sentry_decision::EventCode event =
-      sentry_decision::decode_event_code(static_cast<std::uint32_t>(world->event_code));
+  const sentry_decision::EventCode event = sentry_decision::decode_event_code(
+      static_cast<std::uint32_t>(world->event_code), 0, sentry_decision::TeamColor::kRed);
   const sentry_decision::SentryInfo1 info1 =
       sentry_decision::decode_sentry_info1(static_cast<std::uint32_t>(world->sentry_info_1));
   const sentry_decision::SentryInfo2 info2 =

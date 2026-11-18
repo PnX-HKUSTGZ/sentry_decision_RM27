@@ -9,7 +9,7 @@
 
 namespace sentry_decision_sim {
 
-// 场景取值：set_world 用数值 / 布尔；expect 额外允许字符串（如 tactical_mode: retreat）。
+// 场景取值：set_world 用数值 / 布尔；expect 额外允许字符串（如 task_state: heal）。
 struct ScenarioValue {
   enum class Type { kNumber, kBool, kString };
 

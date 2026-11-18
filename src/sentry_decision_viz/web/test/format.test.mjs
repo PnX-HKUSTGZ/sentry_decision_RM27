@@ -8,7 +8,7 @@ import {
   nodeStatusName,
   parseListState,
   stanceName,
-  tacticalModeName,
+  taskStateName,
   treeStatusToView,
   worldStateToView,
   worldToCanvas,
@@ -26,15 +26,15 @@ function check(ok, message) {
 
 check(nodeStatusName(1) === 'RUNNING', 'nodeStatusName');
 check(nodeStatusName(9) === '#9', 'nodeStatusName unknown');
-check(tacticalModeName(4) === 'retreat', 'tacticalModeName');
-check(tacticalModeName(42) === '#42', 'tacticalModeName unknown');
+check(taskStateName(5) === 'heal', 'taskStateName');
+check(taskStateName(42) === '#42', 'taskStateName unknown');
 check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
 check(gameStageName(2) === '15s自检', 'gameStageName');
 check(gameStageName(99) === '#99', 'gameStageName unknown');
 check(formatMmSs(180) === '03:00', 'formatMmSs 3min');
 check(formatMmSs(5) === '00:05', 'formatMmSs seconds');
 check(formatMmSs(0) === '00:00', 'formatMmSs zero');
-check(tacticalModeName(7) === 'idle', 'tacticalModeName idle');
+check(taskStateName(0) === 'idle', 'taskStateName idle');
 
 const tree = treeStatusToView({
   tick: 3,
@@ -65,9 +65,9 @@ const world = worldStateToView({
   enemy_y: -2,
 });
 check(world.posX === 1 && world.navGoalY === 4, 'world view');
-const decision = decisionToView({ output: { tactical_mode: 4, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
-check(decision.modeName === 'retreat', 'decision mode');
-const decisionMapped = decisionToView({ output: { tactical_mode: 2, stance: 1 } });
+const decision = decisionToView({ output: { task_state: 5, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
+check(decision.modeName === 'heal', 'decision mode');
+const decisionMapped = decisionToView({ output: { task_state: 3, stance: 1 } });
 check(decisionMapped.stanceName === 'attack', 'decision stance');
 
 const model = battlefieldModel(world, decision);

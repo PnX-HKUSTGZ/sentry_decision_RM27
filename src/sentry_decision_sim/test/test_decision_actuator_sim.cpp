@@ -84,8 +84,6 @@ void test_dispatch_verify_roundtrip() {
   request.kind = DecisionActionKind::kAmmoExchange;
   request.target = 10;  // 由 action factory 按累计值折算后的目标
   request.delta = 10;
-  request.retry_interval = Duration{100};
-  request.max_attempts = 3;
   request.verify = ActionVerify::kAmmoExchangedLocal;
   request.monotonic = true;
 
@@ -94,7 +92,7 @@ void test_dispatch_verify_roundtrip() {
   CHECK(outgoing.size() == 1);
   CHECK(outgoing[0].value == 10);  // 0 + 10，折算成累计目标
 
-  // 等待期内不重发。
+  // 只发一次，不重发。
   dispatcher.submit(request);
   CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
 
@@ -105,7 +103,6 @@ void test_dispatch_verify_roundtrip() {
   const auto report = dispatcher.last_report();
   CHECK(report.has_value());
   CHECK(report->effective);
-  CHECK(report->attempts == 1);
 }
 
 }  // namespace
