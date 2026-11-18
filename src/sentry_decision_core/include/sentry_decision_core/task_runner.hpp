@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <optional>
 
 #include "sentry_decision_core/task_policy.hpp"
@@ -28,9 +29,7 @@ class TaskRunner {
     return runtime_.snapshot();
   }
   std::optional<TaskResult> take_result();
-  std::optional<DecisionEpoch> take_epoch() {
-    return runtime_.take_epoch();
-  }
+  std::optional<DecisionEpoch> take_epoch();
 
  private:
   TaskRegistry registry_;
@@ -43,6 +42,9 @@ class TaskRunner {
   int last_local_exchange_ = 0;
   int supply_claimed_minutes_ = 0;
   std::optional<TaskResult> last_result_;
+  TimePoint last_decision_at_{};
+  bool decision_due_ = true;
+  std::deque<DecisionEpoch> epochs_;
 };
 
 }  // namespace sentry_decision

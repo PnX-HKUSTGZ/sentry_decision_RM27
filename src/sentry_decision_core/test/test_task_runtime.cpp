@@ -86,7 +86,7 @@ void test_apply_starts_task() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Fake")), now);
+  runtime.apply(make_plan(now, make_call("Fake")), WorldState{}, now);
 
   CHECK(fake != nullptr);
   CHECK(fake->starts == 1);
@@ -109,8 +109,8 @@ void test_same_plan_does_not_restart() {
   TaskRuntime runtime(registry);
   const TimePoint now{};
   const TaskPlan plan = make_plan(now, make_call("Fake"));
-  runtime.apply(plan, now);
-  runtime.apply(plan, now);
+  runtime.apply(plan, WorldState{}, now);
+  runtime.apply(plan, WorldState{}, now);
 
   CHECK(fake->starts == 1);
 }
@@ -126,7 +126,7 @@ void test_task_success() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Fake")), now);
+  runtime.apply(make_plan(now, make_call("Fake")), WorldState{}, now);
   fake->status = TaskStatus::kSuccess;
   fake->detail = "done";
   runtime.tick(WorldState{}, now + Duration{10});
@@ -150,7 +150,7 @@ void test_task_timeout() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Fake", Duration{100})), now);
+  runtime.apply(make_plan(now, make_call("Fake", Duration{100})), WorldState{}, now);
   runtime.tick(WorldState{}, now + Duration{99});
   CHECK(!runtime.take_result().has_value());
   runtime.tick(WorldState{}, now + Duration{100});
@@ -178,11 +178,11 @@ void test_preemption_aborts_old_task() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Fake")), now);
+  runtime.apply(make_plan(now, make_call("Fake")), WorldState{}, now);
   bool first_aborted = false;
   first->abort_flag = &first_aborted;
   TaskPlan other = make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}});
-  runtime.apply(other, now);
+  runtime.apply(other, WorldState{}, now);
 
   CHECK(first_aborted);
   CHECK(second != nullptr);
@@ -207,11 +207,11 @@ void test_non_abortable_is_deferred() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Fake")), now);
+  runtime.apply(make_plan(now, make_call("Fake")), WorldState{}, now);
   bool first_aborted = false;
   first->abort_flag = &first_aborted;
   first->abortable = false;
-  runtime.apply(make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}}), now);
+  runtime.apply(make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}}), WorldState{}, now);
 
   CHECK(!first_aborted);
   CHECK(second == nullptr);
@@ -242,12 +242,12 @@ void test_resuming_active_task_clears_pending() {
   TaskRuntime runtime(registry);
   const TimePoint now{};
   const TaskPlan current = make_plan(now, make_call("Fake"));
-  runtime.apply(current, now);
+  runtime.apply(current, WorldState{}, now);
   first->abortable = false;
 
   // 先请求切换到 Heal，再改回当前 Navigate；旧的 pending 必须撤销。
-  runtime.apply(make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}}), now);
-  runtime.apply(current, now);
+  runtime.apply(make_plan(now, TaskCall{"Fake", HealParams{}, Duration{0}}), WorldState{}, now);
+  runtime.apply(current, WorldState{}, now);
   CHECK(runtime.snapshot()->abort_block_reason.empty());
 
   first->abortable = true;
@@ -262,7 +262,7 @@ void test_expired_plan() {
 
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now - Duration{2000}, make_call("Fake")), now);
+  runtime.apply(make_plan(now - Duration{2000}, make_call("Fake")), WorldState{}, now);
 
   CHECK(!runtime.snapshot().has_value());
   const auto epoch = runtime.take_epoch();
@@ -270,11 +270,30 @@ void test_expired_plan() {
   CHECK(epoch->reason == ReplanReason::kPlanExpired);
 }
 
+void test_can_start_is_enforced() {
+  TaskRegistry registry;
+  registry.register_task("Fake", [] {
+    auto task = std::make_unique<FakeTask>();
+    task->can_start_ = false;
+    return task;
+  });
+
+  TaskRuntime runtime(registry);
+  const TimePoint now{};
+  runtime.apply(make_plan(now, make_call("Fake")), WorldState{}, now);
+
+  CHECK(!runtime.snapshot().has_value());
+  const auto result = runtime.take_result();
+  CHECK(result.has_value());
+  CHECK(result->status == TaskStatus::kFailure);
+  CHECK(result->reason == "task cannot start");
+}
+
 void test_unknown_task() {
   TaskRegistry registry;
   TaskRuntime runtime(registry);
   const TimePoint now{};
-  runtime.apply(make_plan(now, make_call("Missing")), now);
+  runtime.apply(make_plan(now, make_call("Missing")), WorldState{}, now);
 
   CHECK(!runtime.snapshot().has_value());
   const auto result = runtime.take_result();
@@ -297,6 +316,7 @@ int main() {
   test_non_abortable_is_deferred();
   test_resuming_active_task_clears_pending();
   test_expired_plan();
+  test_can_start_is_enforced();
   test_unknown_task();
 
   if (g_failures == 0) {

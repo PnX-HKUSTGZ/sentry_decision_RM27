@@ -11,7 +11,7 @@ namespace sentry_decision {
 // 决策配置（纯数据，不依赖 YAML）。
 //
 // bringup 在启动时把 profiles / maps / policies 三个 YAML 解析成该结构并校验，
-// 通过 DecisionContext.config 提供给行为树节点（只读）。
+// 通过 Task 层配置视图提供给任务实现（只读）。
 //
 // 数值与开关以「点分命名」的扁平 key 保存（如 nav.retreat_hp），
 // 这样 XML 只引用 key，改阈值无需改代码 / XML；点位用命名点（如 home）。

@@ -431,7 +431,7 @@ class Task {
 ```cpp
 class TaskRuntime {
  public:
-  void apply(const TaskPlan& plan, TimePoint now);
+  void apply(const TaskPlan& plan, const WorldState& world, TimePoint now);
   void tick(const WorldState& world, TimePoint now);
   std::optional<TaskSnapshot> snapshot() const;
   std::optional<Point2D> nav_goal() const;

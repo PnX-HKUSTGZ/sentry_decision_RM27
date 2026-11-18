@@ -279,7 +279,7 @@ RespawnTask
 | 结果 | 条件 |
 |---|---|
 | SUCCESS | 免费复活成功（机器人重新存活） |
-| FAILURE | 免费复活不可用、执行层报错 |
+| FAILURE | 裁判数据无效、执行层报错 |
 | TIMEOUT | 超过 `timeout` 仍未复活 |
 
 ### 4.6 打断
@@ -291,7 +291,7 @@ RespawnTask
 ### 4.7 输出与 metrics
 
 - 整个 `Respawn` 期间保持 `TaskState = kRespawn`。
-- metrics：`alive`、`respawn_progress`。
+- metrics：`alive`、`can_free_resurrect`。
 
 ### 4.8 实现约定
 

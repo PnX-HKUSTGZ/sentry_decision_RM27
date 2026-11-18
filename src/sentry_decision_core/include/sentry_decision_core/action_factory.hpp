@@ -5,11 +5,11 @@
 
 namespace sentry_decision {
 
-// 动作工厂：把“行为树想做什么”翻译成协议目标值 + 生效判据。
+// 动作工厂：把“Task 想做什么”翻译成协议目标值 + 生效判据。
 // 协议字段、累计值折算、最小兑换单位都集中在这里；dispatcher 不感知 kind 的语义。
 //
 // 所有函数的 delta / times 都是「本次增量」，target 由工厂按当前裁判累计值计算。
-// 行为树节点每 tick 调用一次，target 可能随累计值变化；dispatcher 在一段请求
+// Task 每 tick 调用一次，target 可能随累计值变化；dispatcher 在一段请求
 // 开始时取一次 target，并在该段请求持续期间忽略后续变化。
 
 constexpr int kAmmoExchangeUnit = 10;   // 2027 表 5-8：17mm 增益点最小兑换单位

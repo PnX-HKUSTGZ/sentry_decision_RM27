@@ -68,7 +68,7 @@ done
 
 check "200" "$(tcp_ok 9090)" "rosbridge 端口"
 
-for topic in /decision/tree_status /decision/world_state /decision/state; do
+for topic in /decision/world_state /decision/state; do
   if ! wait_echo "${topic}"; then
     echo "FAIL: 话题 ${topic} 无数据" >&2
     fail=1

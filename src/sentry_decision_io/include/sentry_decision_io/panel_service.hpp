@@ -13,7 +13,7 @@ namespace sentry_decision_io {
 bool parse_panel_command(const std::string& command, const std::string& args, bool* list_state,
                          std::string* error);
 
-// 面板 service：只读 list_state。调试不再提供战术层覆盖。
+// 面板 service：只读 list_state，不提供决策内部写入口。
 class PanelService {
  public:
   using DebugCommand = sentry_decision_msgs::srv::DebugCommand;

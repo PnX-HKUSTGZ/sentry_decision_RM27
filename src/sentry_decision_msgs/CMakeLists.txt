@@ -14,8 +14,6 @@ find_package(geometry_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DecisionOutput.msg"
   "msg/DecisionState.msg"
-  "msg/TreeNodeStatus.msg"
-  "msg/TreeStatus.msg"
   "msg/WorldState.msg"
   "srv/ApplyEffect.srv"
   "srv/DebugCommand.srv"

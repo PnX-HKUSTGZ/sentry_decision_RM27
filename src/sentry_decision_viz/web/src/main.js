@@ -5,11 +5,9 @@ import {
   decisionToView,
   formatMmSs,
   parseListState,
-  treeStatusToView,
   worldStateToView,
 } from './format.js';
 import { drawBattlefield } from './battlefield.js';
-import { createTreePanel } from './panels/tree.js';
 import { createWorldPanel } from './panels/world.js';
 import { createIntentsPanel } from './panels/intents.js';
 import { createControlsPanel } from './panels/controls.js';
@@ -17,7 +15,6 @@ import { createControlsPanel } from './panels/controls.js';
 const store = createStore({
   connected: false,
   detail: '',
-  tree: null,
   world: null,
   decision: null,
   listState: null,
@@ -52,9 +49,6 @@ const bridge = createBridge({
   onStatus: function (connected, detail) {
     store.update({ connected: connected, detail: detail });
   },
-  onTree: function (msg) {
-    store.update({ tree: treeStatusToView(msg) });
-  },
   onWorld: function (msg) {
     store.update({ world: worldStateToView(msg) });
   },
@@ -63,7 +57,6 @@ const bridge = createBridge({
   },
 });
 
-const treePanel = createTreePanel(document.getElementById('tree'), document.getElementById('tree-meta'));
 const worldPanel = createWorldPanel(document.getElementById('world'));
 const intentsPanel = createIntentsPanel(document.getElementById('intents'));
 const controlsPanel = createControlsPanel(
@@ -74,7 +67,6 @@ const controlsPanel = createControlsPanel(
 );
 
 store.subscribe(function (state) {
-  treePanel.render(state);
   worldPanel.render(state);
   intentsPanel.render(state);
   controlsPanel.render(state);

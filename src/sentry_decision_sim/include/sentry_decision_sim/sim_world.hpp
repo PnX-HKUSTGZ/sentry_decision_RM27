@@ -84,9 +84,6 @@ struct DecisionView {
   double nav_goal_x = 0.0;
   double nav_goal_y = 0.0;
   bool has_cmd_vel = false;
-  int resource_ammo = 0;
-  bool resource_revive = false;
-  bool resource_instant_revive = false;
 };
 
 // 校验一个 expect 字段：满足返回 true；不满足或字段未知返回 false 并写 error。

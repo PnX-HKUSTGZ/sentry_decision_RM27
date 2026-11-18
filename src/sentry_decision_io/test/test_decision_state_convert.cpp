@@ -30,9 +30,6 @@ void test_decision_output_conversion() {
   output.cmd_vel = Twist{0.1, 0.2, 0.3};
   output.task_state = TaskState::kHeal;
   output.stance = SentryStance::kDefense;
-  output.resource.ammo = 17;
-  output.resource.revive = true;
-  output.resource.instant_revive = true;
 
   const DecisionOutputMsg msg = to_msg(output);
   CHECK(msg.has_nav_goal);
@@ -45,9 +42,6 @@ void test_decision_output_conversion() {
   CHECK(msg.cmd_vel.angular.z == 0.3);
   CHECK(msg.task_state == static_cast<std::uint8_t>(TaskState::kHeal));
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kDefense));
-  CHECK(msg.resource_ammo == 17);
-  CHECK(msg.resource_revive);
-  CHECK(msg.resource_instant_revive);
 }
 
 void test_world_state_conversion() {
@@ -128,8 +122,6 @@ void test_fill_state() {
   CHECK(msg.tick == 42);
   CHECK(msg.output.has_nav_goal);
   CHECK(msg.output.task_state == static_cast<std::uint8_t>(TaskState::kScan));
-  CHECK(msg.conflict_count == 0);
-  CHECK(msg.warnings.empty());
   CHECK(msg.upstream_valid);
   CHECK(msg.self_valid);
   CHECK(!msg.nav_valid);

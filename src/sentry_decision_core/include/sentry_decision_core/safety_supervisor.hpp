@@ -24,7 +24,7 @@ struct SafetyResult {
 };
 
 // 安全监督：位于仲裁之后，做最终限幅与急停兜底，保证安全不被绕过。
-// 纯逻辑、无 ROS，可脱离行为树单测。
+// 纯逻辑、无 ROS，可脱离 Task 层单测。
 class SafetySupervisor {
  public:
   explicit SafetySupervisor(SafetyLimits limits);

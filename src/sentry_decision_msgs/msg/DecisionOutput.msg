@@ -12,8 +12,3 @@ uint8 task_state
 
 # SentryStance: 0 unknown / 1 attack / 2 defense / 3 move
 uint8 stance
-
-# ResourceRequest
-uint16 resource_ammo
-bool resource_revive
-bool resource_instant_revive

@@ -37,7 +37,6 @@ class TaskRegistry {
 
   void register_task(const TaskId& id, Factory factory);
   std::unique_ptr<Task> create(const TaskId& id) const;
-  bool contains(const TaskId& id) const;
 
  private:
   std::map<TaskId, Factory> factories_;
@@ -49,9 +48,10 @@ class TaskRuntime {
  public:
   explicit TaskRuntime(TaskRegistry& registry);
 
-  // 应用一个计划。过期计划只产生 kPlanExpired；不可中止的 active Task 会
-  // 把计划暂存，等任务到达可中止阶段后再应用。
-  void apply(const TaskPlan& plan, TimePoint now);
+  // 应用一个计划。过期计划只产生 kPlanExpired；未通过 Task::can_start 的
+  // 请求直接失败；不可中止的 active Task 会把计划暂存，等任务到达可中止阶段
+  // 后再应用。
+  void apply(const TaskPlan& plan, const WorldState& world, TimePoint now);
 
   // 推进 active Task。任务成功 / 失败 / 超时 / abort 后产生一个 TaskResult
   // 和一个 DecisionEpoch。
@@ -73,10 +73,10 @@ class TaskRuntime {
     TaskOutput output;
   };
 
-  void start(const TaskCall& call, TimePoint now);
+  void start(const TaskCall& call, const WorldState& world, TimePoint now);
   void finish(TaskStatus status, TimePoint now, const std::string& reason,
               const std::map<std::string, double>& metrics);
-  void apply_pending(TimePoint now);
+  void apply_pending(const WorldState& world, TimePoint now);
   void push_epoch(ReplanReason reason, TimePoint now, const std::optional<TaskId>& task);
 
   TaskRegistry& registry_;

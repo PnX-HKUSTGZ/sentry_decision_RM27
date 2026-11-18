@@ -19,9 +19,6 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
   }
   msg.task_state = static_cast<std::uint8_t>(output.task_state);
   msg.stance = static_cast<std::uint8_t>(output.stance);
-  msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
-  msg.resource_revive = output.resource.revive;
-  msg.resource_instant_revive = output.resource.instant_revive;
   return msg;
 }
 
@@ -73,8 +70,6 @@ void fill_state(DecisionStateMsg* msg, const sentry_decision::WorldState& world,
                 const sentry_decision::DecisionOutput& output, std::uint32_t tick) {
   msg->tick = tick;
   msg->output = to_msg(output);
-  msg->conflict_count = 0;
-  msg->warnings.clear();
   msg->upstream_valid = world.upstream.valid;
   msg->self_valid = world.self.valid;
   msg->nav_valid = world.nav.valid;

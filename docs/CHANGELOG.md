@@ -27,11 +27,25 @@
 - 所有 Task 不重试；裁判兑换类任务只设 5 s 检测窗口。
 - `Heal`：基地补给区按每分钟 100 发累积确认；前哨站只回血。
 - `Resource`：状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账。
+- `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`。
+- `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
+- `TaskState`：变化即发，并补 10 Hz 心跳。
+
+### Fixed
+
+- `Heal` 离开补给区后 5 s 发弹确认窗口未重置。
+- `Resource` 动作在 dispatcher 暂停时被清理，导致 5 s 后误失败。
+- 策略恢复当前任务时旧的 pending 计划未撤销。
+- 跨局 `HistoryView` 未清空，可能导致新局误选 `Resource`。
+- 面板急停状态硬编码为 false。
+- `Outpost` / `Resource` / `Respawn` 在裁判数据失效时仍使用旧值。
 
 ### Removed
 
 - `ActionRequest.retry_interval` / `max_attempts`、`ActionReport.attempts`、`ActionDispatcher` 重发状态机、resource BT 的 `retry_ms` / `max_attempts` 端口与 `action.*attempts` 配置。
 - 旧 Task 架构：`TacticalMode`、Intent/Arbiter、Mission 树、`sentry_decision_nodes`、`decision_node` / `decision_main` / `replay_main`、面板战术层覆盖。
+- 旧行为树可视化：`TreeStatus` / `TreeNodeStatus`、`TreeStatePublisher`、Groot2 桥、网页行为树面板与 tree smoke 话题。
+- 旧资源协议字段：`ResourceRequest`、`DecisionOutput.resource_*`、`DecisionState.conflict_count` / `warnings`。
 
 ## [v0.5.2] - 2026-10-31
 

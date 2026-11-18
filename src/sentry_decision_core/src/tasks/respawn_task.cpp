@@ -28,6 +28,8 @@ TaskOutput RespawnTask::tick(const WorldState& world, TimePoint) {
     out.detail = "裁判数据无效";
     return out;
   }
+  out.metrics["alive"] = world.upstream.self_hp > 0 ? 1.0 : 0.0;
+  out.metrics["can_free_resurrect"] = world.upstream.info1.can_free_resurrect ? 1.0 : 0.0;
   if (world.upstream.self_hp > 0) {
     out.status = TaskStatus::kSuccess;
     out.progress = 1.0f;

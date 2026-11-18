@@ -16,10 +16,6 @@ std::unique_ptr<Task> TaskRegistry::create(const TaskId& id) const {
   return it->second();
 }
 
-bool TaskRegistry::contains(const TaskId& id) const {
-  return factories_.find(id) != factories_.end();
-}
-
 TaskRuntime::TaskRuntime(TaskRegistry& registry) : registry_(registry) {}
 
 void TaskRuntime::push_epoch(ReplanReason reason, TimePoint now,
@@ -27,7 +23,7 @@ void TaskRuntime::push_epoch(ReplanReason reason, TimePoint now,
   epochs_.push_back(DecisionEpoch{reason, now, task});
 }
 
-void TaskRuntime::start(const TaskCall& call, TimePoint now) {
+void TaskRuntime::start(const TaskCall& call, const WorldState& world, TimePoint now) {
   std::unique_ptr<Task> task = registry_.create(call.task);
   if (!task) {
     TaskResult result;
@@ -35,6 +31,17 @@ void TaskRuntime::start(const TaskCall& call, TimePoint now) {
     result.status = TaskStatus::kFailure;
     result.finished_at = now;
     result.reason = "unknown task";
+    last_result_ = std::move(result);
+    push_epoch(ReplanReason::kTaskFailed, now, call.task);
+    return;
+  }
+
+  if (!task->can_start(world)) {
+    TaskResult result;
+    result.task = call.task;
+    result.status = TaskStatus::kFailure;
+    result.finished_at = now;
+    result.reason = "task cannot start";
     last_result_ = std::move(result);
     push_epoch(ReplanReason::kTaskFailed, now, call.task);
     return;
@@ -93,7 +100,7 @@ void TaskRuntime::finish(TaskStatus status, TimePoint now, const std::string& re
   push_epoch(replan, now, task);
 }
 
-void TaskRuntime::apply(const TaskPlan& plan, TimePoint now) {
+void TaskRuntime::apply(const TaskPlan& plan, const WorldState& world, TimePoint now) {
   if (plan.valid_for.count() > 0 && now - plan.created_at > plan.valid_for) {
     push_epoch(ReplanReason::kPlanExpired, now, std::nullopt);
     return;
@@ -131,10 +138,10 @@ void TaskRuntime::apply(const TaskPlan& plan, TimePoint now) {
     active_->task->abort();
     finish(TaskStatus::kAborted, now, "preempted", {});
   }
-  start(*plan.call, now);
+  start(*plan.call, world, now);
 }
 
-void TaskRuntime::apply_pending(TimePoint now) {
+void TaskRuntime::apply_pending(const WorldState& world, TimePoint now) {
   if (!pending_plan_.has_value()) {
     return;
   }
@@ -143,12 +150,12 @@ void TaskRuntime::apply_pending(TimePoint now) {
   }
   const TaskPlan plan = *pending_plan_;
   pending_plan_.reset();
-  apply(plan, now);
+  apply(plan, world, now);
 }
 
 void TaskRuntime::tick(const WorldState& world, TimePoint now) {
   if (pending_plan_.has_value()) {
-    apply_pending(now);
+    apply_pending(world, now);
   }
   if (!active_) {
     return;

@@ -5,11 +5,9 @@ import {
   escapeHtml,
   formatMmSs,
   gameStageName,
-  nodeStatusName,
   parseListState,
   stanceName,
   taskStateName,
-  treeStatusToView,
   worldStateToView,
   worldToCanvas,
 } from '../src/format.js';
@@ -24,8 +22,6 @@ function check(ok, message) {
   }
 }
 
-check(nodeStatusName(1) === 'RUNNING', 'nodeStatusName');
-check(nodeStatusName(9) === '#9', 'nodeStatusName unknown');
 check(taskStateName(5) === 'heal', 'taskStateName');
 check(taskStateName(42) === '#42', 'taskStateName unknown');
 check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
@@ -35,21 +31,6 @@ check(formatMmSs(180) === '03:00', 'formatMmSs 3min');
 check(formatMmSs(5) === '00:05', 'formatMmSs seconds');
 check(formatMmSs(0) === '00:00', 'formatMmSs zero');
 check(taskStateName(0) === 'idle', 'taskStateName idle');
-
-const tree = treeStatusToView({
-  tick: 3,
-  tick_ms: 0.5,
-  nodes: [
-    { full_path: 'seq', registration_name: 'Sequence', instance_name: 'seq', status: 1 },
-    { full_path: 'hold', registration_name: 'Hold', instance_name: 'hold', status: 1 },
-    { full_path: 'ok', registration_name: 'Ok', instance_name: 'ok', status: 0 },
-  ],
-  active_path: ['hold', 'seq'],
-});
-check(tree.nodes.length === 3, 'tree nodes');
-check(tree.activeCount === 2, 'tree activeCount');
-check(tree.nodes[0].active === true && tree.nodes[2].active === false, 'tree active flags');
-check(tree.nodes[1].statusName === 'RUNNING', 'tree status name');
 
 const world = worldStateToView({
   pos_x: 1,

@@ -64,17 +64,6 @@ struct Quaternion {
   double z = 0.0;
 };
 
-struct ResourceRequest {
-  // 本地兑换允许发弹量（需占领补给区 / 基地 / 前哨站增益点），单位：发。
-  int ammo = 0;
-  // 远程兑换允许发弹量次数（需脱战），单位：次。
-  int remote_ammo = 0;
-  // 远程兑换血量次数（需脱战），单位：次。
-  int remote_hp = 0;
-  bool revive = false;          // 确认免费复活
-  bool instant_revive = false;  // 兑换立即复活（需 can_instant_resurrect 且金币足够）
-};
-
 // 决策动作类型（下行给下位机）。
 enum class DecisionActionKind {
   kNone,
@@ -109,7 +98,6 @@ struct ActionRequest {
 struct DecisionOutput {
   std::optional<Point2D> nav_goal;
   std::optional<Twist> cmd_vel;
-  ResourceRequest resource{};
   ActionRequest action{};
   TaskState task_state = TaskState::kIdle;
   SentryStance stance = SentryStance::kUnknown;

@@ -384,9 +384,6 @@ class RefereeSimNode : public rclcpp::Node {
     view.nav_goal_x = msg.output.nav_goal.x;
     view.nav_goal_y = msg.output.nav_goal.y;
     view.has_cmd_vel = msg.output.has_cmd_vel;
-    view.resource_ammo = msg.output.resource_ammo;
-    view.resource_revive = msg.output.resource_revive;
-    view.resource_instant_revive = msg.output.resource_instant_revive;
     last_decision_ = view;
     has_decision_ = true;
     // 仿真近似：下位机执行决策姿态后，裁判上报的「当前姿态」应与期望一致

@@ -65,7 +65,7 @@ sentry_decision_RM27/
 ├── .github/workflows/         # CI
 └── src/
     ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
-    ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState / TreeStatus
+    ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState
     ├── sentry_interfaces/       # 与 auto-aim 的上位机接口契约
     ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
     ├── sentry_decision_sim/     # 本地仿真：裁判仿真、场景脚本与伪导航

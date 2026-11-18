@@ -238,28 +238,6 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
     }
     return true;
   }
-  if (field == "resource_ammo") {
-    if (view.resource_ammo != static_cast<int>(expected_number)) {
-      *error = "resource_ammo 不匹配";
-      return false;
-    }
-    return true;
-  }
-  if (field == "resource_revive") {
-    if (view.resource_revive != expected_bool) {
-      *error = "resource_revive 不匹配";
-      return false;
-    }
-    return true;
-  }
-  if (field == "resource_instant_revive") {
-    if (view.resource_instant_revive != expected_bool) {
-      *error = "resource_instant_revive 不匹配";
-      return false;
-    }
-    return true;
-  }
-
   *error = "未知 expect 字段: " + field;
   return false;
 }

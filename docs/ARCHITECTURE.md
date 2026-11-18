@@ -69,7 +69,7 @@ DecisionCommand → auto-aim → MCU
 | `sentry_decision_core` | 信念、Task、动作、安全、日志，纯逻辑 |
 | `sentry_decision_io` | ROS IO、状态发布、面板 service |
 | `sentry_decision_sim` | 裁判 / 导航 / 执行端仿真 |
-| `sentry_decision_viz` | 状态可视化与网页面板 |
+| `sentry_decision_viz` | 网页面板与 rosbridge 启动 |
 | `sentry_decision_bringup` | `task_node` 组合根与配置 |
 
 已删除：`sentry_decision_nodes`、`tree/`、旧 `decision_node` / `decision_main` / `replay_main`。
@@ -84,7 +84,15 @@ ros2 launch sentry_decision_bringup task.launch.py
 
 `task_node` 运行 `TaskRunner + RosIoNode + SafetySupervisor`；配置入口为 `config/profiles.yaml`。
 
-## 7. 测试
+## 7. 当前实现状态
+
+- `RuleBasedTaskPolicy` 是手写规则 baseline，尚未替换为 utility AI。
+- `TaskRunner` 已按 `DecisionEpoch` + 1 s 周期门控策略调用，不再每拍重新决策。
+- `MacroDirective` 只有类型定义，尚未接入策略签名。
+- `TaskRuntime` 在启动前执行 `Task::can_start()`。
+- 行为树 / `TreeStatus` / Groot2 相关代码已删除；可视化只保留网页面板。
+
+## 8. 测试
 
 宿主纯逻辑测试：
 
