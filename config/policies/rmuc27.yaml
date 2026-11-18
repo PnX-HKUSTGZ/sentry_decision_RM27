@@ -1,0 +1,26 @@
+# rmuc27 策略阈值 / 时间窗（由 profiles.yaml 的 strategy_profile 选择）。
+# 2027 第一版仍使用 RuleBasedTaskPolicy；这些阈值供该 baseline 使用。
+self:
+  max_hp: 400
+
+match:
+  duration_s: 420
+
+nav:
+  retreat_hp: 100              # 低于该血量 -> 回补给区
+  recovery_hp: 400             # 撤退退出阈值
+  low_ammo: 50                 # 低于该弹量 -> 回补给区
+  supply_ammo: 150
+  patrol_dwell_s: 5.0
+
+safety:
+  max_vx: 3.0
+  max_vy: 3.0
+  max_wz: 6.0
+  require_upstream: true
+  require_odometry: true
+
+timeouts:
+  upstream_ms: 500
+  odometry_ms: 500
+  navigation_ms: 500

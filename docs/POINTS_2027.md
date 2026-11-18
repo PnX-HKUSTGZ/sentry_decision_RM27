@@ -65,6 +65,8 @@ points:
 
 ## 5. 待办
 
-- 用 web 标定工具填入 11 个点的坐标、yaw 与区域半径。
+- `config/maps/RMUC27.yaml` 已提供 11 个命名点占位（坐标全为 0，禁止直接实车）。
+- 用 web 标定工具填入 11 个点的坐标、yaw 与区域半径，覆盖该文件。
+- 标定完成后可直接用 `task_node --config config/profiles_rmuc27.yaml`；或把 `config/profiles.yaml` 的 `map_profile` / `strategy_profile` 改为 `RMUC27` / `rmuc27`。
 - `RosIoNode` 参数 `own_color`（red/blue）用于把 2027 R/B 事件位映射为 own/enemy。
 - 清理 RMUC26 遗留点（`home` / `patrol_*` / `highland_*` 等）与 2027 配置的引用关系。

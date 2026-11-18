@@ -1,5 +1,6 @@
 # 决策配置入口：选择地图 / 策略 profile 与赛前开关。
 # 相对路径相对本文件所在目录解析。
+# 2027 标定完成后改为 RMUC27 / rmuc27；RMUC27.yaml 当前为未标定占位。
 map_profile: RMUC26
 strategy_profile: rmuc26
 
