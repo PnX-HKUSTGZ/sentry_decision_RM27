@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "sentry_decision_core/logging.hpp"
 #include "sentry_decision_core/task_factory.hpp"
 
 namespace sentry_decision {
@@ -53,6 +54,12 @@ void TaskRunner::tick(const WorldState& world, TimePoint now) {
     TaskPlan plan = policy_->decide(view, runtime_.snapshot(), history_);
     plan.created_at = now;
     plan.valid_for = kPlanValidFor;
+    if (plan.call.has_value() && !plan.rationale.empty()) {
+      const auto active = runtime_.snapshot();
+      if (!active.has_value() || !active->call.has_value() || !(*active->call == *plan.call)) {
+        SD_LOG_ACT("task", "计划 %s：%s", plan.call->task.c_str(), plan.rationale.c_str());
+      }
+    }
     runtime_.apply(plan, view, now);
     last_decision_at_ = now;
     decision_due_ = false;

@@ -15,9 +15,12 @@ timeline:
   - at: 2.0
     expect:
       task_state: outpost
-  - at: 5.0
+  - at: 12.0
+    expect:
+      task_state: outpost
+  - at: 14.0
     set_world:
       enemy_outpost_hp: 0
-  - at: 7.0
+  - at: 16.0
     expect:
       task_state: navigate
