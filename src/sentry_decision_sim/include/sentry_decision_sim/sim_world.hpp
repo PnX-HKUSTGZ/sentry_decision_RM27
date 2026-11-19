@@ -26,6 +26,26 @@ struct RespawnState {
   int instant_count = 0;     // 本局累计兑换立即复活次数（计入读条公式）
 };
 
+// 一处前哨阵地的控制状态（相对我方视角）。
+//
+// 2027 规则 5.6.2：
+//   - 对方完全控制 -> 我方连续激活增益点 5 s -> 我方临时控制；
+//   - 对方临时控制 -> 对方连续 5 s 不激活 -> 我方完全控制；
+//   - 前哨站被击毁时，控制方在完全 / 临时之间切换；临时控制方击毁后转为完全控制。
+//
+// held_by_us / full 共同表示「谁控制、是否完全控制」；challenge_ms 是挑战方
+// 连续激活增益点的累计时长；holder_absent_ms 是临时控制方连续不激活的时长。
+//
+// 当前仿真只以对应前哨站增益点作为占点输入；中央高地增益点尚未标定，
+// 接入时把其区域并入对应前哨的 active 判定即可。
+struct OutpostControlState {
+  bool held_by_us = false;
+  bool full = true;
+  bool enemy_present = false;  // 仿真输入：敌方机器人是否激活该前哨站增益点
+  int challenge_ms = 0;
+  int holder_absent_ms = 0;
+};
+
 // 消息级仿真世界：字段与 sentry_interfaces 上行消息一一对应。
 //
 // 为什么不复用 core 的 UpstreamState：那边存的是解码后的 event / info1 / info2 / info3，
@@ -66,6 +86,11 @@ struct SimWorld {
   std::vector<PendingRemoteExchange> pending_remote;
   // 复活读条状态（规则 5.2.2）。
   RespawnState respawn;
+
+  // 2027 前哨阵地控制状态（仿真专属，写入 event_code bit 22-31）。
+  // 开局时己方半场完全控制，敌方半场由对方完全控制。
+  OutpostControlState our_outpost_control{true, true};
+  OutpostControlState enemy_outpost_control{false, true};
 
   // TeamInfo
   int base_hp = 0;
@@ -170,23 +195,26 @@ struct GainZone {
   }
 };
 
-// 仿真场上的己方增益点区域。
+// 仿真场上的增益点区域（己方 / 敌方前哨站各一个）。
 struct GainZones {
-  GainZone supply;            // 己方补给区
-  GainZone base_buff;         // 己方基地增益点
-  GainZone our_outpost_buff;  // 己方前哨站增益点
-  GainZone fort_buff;         // 己方堡垒增益点
+  GainZone supply;              // 己方补给区
+  GainZone base_buff;           // 己方基地增益点
+  GainZone our_outpost_buff;    // 己方前哨站增益点
+  GainZone enemy_outpost_buff;  // 敌方前哨站增益点
+  GainZone fort_buff;           // 己方堡垒增益点
 };
 
 struct Occupancy {
   bool supply = false;
   bool base_buff = false;
   bool our_outpost_buff = false;
+  bool enemy_outpost_buff = false;
   bool fort_buff = false;
 
   // 规则表 5-8：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点之一。
+  // 前哨站的「完全控制」条件由 EventCode::local_ammo_exchange_point() 判断。
   bool local_ammo_exchange_point() const {
-    return supply || base_buff || our_outpost_buff;
+    return supply || base_buff || our_outpost_buff || enemy_outpost_buff;
   }
 };
 
@@ -195,6 +223,18 @@ Occupancy evaluate_occupancy(const GainZones& zones, double x, double y);
 
 // 把占领状态写回 SimWorld 的 event_code 位段（只改占领相关位，保留其它位）。
 void apply_occupancy(SimWorld* world, const Occupancy& occupancy);
+
+// 推进一处前哨阵地的控制状态（dt_ms 为本次步长，内部按 5 s 阈值结算）。
+// our_active 表示我方机器人是否激活该前哨站对应的增益点；敌方是否激活读
+// state->enemy_present。
+void step_outpost_control(OutpostControlState* state, int* hp, bool our_active, int dt_ms);
+
+// 结算一次前哨站击毁。by_us=true 表示我方击毁（目标为敌方半场前哨站）；
+// by_us=false 表示敌方击毁（目标为己方半场前哨站）。
+void destroy_outpost(OutpostControlState* state, int* hp, bool by_us);
+
+// 把两处前哨阵地的控制状态写回 event_code bit 28-31。
+void apply_outpost_control_bits(SimWorld* world);
 
 // ---- 裁判侧动作前置校验与结算 ----
 

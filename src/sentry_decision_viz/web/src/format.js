@@ -4,12 +4,22 @@
 import { fieldExtent } from './field.js';
 
 export const TASK_STATES = ['idle', 'navigate', 'scan', 'outpost', 'resource', 'heal', 'respawn'];
+export const TASK_STATUSES = ['idle', 'running', 'success', 'failure', 'timeout', 'aborted'];
+export const OUTPOST_CONTROLS = ['我方完全控制', '我方临时控制', '敌方控制（未区分）'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 // 比赛阶段：0 未开始 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中 / 5 结算。
 export const GAME_STAGES = ['未开始', '准备', '15s自检', '5s倒计时', '比赛中', '比赛结算'];
 
 export function taskStateName(state) {
   return TASK_STATES[state] || '#' + state;
+}
+
+export function taskStatusName(status) {
+  return TASK_STATUSES[status] || '#' + status;
+}
+
+export function outpostControlName(control) {
+  return OUTPOST_CONTROLS[control] || '未知';
 }
 
 export function stanceName(stance) {
@@ -21,6 +31,11 @@ export function gameStageName(status) {
 }
 
 // 秒 -> "MM:SS"（用于比赛倒计时）。
+export function formatDuration(ms) {
+  const seconds = Math.max(0, Number(ms) || 0) / 1000;
+  return seconds.toFixed(1) + ' s';
+}
+
 export function formatMmSs(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
   const mm = String(Math.floor(total / 60)).padStart(2, '0');
@@ -38,7 +53,11 @@ export function worldStateToView(msg) {
     selfAmmo: msg.self_ammo,
     baseHp: msg.base_hp,
     ourOutpostHp: msg.our_outpost_hp,
+    ourOutpostControl: msg.our_outpost_control,
+    ourOutpostControlName: outpostControlName(msg.our_outpost_control),
     enemyOutpostHp: msg.enemy_outpost_hp,
+    enemyOutpostControl: msg.enemy_outpost_control,
+    enemyOutpostControlName: outpostControlName(msg.enemy_outpost_control),
     enemyBaseHp: msg.enemy_base_hp,
     canRebuild: msg.can_rebuild_outpost,
     upstreamValid: msg.upstream_valid,

@@ -21,6 +21,7 @@ PolicyConfig make_config() {
   PolicyConfig config;
   config.numbers["nav.retreat_hp"] = 50.0;
   config.numbers["nav.low_ammo"] = 20.0;
+  config.numbers["match.duration_s"] = 420.0;
   config.points["own_base_supply"] = Point2D{0.0, 0.0, 0.0};
   config.point_radius["own_base_supply"] = 0.5;
   config.points["enemy_outpost_front"] = Point2D{5.0, 0.0, 0.0};
@@ -72,14 +73,54 @@ void test_low_hp_selects_heal() {
   CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
 }
 
-void test_low_ammo_selects_heal() {
+void test_low_ammo_far_from_base_selects_heal() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
   WorldState world = make_world();
+  world.self.pose = Point2D{5.0, 0.0, 0.0};
   world.upstream.self_ammo = 20;
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
   CHECK(plan.call->task == "Heal");
+}
+
+void test_low_ammo_at_base_selects_resource() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.upstream.self_ammo = 20;
+  world.upstream.coins = 200;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Resource");
+  CHECK(std::get<ResourceParams>(plan.call->params).amount == 100);
+}
+
+void test_low_ammo_at_base_with_free_batch_selects_heal() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.upstream.self_ammo = 20;
+  world.upstream.coins = 0;
+  world.upstream.game_time_remaining = 300;  // 已进行 120s，2 个免费批次
+  world.supply_claimed_minutes = 0;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+}
+
+void test_low_ammo_at_base_without_ammo_source_does_not_loop_heal() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.upstream.self_ammo = 20;
+  world.upstream.coins = 0;
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.game_time_remaining = 360;  // 已进行 60s
+  world.supply_claimed_minutes = 1;          // 免费批次已领取
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Scan");
 }
 
 void test_heal_success_at_base_selects_resource() {
@@ -145,7 +186,10 @@ int main() {
   test_stopped_returns_empty_plan();
   test_dead_selects_respawn();
   test_low_hp_selects_heal();
-  test_low_ammo_selects_heal();
+  test_low_ammo_far_from_base_selects_heal();
+  test_low_ammo_at_base_selects_resource();
+  test_low_ammo_at_base_with_free_batch_selects_heal();
+  test_low_ammo_at_base_without_ammo_source_does_not_loop_heal();
   test_heal_success_at_base_selects_resource();
   test_enemy_outpost_far_selects_navigate();
   test_enemy_outpost_near_selects_outpost();

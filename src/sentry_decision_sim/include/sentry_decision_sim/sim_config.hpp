@@ -34,6 +34,7 @@ struct SimConfig {
   double start_x = 0.0, start_y = 0.0;
   double base_x = 0.0, base_y = 0.0, base_radius = 0.0;
   double our_x = 0.0, our_y = 0.0, our_radius = 0.0;
+  double enemy_outpost_x = 0.0, enemy_outpost_y = 0.0, enemy_outpost_radius = 0.0;
   double fort_x = 0.0, fort_y = 0.0, fort_radius = 0.0;
   SimEffects effects;
 };

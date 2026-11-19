@@ -11,6 +11,10 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     ['enemy_outpost_hp', '敌方前哨'],
     ['enemy_base_hp', '敌方基地'],
     ['game_time_remaining', '剩余时间'],
+    ['our_outpost_control', '己方前哨控制 0/1/2'],
+    ['enemy_outpost_control', '敌方前哨控制 0/1/2'],
+    ['enemy_at_our_outpost_buff', '敌方占己方前哨 0/1'],
+    ['enemy_at_enemy_outpost_buff', '敌方占敌方前哨 0/1'],
   ];
   let html = '';
   html += '<div class="row"><span>比赛</span>';
@@ -50,6 +54,38 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     group[1].forEach(function (item) {
       html +=
         '<button class="sim-effect" data-effect="' + item[0] + '">' + item[1] + '</button>';
+    });
+    html += '</div>';
+  });
+
+  // 前哨快捷操作：直接改控制状态与敌方占点标志，省去逐项选字段。
+  const outpostRows = [
+    ['己方前哨', [
+      ['完全控制', 'our_outpost_control', 0],
+      ['临时控制', 'our_outpost_control', 1],
+      ['未控制', 'our_outpost_control', 2],
+      ['敌方占点', 'enemy_at_our_outpost_buff', 1],
+      ['敌方离开', 'enemy_at_our_outpost_buff', 0],
+    ]],
+    ['对方前哨', [
+      ['我方完全', 'enemy_outpost_control', 0],
+      ['我方临时', 'enemy_outpost_control', 1],
+      ['敌方控制', 'enemy_outpost_control', 2],
+      ['敌方占点', 'enemy_at_enemy_outpost_buff', 1],
+      ['敌方离开', 'enemy_at_enemy_outpost_buff', 0],
+    ]],
+  ];
+  outpostRows.forEach(function (group) {
+    html += '<div class="row"><span>' + group[0] + '</span>';
+    group[1].forEach(function (item) {
+      html +=
+        '<button class="sim-world-quick" data-field="' +
+        item[1] +
+        '" data-value="' +
+        item[2] +
+        '">' +
+        item[0] +
+        '</button>';
     });
     html += '</div>';
   });
@@ -97,9 +133,7 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       });
   });
 
-  document.getElementById('btn-sim-world-set').addEventListener('click', function () {
-    const field = document.getElementById('sim-world-field').value;
-    const value = parseFloat(document.getElementById('sim-world-value').value);
+  function setSimWorld(field, value) {
     if (!isFinite(value)) {
       onLog('仿真世界: 取值无效');
       return;
@@ -113,6 +147,19 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       .catch(function (error) {
         onLog('仿真世界设置失败: ' + error + '（裁判仿真节点未运行？）');
       });
+  }
+
+  document.getElementById('btn-sim-world-set').addEventListener('click', function () {
+    const field = document.getElementById('sim-world-field').value;
+    const value = parseFloat(document.getElementById('sim-world-value').value);
+    setSimWorld(field, value);
+  });
+
+  // 前哨快捷按钮：data-field / data-value -> set_world。
+  Array.prototype.forEach.call(document.querySelectorAll('.sim-world-quick'), function (button) {
+    button.addEventListener('click', function () {
+      setSimWorld(button.getAttribute('data-field'), Number(button.getAttribute('data-value')));
+    });
   });
 
   // 仿真效果按钮统一走 /sentry_sim/apply_effect；步长在 sim.yaml，前端只传效果名。

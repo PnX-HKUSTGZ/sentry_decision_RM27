@@ -207,6 +207,10 @@ void RosIoNode::cancel_goal() {
     std::lock_guard<std::mutex> lock(nav_mutex_);
     handle = goal_handle_;
     nav_state_.current_goal.reset();
+    // 取消目标后旧的 reached / failed 结果仍然有效，会污染下一次 Navigate：
+    // 重置后新任务会在旧 reached=true 且不在新目标半径内时立即误判失败。
+    nav_state_.reached = false;
+    nav_state_.failed = false;
     nav_state_.stamp = sentry_decision::SteadyClock::now();
   }
   if (handle) {
@@ -216,7 +220,13 @@ void RosIoNode::cancel_goal() {
 
 sentry_decision::NavState RosIoNode::status() const {
   std::lock_guard<std::mutex> lock(nav_mutex_);
-  return nav_state_;
+  sentry_decision::NavState out = nav_state_;
+  // NavState 是 NavigationSink 的可用状态，不等同于「已有导航目标」：
+  // 首次 Navigate 必须在没有目标时也能启动；状态查询本身作为心跳刷新 stamp，
+  // 是否真正可用由 action server 是否就绪决定。
+  out.stamp = sentry_decision::SteadyClock::now();
+  out.valid = nav_client_ != nullptr && nav_client_->action_server_is_ready();
+  return out;
 }
 
 void RosIoNode::set_velocity(const sentry_decision::Twist& cmd) {

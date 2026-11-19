@@ -10,6 +10,8 @@ void merge(const GameInfoMsg& msg, sentry_decision::UpstreamState* out,
   out->game_time_remaining = msg.game_time_remaining;
   out->coins = msg.coin_remaining;
   out->event = sentry_decision::decode_event_code(msg.event_code, msg.event_code_2, own_color);
+  out->our_outpost_control = out->event.our_outpost_control;
+  out->enemy_outpost_control = out->event.enemy_outpost_control;
   out->detect_color = msg.detect_color;
   out->can_rebuild_outpost = msg.can_rebuild_outpost;
   out->manual_point.x = msg.manual_point_x;

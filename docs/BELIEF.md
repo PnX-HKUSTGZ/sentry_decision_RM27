@@ -70,8 +70,8 @@ flowchart LR
 | `enemy_outpost_hp` | int | `GameInfo.enemy_outpost_hp` | 敌方前哨站血量 |
 | `enemy_base_hp` | int | `GameInfo.enemy_base_hp` | 敌方基地血量 |
 | `can_rebuild_outpost` | bool | `GameInfo.can_rebuild_outpost` | 己方是否可重建前哨站 |
-| `our_outpost_control` | `OutpostControl` | `event_data` bit 28-29 映射 | 己方半场前哨阵地：完全 / 临时 / 未控制；待 2027 解码接入 |
-| `enemy_outpost_control` | `OutpostControl` | `event_data` bit 30-31 映射 | 对方半场前哨阵地：完全 / 临时 / 未控制；待 2027 解码接入 |
+| `our_outpost_control` | `OutpostControl` | `event_data` bit 28-29 映射 | 己方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
+| `enemy_outpost_control` | `OutpostControl` | `event_data` bit 30-31 映射 | 对方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
 | `self_hp` | int | `SentryInfoOnline.self_health` | 自身血量 |
 | `self_ammo` | int | `SentryInfoOnline.bullets_remaining` | 自身允许发弹量 |
 | `cooling_value` | int | `SentryInfoOnline.cooling_value` | 冷却值 |
@@ -87,6 +87,11 @@ flowchart LR
 
 > **2027 场地事件**：`0x0101` 拆成 `event_data` / `event_data_2`；前哨阵地控制状态在
 > `event_data` bit 28-31（R/B 各 2 bit），基地控制状态在 `event_data_2` bit 0-3。
+> 前哨控制 2 bit 的取值：0 己方完全控制 / 1 己方临时控制 / 2 己方未控制；3 为保留值，
+> 解码为 `kNotOwned`。注意：0x0101 直接链路看不到「敌方完全控制 / 敌方临时控制」的区别，
+> 需要这项信息时只能用 `GlobalUnitStatus`（1-4 四态，服务器→自定义终端），当前决策链路未接入。
+> `RosIoNode` 已在 `merge(GameInfo)` 中把解码后的 `our_outpost_control` /
+> `enemy_outpost_control` 写入 `UpstreamState`，Task 层不再看到恒定的 `kNotOwned`。
 > R/B → own/enemy 的映射在本层用 `RosIoNode` 的 `own_color` 参数做一次，Task 层不出现红蓝。
 > `GameInfo.event_code_2` 已加入消息，auto-aim 已转发；MCU 固件未按 33 B 上行前按 0 处理，此时基地控制状态不可用，前哨控制不受影响。
 

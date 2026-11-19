@@ -13,6 +13,12 @@
 
 ### Added
 
+- 无头策略冒烟：`strategy_smoke` 场景覆盖进攻前哨、Scan、低血 Heal、Resource、战亡 Respawn 的完整策略流程；`low_ammo_reset_smoke` 覆盖低弹兑换与重置恢复；`nav_reset_smoke` 覆盖导航成功后重置再启动。
+- 面板「资源与动作」显示当前 `TaskSnapshot`（任务、状态、阶段、参数、已进行时间、指标）与上一次 `TaskResult`。
+- 世界状态面板显示两处前哨阵地的控制方（我方完全 / 我方临时 / 敌方控制（未区分））。
+- 世界状态面板移除未启用的“期望 / 当前姿态”行；2027 Task 层当前不输出姿态。
+- 仿真控制新增「己方前哨 / 对方前哨」快捷行：切换完全 / 临时 / 未控制，以及敌方占点 / 离开。
+- 仿真裁判 2027 前哨控制：增益点 5 s 占点、击毁后的完全 / 临时控制转换、前哨站 500 血重建，以及前哨站增益点按补给区 50% 速率回血（不领免费发弹量）。
 - `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
 - `core/task_runtime`：`TaskRegistry`、Task 生命周期、超时、抢占、结果与 `DecisionEpoch`。
 - `core/task_policy` / `core/task_runner`：手写 Task 选择 + Policy/Runtime 组合根。
@@ -33,6 +39,12 @@
 
 ### Fixed
 
+- 重置后 `nav.reached` / `nav.failed` 残留，下一次 `Navigate` 会误判“导航已结束但不在到达半径内”并反复失败；现在取消目标时清空旧结果。
+- 低弹且已在基地时策略仍反复选择 `Heal`（满血立即成功），任务态反复回到 `idle` 且弹药不增加；现在优先选择 `Resource`，买不起且无免费批次时不再空转。
+- `RosIoNode::status` 只在发送导航目标后置 `nav.valid`，导致首个 `Navigate` 永远无法启动；现在以 action server 就绪为可用条件，并在查询时刷新心跳。
+- 仿真补给区 / 前哨站回血会把 `self_hp=0` 的机器人“救活”，导致 `Respawn` 被取消；现在战亡期间不执行回血。
+- `sentry_bridge` 未把 `event_code` 中已解码的前哨控制状态写入 `UpstreamState`，导致 Task 层始终看到 `kNotOwned`。
+- `match_smoke` 仍按 2026 起点坐标校验，切换 RMUC27 后失败。
 - `Heal` 离开补给区后 5 s 发弹确认窗口未重置。
 - `Resource` 动作在 dispatcher 暂停时被清理，导致 5 s 后误失败。
 - 策略恢复当前任务时旧的 pending 计划未撤销。

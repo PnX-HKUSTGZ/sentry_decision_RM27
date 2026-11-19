@@ -72,12 +72,12 @@ call_stage 0
 sleep 0.5
 expect_stage 0 "重置回未开始"
 
-# 重置位置：demo 的 start_pose 为 home (-11.47, -4.40)。
+# 重置位置：demo 的 start_pose 为 2027 己方基地补给区 (-12.37, -3.35)。
 call_stage 0
 sleep 0.5
 pose="$(odom_pose)"
-if ! python3 -c "import sys; x, y = map(float, sys.argv[1].split()); sys.exit(0 if abs(x + 11.47) < 0.05 and abs(y + 4.40) < 0.05 else 1)" "${pose}"; then
-  echo "FAIL: 重置后位姿应为 (-11.47, -4.40)，实际 ${pose}" >&2
+if ! python3 -c "import sys; x, y = map(float, sys.argv[1].split()); sys.exit(0 if abs(x + 12.37) < 0.05 and abs(y + 3.35) < 0.05 else 1)" "${pose}"; then
+  echo "FAIL: 重置后位姿应为 (-12.37, -3.35)，实际 ${pose}" >&2
   fail=1
 fi
 

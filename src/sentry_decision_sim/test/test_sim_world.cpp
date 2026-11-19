@@ -151,6 +151,126 @@ void test_occupancy() {
   event = decode_event_code(world.event_code, 0, TeamColor::kRed);
   CHECK(!event.supply_zone_occupied);
   CHECK(!event.local_ammo_exchange_point());
+
+  // 敌方前哨增益点：只有己方完全控制时才发送 1，否则按协议发送 4。
+  SimWorld outpost_world;
+  outpost_world.enemy_outpost_hp = 1000;
+  Occupancy enemy_buff;
+  enemy_buff.enemy_outpost_buff = true;
+  outpost_world.enemy_outpost_control.held_by_us = true;
+  outpost_world.enemy_outpost_control.full = true;
+  apply_occupancy(&outpost_world, enemy_buff);
+  apply_outpost_control_bits(&outpost_world);
+  event = decode_event_code(outpost_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.enemy_outpost_buff_status == 1);
+  CHECK(event.enemy_outpost_control == OutpostControl::kOwnFull);
+  CHECK(event.local_ammo_exchange_point());
+
+  outpost_world.enemy_outpost_control.full = false;
+  apply_occupancy(&outpost_world, enemy_buff);
+  apply_outpost_control_bits(&outpost_world);
+  event = decode_event_code(outpost_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.enemy_outpost_buff_status == 1);  // 临时控制仍算控制
+  CHECK(event.enemy_outpost_control == OutpostControl::kOwnTemporary);
+  CHECK(!event.local_ammo_exchange_point());
+
+  outpost_world.enemy_outpost_control.held_by_us = false;
+  apply_occupancy(&outpost_world, enemy_buff);
+  apply_outpost_control_bits(&outpost_world);
+  event = decode_event_code(outpost_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.enemy_outpost_buff_status == 4);  // 未控制时不发送增益点状态
+  CHECK(event.enemy_outpost_control == OutpostControl::kNotOwned);
+}
+
+// 2027 前哨控制：两条转化路径 + 己方前哨失守。
+void test_outpost_control_paths() {
+  // 路径 1：占增益点 5 s -> 临时控制 -> 击毁 -> 完全控制并重建 500 血。
+  {
+    SimWorld world;
+    world.enemy_outpost_hp = 1000;
+    CHECK(!world.enemy_outpost_control.held_by_us);
+    CHECK(world.enemy_outpost_control.full);
+
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 4999);
+    CHECK(!world.enemy_outpost_control.held_by_us);
+    CHECK(world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_control.challenge_ms == 4999);
+
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 1);
+    CHECK(world.enemy_outpost_control.held_by_us);
+    CHECK(!world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_hp == 1000);
+
+    destroy_outpost(&world.enemy_outpost_control, &world.enemy_outpost_hp, true);
+    CHECK(world.enemy_outpost_control.held_by_us);
+    CHECK(world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_hp == 500);
+  }
+
+  // 路径 2：先击毁 -> 对方临时控制 -> 对方离开 5 s -> 我方完全控制并重建。
+  {
+    SimWorld world;
+    world.enemy_outpost_hp = 1000;
+    destroy_outpost(&world.enemy_outpost_control, &world.enemy_outpost_hp, true);
+    CHECK(!world.enemy_outpost_control.held_by_us);
+    CHECK(!world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_hp == 0);
+
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, false, 4999);
+    CHECK(!world.enemy_outpost_control.held_by_us);
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, false, 1);
+    CHECK(world.enemy_outpost_control.held_by_us);
+    CHECK(world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_hp == 500);
+  }
+
+  // 己方前哨被击毁：先转临时控制；我方离开 5 s 后对方完全控制并重建。
+  {
+    SimWorld world;
+    world.our_outpost_hp = 1000;
+    destroy_outpost(&world.our_outpost_control, &world.our_outpost_hp, false);
+    CHECK(world.our_outpost_control.held_by_us);
+    CHECK(!world.our_outpost_control.full);
+    CHECK(world.our_outpost_hp == 0);
+
+    step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, false, 5000);
+    CHECK(!world.our_outpost_control.held_by_us);
+    CHECK(world.our_outpost_control.full);
+    CHECK(world.our_outpost_hp == 500);
+  }
+
+  // 对方占点 5 s：己方完全控制 -> 对方临时控制；对方再击毁 -> 对方完全控制。
+  {
+    SimWorld world;
+    world.our_outpost_hp = 1000;
+    world.our_outpost_control.enemy_present = true;
+    step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, false, 5000);
+    CHECK(!world.our_outpost_control.held_by_us);
+    CHECK(!world.our_outpost_control.full);
+
+    destroy_outpost(&world.our_outpost_control, &world.our_outpost_hp, false);
+    CHECK(!world.our_outpost_control.held_by_us);
+    CHECK(world.our_outpost_control.full);
+    CHECK(world.our_outpost_hp == 500);
+  }
+
+  // 双方同时激活：占领进度暂停；单方离开后进度按同速倒退。
+  {
+    SimWorld world;
+    world.enemy_outpost_hp = 1000;
+    world.enemy_outpost_control.enemy_present = true;
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 2500);
+    CHECK(world.enemy_outpost_control.challenge_ms == 0);
+
+    world.enemy_outpost_control.enemy_present = false;
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 2500);
+    CHECK(world.enemy_outpost_control.challenge_ms == 2500);
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, false, 1000);
+    CHECK(world.enemy_outpost_control.challenge_ms == 1500);
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 3500);
+    CHECK(world.enemy_outpost_control.held_by_us);
+    CHECK(!world.enemy_outpost_control.full);
+  }
 }
 
 DecisionAction make_action(DecisionActionKind kind, int value) {
@@ -449,6 +569,7 @@ int main() {
   test_supply_heal_ready();
   test_apply_effects();
   test_occupancy();
+  test_outpost_control_paths();
   test_supply_ammo();
   test_remote_hp_delay();
   test_remote_hp_void_on_death();

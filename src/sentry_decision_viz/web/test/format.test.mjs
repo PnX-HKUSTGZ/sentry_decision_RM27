@@ -3,11 +3,14 @@ import {
   battlefieldModel,
   decisionToView,
   escapeHtml,
+  formatDuration,
   formatMmSs,
   gameStageName,
   parseListState,
+  outpostControlName,
   stanceName,
   taskStateName,
+  taskStatusName,
   worldStateToView,
   worldToCanvas,
 } from '../src/format.js';
@@ -31,8 +34,15 @@ check(formatMmSs(180) === '03:00', 'formatMmSs 3min');
 check(formatMmSs(5) === '00:05', 'formatMmSs seconds');
 check(formatMmSs(0) === '00:00', 'formatMmSs zero');
 check(taskStateName(0) === 'idle', 'taskStateName idle');
+check(taskStatusName(2) === 'success' && taskStatusName(99) === '#99', 'taskStatusName');
+check(outpostControlName(0) === '我方完全控制', 'outpostControlName full');
+check(outpostControlName(2) === '敌方控制（未区分）', 'outpostControlName enemy');
+check(outpostControlName(9) === '未知', 'outpostControlName unknown');
+check(formatDuration(1500) === '1.5 s', 'formatDuration');
 
 const world = worldStateToView({
+  our_outpost_control: 1,
+  enemy_outpost_control: 2,
   pos_x: 1,
   pos_y: 2,
   yaw: 0.5,
@@ -46,6 +56,8 @@ const world = worldStateToView({
   enemy_y: -2,
 });
 check(world.posX === 1 && world.navGoalY === 4, 'world view');
+check(world.ourOutpostControlName === '我方临时控制', 'world our outpost control');
+check(world.enemyOutpostControlName === '敌方控制（未区分）', 'world enemy outpost control');
 const decision = decisionToView({ output: { task_state: 5, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
 check(decision.modeName === 'heal', 'decision mode');
 const decisionMapped = decisionToView({ output: { task_state: 3, stance: 1 } });

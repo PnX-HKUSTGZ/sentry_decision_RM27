@@ -14,11 +14,16 @@ export function createWorldPanel(el) {
       }
       let html = '<table>';
       html += row('模式', d ? d.modeName : '-');
-      html += row('期望 / 当前姿态', (d ? d.stanceName : '-') + ' / ' + w.stanceName);
       html += row('血量 / 弹量', w.selfHp + ' / ' + w.selfAmmo);
       html += row('金币', w.coins);
-      html += row('己方基地 / 前哨', w.baseHp + ' / ' + w.ourOutpostHp);
-      html += row('敌方前哨 / 基地', w.enemyOutpostHp + ' / ' + w.enemyBaseHp);
+      html += row(
+        '己方前哨 / 基地',
+        w.ourOutpostHp + ' / ' + w.baseHp + '（前哨 ' + w.ourOutpostControlName + '）'
+      );
+      html += row(
+        '敌方前哨 / 基地',
+        w.enemyOutpostHp + ' / ' + w.enemyBaseHp + '（前哨 ' + w.enemyOutpostControlName + '）'
+      );
       html += row('剩余时间', w.gameTime + ' s');
       html += row('比赛阶段', w.gameStatus);
       const fmt = function (value) {

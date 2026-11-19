@@ -28,6 +28,9 @@ class TaskRunner {
   std::optional<TaskSnapshot> snapshot() const {
     return runtime_.snapshot();
   }
+  const std::optional<TaskResult>& previous_task() const {
+    return history_.previous_task;
+  }
   std::optional<TaskResult> take_result();
   std::optional<DecisionEpoch> take_epoch();
 

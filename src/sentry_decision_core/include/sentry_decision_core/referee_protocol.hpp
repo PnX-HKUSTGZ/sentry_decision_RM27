@@ -55,8 +55,13 @@ struct EventCode {
   }
 
   // 本地兑换发弹量（2027 表 5-8）：己方补给区 / 基地增益点 / 前哨站增益点。
+  // 2027 规则 5.6.4.6：只有己方完全控制的前哨阵地，其增益点才可兑换。
   bool local_ammo_exchange_point() const {
-    return supply_zone_occupied || base_buff_occupied || own_active(our_outpost_buff_status);
+    const bool own_outpost =
+        own_active(our_outpost_buff_status) && our_outpost_control == OutpostControl::kOwnFull;
+    const bool enemy_outpost =
+        own_active(enemy_outpost_buff_status) && enemy_outpost_control == OutpostControl::kOwnFull;
+    return supply_zone_occupied || base_buff_occupied || own_outpost || enemy_outpost;
   }
 };
 

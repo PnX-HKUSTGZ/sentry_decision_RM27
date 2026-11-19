@@ -49,6 +49,12 @@ void test_apply_world_field() {
   CHECK(world.can_rebuild_outpost);
   CHECK(apply_world_field(&world, "sentry_info_1", number(7), &error));
   CHECK(world.sentry_info_1 == 7u);
+  CHECK(apply_world_field(&world, "enemy_outpost_control", number(1), &error));
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(!world.enemy_outpost_control.full);
+  CHECK(apply_world_field(&world, "enemy_at_our_outpost_buff", boolean(true), &error));
+  CHECK(world.our_outpost_control.enemy_present);
+  CHECK(!apply_world_field(&world, "enemy_outpost_control", number(3), &error));
 
   CHECK(!apply_world_field(&world, "not_a_field", number(1), &error));
   CHECK(!error.empty());

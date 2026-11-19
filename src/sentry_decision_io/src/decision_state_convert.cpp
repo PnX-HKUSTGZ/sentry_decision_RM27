@@ -33,6 +33,8 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
   msg.base_hp = upstream.base_hp;
   msg.our_outpost_hp = upstream.our_outpost_hp;
   msg.enemy_outpost_hp = upstream.enemy_outpost_hp;
+  msg.our_outpost_control = static_cast<std::uint8_t>(upstream.our_outpost_control);
+  msg.enemy_outpost_control = static_cast<std::uint8_t>(upstream.enemy_outpost_control);
   msg.enemy_base_hp = upstream.enemy_base_hp;
   msg.can_rebuild_outpost = upstream.can_rebuild_outpost;
   msg.upstream_valid = upstream.valid;

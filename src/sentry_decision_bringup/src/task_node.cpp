@@ -2,8 +2,11 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
@@ -82,6 +85,35 @@ std::string json_escape(const std::string& text) {
   return out;
 }
 
+std::string task_params_text(const sentry_decision::TaskCall& call) {
+  std::ostringstream out;
+  if (const auto* p = std::get_if<sentry_decision::NavigateParams>(&call.params)) {
+    out << "target=" << p->target << ", arrive_radius=" << p->arrive_radius;
+  } else if (const auto* p = std::get_if<sentry_decision::OutpostParams>(&call.params)) {
+    out << "target_side=" << (p->target_side == sentry_decision::Side::kOwn ? "own" : "enemy");
+  } else if (const auto* p = std::get_if<sentry_decision::HealParams>(&call.params)) {
+    out << "heal_point=" << p->heal_point
+        << ", claim_free_ammo=" << (p->claim_free_ammo ? "true" : "false");
+  } else if (const auto* p = std::get_if<sentry_decision::ResourceParams>(&call.params)) {
+    out << "exchange_point=" << p->exchange_point << ", amount=" << p->amount;
+  }
+  return out.str();
+}
+
+std::string metrics_text(const std::map<std::string, double>& metrics) {
+  std::ostringstream out;
+  out << std::fixed << std::setprecision(3);
+  bool first = true;
+  for (const auto& item : metrics) {
+    if (!first) {
+      out << "; ";
+    }
+    first = false;
+    out << item.first << "=" << item.second;
+  }
+  return out.str();
+}
+
 class TaskDecisionNode : public rclcpp::Node {
  public:
   TaskDecisionNode(std::shared_ptr<sentry_decision_io::RosIoNode> io, const Options& options,
@@ -102,7 +134,44 @@ class TaskDecisionNode : public rclcpp::Node {
   }
 
  private:
+  std::string build_task_json() const {
+    std::ostringstream out;
+    const std::optional<sentry_decision::TaskSnapshot> snapshot = runner_.snapshot();
+    out << "\"task\":";
+    if (!snapshot.has_value()) {
+      out << "null";
+    } else {
+      const std::string params =
+          snapshot->call.has_value() ? task_params_text(*snapshot->call) : std::string{};
+      out << "{\"id\":\"" << json_escape(snapshot->task)
+          << "\",\"status\":" << static_cast<int>(snapshot->status)
+          << ",\"state\":" << static_cast<int>(snapshot->task_state) << ",\"phase\":\""
+          << json_escape(snapshot->phase) << "\",\"detail\":\"" << json_escape(snapshot->detail)
+          << "\",\"progress\":" << snapshot->progress
+          << ",\"elapsed_ms\":" << snapshot->elapsed.count() << ",\"params\":\""
+          << json_escape(params) << "\",\"metrics\":\""
+          << json_escape(metrics_text(snapshot->metrics)) << "\"}";
+    }
+
+    const std::optional<sentry_decision::TaskResult>& previous = runner_.previous_task();
+    out << ",\"previous\":";
+    if (!previous.has_value()) {
+      out << "null";
+    } else {
+      out << "{\"id\":\"" << json_escape(previous->task)
+          << "\",\"status\":" << static_cast<int>(previous->status) << ",\"reason\":\""
+          << json_escape(previous->reason) << "\",\"elapsed_ms\":" << previous->elapsed.count()
+          << ",\"metrics\":\"" << json_escape(metrics_text(previous->metrics)) << "\"}";
+    }
+    return out.str();
+  }
+
   std::string state_snapshot_json() const {
+    std::string task_json;
+    {
+      std::lock_guard<std::mutex> lock(task_json_mutex_);
+      task_json = task_json_;
+    }
     std::ostringstream out;
     out << "{\"points\":[";
     bool first = true;
@@ -122,7 +191,8 @@ class TaskDecisionNode : public rclcpp::Node {
       }
     }
     out << "],\"task_state\":" << task_state_json_.load()
-        << ",\"safety_emergency\":" << (safety_emergency_json_.load() ? "true" : "false") << "}";
+        << ",\"safety_emergency\":" << (safety_emergency_json_.load() ? "true" : "false") << ","
+        << task_json << "}";
     return out.str();
   }
 
@@ -137,6 +207,10 @@ class TaskDecisionNode : public rclcpp::Node {
     }
     while (auto epoch = runner_.take_epoch()) {
       SD_LOG_DEBUG("task", "DecisionEpoch reason=%d", static_cast<int>(epoch->reason));
+    }
+    {
+      std::lock_guard<std::mutex> lock(task_json_mutex_);
+      task_json_ = build_task_json();
     }
 
     const sentry_decision::TaskState state = runner_.task_state();
@@ -190,6 +264,8 @@ class TaskDecisionNode : public rclcpp::Node {
   TimePoint last_task_state_sent_{};
   std::atomic<int> task_state_json_{0};
   std::atomic<bool> safety_emergency_json_{false};
+  mutable std::mutex task_json_mutex_;
+  std::string task_json_ = "\"task\":null,\"previous\":null";
   std::uint32_t tick_count_ = 0;
   int max_ticks_ = 0;
   rclcpp::TimerBase::SharedPtr timer_;

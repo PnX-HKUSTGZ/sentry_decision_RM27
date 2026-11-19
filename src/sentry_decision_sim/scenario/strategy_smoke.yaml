@@ -1,0 +1,46 @@
+# 无头策略冒烟：进攻前哨 -> 转 Scan -> 低血回基地 Heal -> 战亡 Respawn -> 满血 Resource -> Scan。
+# 由 tools/scenario_smoke_test.sh 驱动；时间点为仿真墙钟，留有几秒余量。
+name: strategy_smoke
+start_pose: [-12.37, -3.35, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 200
+  self_hp: 400
+  self_ammo: 100
+  base_hp: 5000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 5000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: navigate
+  - at: 10.0
+    expect:
+      task_state: outpost
+  - at: 12.0
+    set_world:
+      enemy_outpost_hp: 0
+  - at: 14.0
+    expect:
+      task_state: scan
+  - at: 16.0
+    set_world:
+      self_hp: 100
+      coins: 200
+  - at: 18.0
+    expect:
+      task_state: heal
+  - at: 30.0
+    set_world:
+      self_hp: 0
+  - at: 33.0
+    expect:
+      task_state: respawn
+  - at: 38.0
+    expect:
+      task_state: heal
+  - at: 48.0
+    expect:
+      task_state: scan

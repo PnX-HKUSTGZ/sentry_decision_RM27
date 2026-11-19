@@ -21,6 +21,7 @@ PolicyConfig make_config() {
   PolicyConfig config;
   config.numbers["nav.retreat_hp"] = 50.0;
   config.numbers["nav.low_ammo"] = 20.0;
+  config.numbers["match.duration_s"] = 420.0;
   config.points["own_base_supply"] = Point2D{0.0, 0.0, 0.0};
   config.point_radius["own_base_supply"] = 0.5;
   config.points["enemy_outpost_front"] = Point2D{5.0, 0.0, 0.0};
@@ -100,14 +101,18 @@ void test_history_reset_between_matches() {
   const PolicyConfig config = make_config();
   TaskRunner runner(config, 400, Duration{420000});
   WorldState world = make_world();
-  world.self.pose = Point2D{0.0, 0.0, 0.0};
+  // 低弹且不在基地 -> Heal 负责回到基地；到基地后满血、无待领取分钟，Heal 成功。
+  world.self.pose = Point2D{5.0, 0.0, 0.0};
   world.upstream.self_ammo = 10;
   world.upstream.coins = 200;
   world.upstream.game_time_remaining = 420;
   world.upstream.enemy_outpost_hp = 0;
 
-  // 低弹 -> 基地 Heal；满血且没有待领取分钟，立即成功。
   runner.tick(world, TimePoint{});
+  CHECK(runner.task_state() == TaskState::kHeal);
+  world.self.pose = Point2D{0.0, 0.0, 0.0};
+  world.upstream.self_ammo = 100;
+  runner.tick(world, TimePoint{} + Duration{500});
   const auto heal = runner.take_result();
   CHECK(heal.has_value());
   CHECK(heal->task == "Heal");

@@ -108,6 +108,8 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
                      &out->base_radius, error) ||
           !load_zone(zones["our_outpost"], points, radii, "our_outpost", &out->our_x, &out->our_y,
                      &out->our_radius, error) ||
+          !load_zone(zones["enemy_outpost"], points, radii, "enemy_outpost", &out->enemy_outpost_x,
+                     &out->enemy_outpost_y, &out->enemy_outpost_radius, error) ||
           !load_zone(zones["fort_buff"], points, radii, "fort_buff", &out->fort_x, &out->fort_y,
                      &out->fort_radius, error)) {
         return false;

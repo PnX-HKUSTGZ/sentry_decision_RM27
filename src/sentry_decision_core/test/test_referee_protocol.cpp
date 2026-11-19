@@ -89,7 +89,18 @@ void test_decode_event_code() {
   CHECK(point.local_ammo_exchange_point());
   point = {};
   point.our_outpost_buff_status = 1;
+  CHECK(!point.local_ammo_exchange_point());  // 仅占领增益点，未完全控制
+  point.our_outpost_control = OutpostControl::kOwnFull;
   CHECK(point.local_ammo_exchange_point());
+  point.our_outpost_control = OutpostControl::kOwnTemporary;
+  CHECK(!point.local_ammo_exchange_point());
+
+  point = {};
+  point.enemy_outpost_buff_status = 1;
+  point.enemy_outpost_control = OutpostControl::kOwnFull;
+  CHECK(point.local_ammo_exchange_point());
+  point.enemy_outpost_control = OutpostControl::kNotOwned;
+  CHECK(!point.local_ammo_exchange_point());
 }
 
 void test_decode_sentry_info1() {

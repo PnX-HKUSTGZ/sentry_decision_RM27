@@ -52,6 +52,35 @@ using sentry_decision_sim::ScenarioValue;
 using sentry_decision_sim::SimConfig;
 using sentry_decision_sim::SimWorld;
 
+const char* outpost_control_text(const sentry_decision_sim::OutpostControlState& state) {
+  if (!state.held_by_us) {
+    return "未控制";
+  }
+  return state.full ? "完全控制" : "临时控制";
+}
+
+// 仿真回血区：基地补给区，或己方完全控制的任一前哨站增益点。
+enum class HealZone {
+  kNone,
+  kSupply,
+  kOurOutpost,
+  kEnemyOutpost,
+};
+
+const char* heal_zone_text(HealZone zone) {
+  switch (zone) {
+    case HealZone::kSupply:
+      return "补给区";
+    case HealZone::kOurOutpost:
+      return "己方前哨站增益点";
+    case HealZone::kEnemyOutpost:
+      return "敌方前哨站增益点";
+    case HealZone::kNone:
+    default:
+      return "无";
+  }
+}
+
 struct Options {
   double rate_hz = 20.0;
   std::string scenario;
@@ -164,6 +193,7 @@ class RefereeSimNode : public rclcpp::Node {
     last_supply_tick_ = last_stage_tick_;
     last_remote_tick_ = last_stage_tick_;
     last_respawn_tick_ = last_stage_tick_;
+    last_outpost_tick_ = last_stage_tick_;
     const auto period =
         std::chrono::duration_cast<Duration>(std::chrono::duration<double>(1.0 / options.rate_hz));
     timer_ = create_wall_timer(period, [this]() { tick(); });
@@ -220,6 +250,9 @@ class RefereeSimNode : public rclcpp::Node {
     our_outpost_center_x_ = declare_number_param("our_outpost_center_x", sim_.our_x);
     our_outpost_center_y_ = declare_number_param("our_outpost_center_y", sim_.our_y);
     our_outpost_radius_ = declare_number_param("our_outpost_radius", sim_.our_radius);
+    enemy_outpost_center_x_ = declare_number_param("enemy_outpost_center_x", sim_.enemy_outpost_x);
+    enemy_outpost_center_y_ = declare_number_param("enemy_outpost_center_y", sim_.enemy_outpost_y);
+    enemy_outpost_radius_ = declare_number_param("enemy_outpost_radius", sim_.enemy_outpost_radius);
     fort_buff_center_x_ = declare_number_param("fort_buff_center_x", sim_.fort_x);
     fort_buff_center_y_ = declare_number_param("fort_buff_center_y", sim_.fort_y);
     fort_buff_radius_ = declare_number_param("fort_buff_radius", sim_.fort_radius);
@@ -424,8 +457,9 @@ class RefereeSimNode : public rclcpp::Node {
       last_supply_tick_ = SteadyClock::now();
       last_remote_tick_ = last_supply_tick_;
       last_respawn_tick_ = last_supply_tick_;
-      in_supply_ = false;
-      supply_seconds_in_zone_ = 0;
+      last_outpost_tick_ = last_supply_tick_;
+      heal_zone_ = HealZone::kNone;
+      heal_seconds_in_zone_ = 0;
     }
     last_stage_tick_ = SteadyClock::now();
     sync_world_stage();
@@ -508,6 +542,31 @@ class RefereeSimNode : public rclcpp::Node {
     return std::hypot(pose.x - supply_center_x_, pose.y - supply_center_y_) <= supply_radius_;
   }
 
+  bool in_zone(double x, double y, double radius) const {
+    if (!(radius > 0.0)) {
+      return false;
+    }
+    const sentry_decision::Point2D pose = current_pose();
+    return std::hypot(pose.x - x, pose.y - y) <= radius;
+  }
+
+  // 规则 5.3：基地补给区按当前速率回血；己方完全控制的前哨站增益点按该速率的 50% 回血。
+  // 前哨站不能领取免费发弹量，因此这里只决定回血区，发弹领取仍只由 kSupply 触发。
+  HealZone current_heal_zone() const {
+    if (in_supply_zone()) {
+      return HealZone::kSupply;
+    }
+    if (in_zone(our_outpost_center_x_, our_outpost_center_y_, our_outpost_radius_) &&
+        world_.our_outpost_control.held_by_us && world_.our_outpost_control.full) {
+      return HealZone::kOurOutpost;
+    }
+    if (in_zone(enemy_outpost_center_x_, enemy_outpost_center_y_, enemy_outpost_radius_) &&
+        world_.enemy_outpost_control.held_by_us && world_.enemy_outpost_control.full) {
+      return HealZone::kEnemyOutpost;
+    }
+    return HealZone::kNone;
+  }
+
   // 比赛已进行秒数：由「比赛时长 - 当前剩余」得到，时长与 MatchStageController 保持一致。
   int match_elapsed_seconds() const {
     const int total = match_.duration_seconds(sentry_decision_sim::MatchStage::kRunning);
@@ -521,33 +580,52 @@ class RefereeSimNode : public rclcpp::Node {
                : supply_heal_ratio_;
   }
 
+  // 规则 5.3：前哨站增益点回血速率是「此时补给区回血速率」的 50%。
+  double heal_ratio_for_zone(HealZone zone) const {
+    const double ratio = supply_heal_ratio_for_now();
+    return zone == HealZone::kSupply ? ratio : ratio * 0.5;
+  }
+
   void apply_supply_second() {
     if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
       return;
     }
-    const bool inside = in_supply_zone();
-    if (inside != in_supply_) {
-      in_supply_ = inside;
-      supply_seconds_in_zone_ = 0;
-      SD_LOG_ACT("sim", "%s补给区", inside ? "进入" : "离开");
+    // 战亡后先走复活读条，不能被补给区 / 前哨站回血「救活」，否则 sync_respawn 会误判存活。
+    if (world_.self_hp <= 0) {
+      return;
     }
-    if (!inside) {
+    const HealZone zone = current_heal_zone();
+    if (zone != heal_zone_) {
+      if (heal_zone_ != HealZone::kNone) {
+        SD_LOG_ACT("sim", "离开%s", heal_zone_text(heal_zone_));
+      }
+      if (zone != HealZone::kNone) {
+        SD_LOG_ACT("sim", "进入%s", heal_zone_text(zone));
+      }
+      heal_zone_ = zone;
+      heal_seconds_in_zone_ = 0;
+    }
+    if (zone == HealZone::kNone) {
       return;
     }
     // 进入后先等检测建立（enter_delay_s，默认 1s），延时满足前的整秒不回血。
-    if (sentry_decision_sim::supply_heal_ready(supply_seconds_in_zone_, supply_enter_delay_s_)) {
+    if (sentry_decision_sim::supply_heal_ready(heal_seconds_in_zone_, supply_enter_delay_s_)) {
       const int healed =
-          sentry_decision_sim::supply_heal(&world_, max_hp_, supply_heal_ratio_for_now());
+          sentry_decision_sim::supply_heal(&world_, max_hp_, heal_ratio_for_zone(zone));
       if (healed > 0) {
-        SD_LOG_ACT("sim", "补给区回血 +%d -> %d/%d", healed, world_.self_hp, max_hp_);
+        SD_LOG_ACT("sim", "%s回血 +%d -> %d/%d", heal_zone_text(zone), healed, world_.self_hp,
+                   max_hp_);
       }
     }
-    ++supply_seconds_in_zone_;
-    // 规则 5.3.2：占领补给区时领取累积的免费发弹量（每满 1 分钟 100 发）。
-    const int gained =
-        sentry_decision_sim::claim_supply_ammo(&world_, match_elapsed_seconds(), true);
-    if (gained > 0) {
-      SD_LOG_ACT("sim", "补给区免费发弹量 +%d -> %d", gained, world_.self_ammo);
+    ++heal_seconds_in_zone_;
+    if (zone == HealZone::kSupply) {
+      // 规则 5.3.2：占领补给区时领取累积的免费发弹量（每满 1 分钟 100 发）。
+      // 前哨站增益点只回血，不能领取免费发弹量。
+      const int gained =
+          sentry_decision_sim::claim_supply_ammo(&world_, match_elapsed_seconds(), true);
+      if (gained > 0) {
+        SD_LOG_ACT("sim", "补给区免费发弹量 +%d -> %d", gained, world_.self_ammo);
+      }
     }
   }
 
@@ -609,11 +687,41 @@ class RefereeSimNode : public rclcpp::Node {
     zones.supply = {supply_center_x_, supply_center_y_, supply_radius_};
     zones.base_buff = {base_buff_center_x_, base_buff_center_y_, base_buff_radius_};
     zones.our_outpost_buff = {our_outpost_center_x_, our_outpost_center_y_, our_outpost_radius_};
+    zones.enemy_outpost_buff = {enemy_outpost_center_x_, enemy_outpost_center_y_,
+                                enemy_outpost_radius_};
     zones.fort_buff = {fort_buff_center_x_, fort_buff_center_y_, fort_buff_radius_};
     const sentry_decision::Point2D pose = current_pose();
     const sentry_decision_sim::Occupancy occupancy =
         sentry_decision_sim::evaluate_occupancy(zones, pose.x, pose.y);
+
+    // 2027 前哨控制：只在比赛中推进，按真实步长结算（限制单拍步长，避免阻塞后瞬移）。
+    const TimePoint now = SteadyClock::now();
+    int dt_ms =
+        static_cast<int>(std::chrono::duration_cast<Duration>(now - last_outpost_tick_).count());
+    last_outpost_tick_ = now;
+    dt_ms = std::clamp(dt_ms, 0, 1000);
+    if (world_.game_status != static_cast<int>(sentry_decision::GameStatus::kRunning)) {
+      dt_ms = 0;
+    }
+    const sentry_decision_sim::OutpostControlState before_our = world_.our_outpost_control;
+    const sentry_decision_sim::OutpostControlState before_enemy = world_.enemy_outpost_control;
+    if (dt_ms > 0) {
+      sentry_decision_sim::step_outpost_control(&world_.our_outpost_control, &world_.our_outpost_hp,
+                                                occupancy.our_outpost_buff, dt_ms);
+      sentry_decision_sim::step_outpost_control(&world_.enemy_outpost_control,
+                                                &world_.enemy_outpost_hp,
+                                                occupancy.enemy_outpost_buff, dt_ms);
+    }
     sentry_decision_sim::apply_occupancy(&world_, occupancy);
+    sentry_decision_sim::apply_outpost_control_bits(&world_);
+    if (before_our.held_by_us != world_.our_outpost_control.held_by_us ||
+        before_our.full != world_.our_outpost_control.full) {
+      SD_LOG_ACT("sim", "己方前哨控制 -> %s", outpost_control_text(world_.our_outpost_control));
+    }
+    if (before_enemy.held_by_us != world_.enemy_outpost_control.held_by_us ||
+        before_enemy.full != world_.enemy_outpost_control.full) {
+      SD_LOG_ACT("sim", "敌方前哨控制 -> %s", outpost_control_text(world_.enemy_outpost_control));
+    }
   }
 
   void tick() {
@@ -820,9 +928,10 @@ class RefereeSimNode : public rclcpp::Node {
   TimePoint last_supply_tick_{};
   TimePoint last_remote_tick_{};
   TimePoint last_respawn_tick_{};
-  bool in_supply_ = false;
-  // 连续在补给区内的整秒数（进入当拍为 0），用于回血进入延时。
-  int supply_seconds_in_zone_ = 0;
+  TimePoint last_outpost_tick_{};
+  HealZone heal_zone_ = HealZone::kNone;
+  // 连续在回血区内的整秒数（进入当拍为 0），用于回血进入延时。
+  int heal_seconds_in_zone_ = 0;
   // 有效值由 declare_and_create_interfaces() 从 config/sim.yaml 写入；
   // 这里的零值只是构造期占位，不是可调参数。
   int max_hp_ = 0;
@@ -839,6 +948,9 @@ class RefereeSimNode : public rclcpp::Node {
   double our_outpost_center_x_ = 0.0;
   double our_outpost_center_y_ = 0.0;
   double our_outpost_radius_ = 0.0;
+  double enemy_outpost_center_x_ = 0.0;
+  double enemy_outpost_center_y_ = 0.0;
+  double enemy_outpost_radius_ = 0.0;
   double fort_buff_center_x_ = 0.0;
   double fort_buff_center_y_ = 0.0;
   double fort_buff_radius_ = 0.0;

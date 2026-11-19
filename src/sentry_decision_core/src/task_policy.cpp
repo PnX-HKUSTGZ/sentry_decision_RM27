@@ -1,5 +1,6 @@
 #include "sentry_decision_core/task_policy.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -43,6 +44,17 @@ bool low_threshold(const PolicyConfig& config, const char* key, int value) {
   return threshold.has_value() && static_cast<double>(value) <= threshold.value();
 }
 
+// 当前是否还有未领取的补给区免费发弹批次（每满 1 分钟 100 发）。
+bool free_ammo_available(const WorldState& world, const PolicyConfig& config) {
+  const auto duration = config.number("match.duration_s");
+  if (!duration.has_value()) {
+    return false;
+  }
+  const int elapsed =
+      std::max(0, static_cast<int>(duration.value()) - world.upstream.game_time_remaining);
+  return world.supply_claimed_minutes < elapsed / 60;
+}
+
 }  // namespace
 
 RuleBasedTaskPolicy::RuleBasedTaskPolicy(const PolicyConfig& config) : config_(config) {}
@@ -58,8 +70,33 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
     return plan_with(world, call("Respawn", RespawnParams{}));
   }
 
-  if (low_threshold(config_, "nav.retreat_hp", world.upstream.self_hp) ||
-      low_threshold(config_, "nav.low_ammo", world.upstream.self_ammo)) {
+  const bool low_hp = low_threshold(config_, "nav.retreat_hp", world.upstream.self_hp);
+  const bool low_ammo = low_threshold(config_, "nav.low_ammo", world.upstream.self_ammo);
+  const bool at_base = point_near(world, config_, std::string(points2027::kOwnBaseSupply));
+  const int remaining_exchange = 1000 - world.upstream.info1.ammo_exchanged_local;
+  const bool can_buy_ammo = at_base && remaining_exchange >= kResourceBatch &&
+                            world.upstream.coins >= kResourceBatch &&
+                            kResourceBatch % kAmmoExchangeUnit == 0;
+
+  // 低血优先回血。
+  if (low_hp) {
+    return plan_with(world,
+                     call("Heal", HealParams{std::string(points2027::kOwnBaseSupply), true}));
+  }
+
+  // 低弹但不在基地：先回基地。到基地后优先兑换，避免「Heal 已满血 -> 立刻成功 -> 再 Heal」
+  // 的空转（此时任务态会反复回到 idle，且弹药永远不增加）。
+  if (low_ammo && !at_base) {
+    return plan_with(world,
+                     call("Heal", HealParams{std::string(points2027::kOwnBaseSupply), true}));
+  }
+  if (low_ammo && can_buy_ammo) {
+    return plan_with(world, call("Resource", ResourceParams{std::string(points2027::kOwnBaseSupply),
+                                                            kResourceBatch}));
+  }
+  // 低弹且在基地但买不起：如果还有免费发弹批次，Heal 可领取；否则继续后续目标，
+  // 不能让 Heal 空转。
+  if (low_ammo && at_base && free_ammo_available(world, config_)) {
     return plan_with(world,
                      call("Heal", HealParams{std::string(points2027::kOwnBaseSupply), true}));
   }
@@ -74,8 +111,6 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   const bool previous_heal = history.previous_task.has_value() &&
                              history.previous_task->task == "Heal" &&
                              history.previous_task->status == TaskStatus::kSuccess;
-  const bool at_base = point_near(world, config_, std::string(points2027::kOwnBaseSupply));
-  const int remaining_exchange = 1000 - world.upstream.info1.ammo_exchanged_local;
   if (previous_heal && at_base && remaining_exchange >= kResourceBatch &&
       world.upstream.coins >= kResourceBatch && kResourceBatch % kAmmoExchangeUnit == 0) {
     return plan_with(world, call("Resource", ResourceParams{std::string(points2027::kOwnBaseSupply),
