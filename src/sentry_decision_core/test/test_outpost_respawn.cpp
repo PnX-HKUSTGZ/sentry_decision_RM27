@@ -32,6 +32,7 @@ void test_outpost_running_and_success() {
   world.upstream.valid = true;
   world.upstream.enemy_outpost_hp = 1000;
   world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
   TaskOutput running = task.tick(world, now);
   CHECK(running.status == TaskStatus::kRunning);
   CHECK(running.task_state == TaskState::kOutpost);
@@ -52,9 +53,56 @@ void test_outpost_fails_if_owned() {
   world.upstream.valid = true;
   world.upstream.our_outpost_hp = 1000;
   world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
   TaskOutput out = task.tick(world, now);
   CHECK(out.status == TaskStatus::kFailure);
-  CHECK(out.detail == "目标前哨站已被己方控制");
+  CHECK(out.detail == "目标前哨站归属我方");
+}
+
+void test_outpost_unknown_owner_fails() {
+  OutpostTask task;
+  const TimePoint now{};
+  task.start(outpost_call(Side::kEnemy), now);
+
+  WorldState world;
+  world.self.valid = true;
+  world.upstream.valid = true;
+  world.upstream.enemy_outpost_hp = 1000;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kUnknown;
+  const TaskOutput out = task.tick(world, now);
+  CHECK(out.status == TaskStatus::kFailure);
+  CHECK(out.detail == "目标前哨站归属未知");
+}
+
+void test_outpost_temporary_enemy_owner_runs() {
+  OutpostTask task;
+  const TimePoint now{};
+  task.start(outpost_call(Side::kEnemy), now);
+
+  WorldState world;
+  world.self.valid = true;
+  world.upstream.valid = true;
+  world.upstream.enemy_outpost_hp = 1000;
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnTemporary;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
+  const TaskOutput out = task.tick(world, now);
+  CHECK(out.status == TaskStatus::kRunning);
+}
+
+void test_outpost_full_is_success() {
+  OutpostTask task;
+  const TimePoint now{};
+  task.start(outpost_call(Side::kEnemy), now);
+
+  WorldState world;
+  world.self.valid = true;
+  world.upstream.valid = true;
+  world.upstream.enemy_outpost_hp = 500;
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
+  const TaskOutput out = task.tick(world, now);
+  CHECK(out.status == TaskStatus::kSuccess);
 }
 
 void test_outpost_own_side_uses_own_hp() {
@@ -68,6 +116,7 @@ void test_outpost_own_side_uses_own_hp() {
   world.upstream.our_outpost_hp = 500;
   world.upstream.enemy_outpost_hp = 0;
   world.upstream.our_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.our_outpost_owner = OutpostOwner::kEnemy;
   TaskOutput out = task.tick(world, now);
   CHECK(out.status == TaskStatus::kRunning);
   CHECK(out.metrics.at("outpost_hp") == 500.0);
@@ -131,6 +180,9 @@ void test_respawn_rejects_wrong_params() {
 int main() {
   test_outpost_running_and_success();
   test_outpost_fails_if_owned();
+  test_outpost_unknown_owner_fails();
+  test_outpost_temporary_enemy_owner_runs();
+  test_outpost_full_is_success();
   test_outpost_own_side_uses_own_hp();
   test_outpost_rejects_wrong_params();
   test_respawn_waits_then_succeeds();

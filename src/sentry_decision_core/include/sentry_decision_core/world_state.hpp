@@ -38,6 +38,10 @@ struct UpstreamState {
   OutpostControl our_outpost_control = OutpostControl::kNotOwned;
   OutpostControl enemy_outpost_control = OutpostControl::kNotOwned;
 
+  // 前哨站建筑归属：由 WorldModel 依据控制转换 / 重建事件维护。
+  OutpostOwner our_outpost_owner = OutpostOwner::kUnknown;
+  OutpostOwner enemy_outpost_owner = OutpostOwner::kUnknown;
+
   // 自身状态（SentryInfoOnline + SentryInfoOffline）
   int self_hp = 0;
   int self_ammo = 0;

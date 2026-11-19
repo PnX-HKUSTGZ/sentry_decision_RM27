@@ -690,6 +690,12 @@ class RefereeSimNode : public rclcpp::Node {
     zones.enemy_outpost_buff = {enemy_outpost_center_x_, enemy_outpost_center_y_,
                                 enemy_outpost_radius_};
     zones.fort_buff = {fort_buff_center_x_, fort_buff_center_y_, fort_buff_radius_};
+    for (const sentry_decision_sim::SimZone& zone : sim_.our_highland) {
+      zones.our_highland.push_back({zone.x, zone.y, zone.radius});
+    }
+    for (const sentry_decision_sim::SimZone& zone : sim_.enemy_highland) {
+      zones.enemy_highland.push_back({zone.x, zone.y, zone.radius});
+    }
     const sentry_decision::Point2D pose = current_pose();
     const sentry_decision_sim::Occupancy occupancy =
         sentry_decision_sim::evaluate_occupancy(zones, pose.x, pose.y);
@@ -706,11 +712,12 @@ class RefereeSimNode : public rclcpp::Node {
     const sentry_decision_sim::OutpostControlState before_our = world_.our_outpost_control;
     const sentry_decision_sim::OutpostControlState before_enemy = world_.enemy_outpost_control;
     if (dt_ms > 0) {
-      sentry_decision_sim::step_outpost_control(&world_.our_outpost_control, &world_.our_outpost_hp,
-                                                occupancy.our_outpost_buff, dt_ms);
-      sentry_decision_sim::step_outpost_control(&world_.enemy_outpost_control,
-                                                &world_.enemy_outpost_hp,
-                                                occupancy.enemy_outpost_buff, dt_ms);
+      sentry_decision_sim::step_outpost_control(
+          &world_.our_outpost_control, &world_.our_outpost_hp,
+          occupancy.our_outpost_buff || occupancy.our_highland, dt_ms);
+      sentry_decision_sim::step_outpost_control(
+          &world_.enemy_outpost_control, &world_.enemy_outpost_hp,
+          occupancy.enemy_outpost_buff || occupancy.enemy_highland, dt_ms);
     }
     sentry_decision_sim::apply_occupancy(&world_, occupancy);
     sentry_decision_sim::apply_outpost_control_bits(&world_);

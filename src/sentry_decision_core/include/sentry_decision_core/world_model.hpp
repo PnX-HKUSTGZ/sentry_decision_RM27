@@ -22,6 +22,10 @@ class WorldModel {
   WorldState snapshot(TimePoint now);
 
  private:
+  void update_outpost_owner(OutpostOwner* owner, int* previous_hp, bool* pending,
+                            TimePoint* pending_at, int hp, OutpostControl control,
+                            TimePoint now);
+
   UpstreamSource& upstream_;
   OdometrySource& odometry_;
   NavigationSink& navigation_;
@@ -29,6 +33,17 @@ class WorldModel {
   bool upstream_was_valid_ = true;
   bool odometry_was_valid_ = true;
   bool navigation_was_valid_ = true;
+
+  // 前哨站建筑归属 belief：开局己方半场归己方、敌方半场归敌方；
+  // 血量上升视为重建，归属反转到「另一方」，1 s 后用 full 控制方校正。
+  OutpostOwner our_outpost_owner_ = OutpostOwner::kOwn;
+  OutpostOwner enemy_outpost_owner_ = OutpostOwner::kEnemy;
+  int previous_our_outpost_hp_ = -1;
+  int previous_enemy_outpost_hp_ = -1;
+  bool our_rebuild_pending_ = false;
+  bool enemy_rebuild_pending_ = false;
+  TimePoint our_rebuild_at_{};
+  TimePoint enemy_rebuild_at_{};
 };
 
 }  // namespace sentry_decision

@@ -35,7 +35,7 @@ export function createIntentsPanel(el) {
       html += row('参数', task ? code(task.params) : '-');
       html += row('指标', task ? code(task.metrics) : '-');
       html += row(
-        '上一次',
+        '上次任务',
         previous ? escapeHtml(previous.id) + ' / ' + taskStatusName(previous.status) : '-',
         'section-start'
       );

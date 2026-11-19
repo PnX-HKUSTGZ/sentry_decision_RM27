@@ -45,6 +45,37 @@ bool load_zone(const YAML::Node& node,
   return true;
 }
 
+// 读取一组圆形增益区：points 是命名点列表，半径同样取自地图点第 4 位。
+bool load_zones(const YAML::Node& node,
+                const std::map<std::string, sentry_decision::Point2D>& points,
+                const std::map<std::string, double>& radii, const char* label,
+                std::vector<SimZone>* out, std::string* error) {
+  if (!node) {
+    return true;
+  }
+  const YAML::Node list = node["points"];
+  if (!list || !list.IsSequence() || list.size() == 0) {
+    *error = std::string(label) + ": 需要非空的 points 列表";
+    return false;
+  }
+  out->clear();
+  for (const YAML::Node& item : list) {
+    const std::string point = item.as<std::string>();
+    const auto it = points.find(point);
+    if (it == points.end()) {
+      *error = std::string(label) + ": 未知命名点 '" + point + "'";
+      return false;
+    }
+    const auto radius_it = radii.find(point);
+    if (radius_it == radii.end() || !(radius_it->second > 0.0)) {
+      *error = std::string(label) + ": 地图点 '" + point + "' 缺少正半径（点第 4 位）";
+      return false;
+    }
+    out->push_back(SimZone{it->second.x, it->second.y, radius_it->second});
+  }
+  return true;
+}
+
 }  // namespace
 
 bool load_sim_config(const std::string& path, SimConfig* out, std::string* error) {
@@ -111,7 +142,11 @@ bool load_sim_config(const std::string& path, SimConfig* out, std::string* error
           !load_zone(zones["enemy_outpost"], points, radii, "enemy_outpost", &out->enemy_outpost_x,
                      &out->enemy_outpost_y, &out->enemy_outpost_radius, error) ||
           !load_zone(zones["fort_buff"], points, radii, "fort_buff", &out->fort_x, &out->fort_y,
-                     &out->fort_radius, error)) {
+                     &out->fort_radius, error) ||
+          !load_zones(zones["our_highland"], points, radii, "our_highland", &out->our_highland,
+                      error) ||
+          !load_zones(zones["enemy_highland"], points, radii, "enemy_highland",
+                      &out->enemy_highland, error)) {
         return false;
       }
     }

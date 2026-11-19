@@ -29,14 +29,17 @@ bool set_outpost_control(OutpostControlState* state, int value) {
     case 0:  // 己方完全控制
       state->held_by_us = true;
       state->full = true;
+      state->owner_is_us = true;
       break;
-    case 1:  // 己方临时控制
+    case 1:  // 己方临时控制：正常路径为「敌方完全控制 -> 我方临时」
       state->held_by_us = true;
       state->full = false;
+      state->owner_is_us = false;
       break;
     case 2:  // 己方未控制（由对方控制）
       state->held_by_us = false;
       state->full = true;
+      state->owner_is_us = false;
       break;
     default:
       return false;
@@ -194,6 +197,10 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
       *error = "enemy_outpost_control 只能是 0（完全）/ 1（临时）/ 2（未控制）";
       return false;
     }
+  } else if (field == "our_outpost_owner") {
+    world->our_outpost_control.owner_is_us = number != 0.0;
+  } else if (field == "enemy_outpost_owner") {
+    world->enemy_outpost_control.owner_is_us = number != 0.0;
   } else if (field == "enemy_at_our_outpost_buff") {
     world->our_outpost_control.enemy_present = number != 0.0;
   } else if (field == "enemy_at_enemy_outpost_buff") {
@@ -527,6 +534,12 @@ Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
   occupancy.our_outpost_buff = zones.our_outpost_buff.contains(x, y);
   occupancy.enemy_outpost_buff = zones.enemy_outpost_buff.contains(x, y);
   occupancy.fort_buff = zones.fort_buff.contains(x, y);
+  for (const GainZone& zone : zones.our_highland) {
+    occupancy.our_highland = occupancy.our_highland || zone.contains(x, y);
+  }
+  for (const GainZone& zone : zones.enemy_highland) {
+    occupancy.enemy_highland = occupancy.enemy_highland || zone.contains(x, y);
+  }
   return occupancy;
 }
 
@@ -585,8 +598,13 @@ void step_outpost_control(OutpostControlState* state, int* hp, bool our_active, 
     state->full = true;
     state->challenge_ms = 0;
     state->holder_absent_ms = 0;
-    if (hp != nullptr && *hp <= 0) {
-      *hp = 500;  // 规则 5.6.1：击毁后完成控制转换，前哨站以 500 血重建。
+    // 规则 5.6.1：只有完全控制换到「另一方」时才重建 500 血。
+    // 同方完全控制恢复不重建，已毁前哨站保持 0 血。
+    if (state->held_by_us != state->owner_is_us) {
+      state->owner_is_us = state->held_by_us;
+      if (hp != nullptr && *hp <= 0) {
+        *hp = 500;
+      }
     }
   }
 }
@@ -596,22 +614,21 @@ void destroy_outpost(OutpostControlState* state, int* hp, bool by_us) {
     return;
   }
   const bool destroyer_is_holder = state->held_by_us == by_us;
-  if (destroyer_is_holder) {
-    if (state->full) {
-      // 控制方自己击毁（仿真里只可能来自手动效果）：完全 -> 临时。
-      state->full = false;
-      *hp = 0;
-    } else {
-      // 临时控制方击毁：临时 -> 完全，前哨站重建为 500 血。
-      state->full = true;
-      *hp = 500;
-    }
-  } else if (state->full) {
-    // 对方完全控制的前哨站被击毁：完全 -> 临时（对方），等待其离开 5 s。
+  if (state->full) {
+    // 完全控制被击毁：控制方转为临时，归属不变；等待其离开 5 s。
     state->full = false;
     *hp = 0;
+  } else if (destroyer_is_holder) {
+    // 临时控制方击毁：临时 -> 完全。只有换成另一方时才重建 500 血。
+    state->full = true;
+    if (state->held_by_us != state->owner_is_us) {
+      state->owner_is_us = state->held_by_us;
+      *hp = 500;
+    } else {
+      *hp = 0;
+    }
   } else {
-    // 对方临时控制且被非控制方击毁：保持临时，血量归零。
+    // 非控制方击毁临时控制的前哨站：保持临时，血量归零。
     *hp = 0;
   }
   state->challenge_ms = 0;
@@ -649,6 +666,9 @@ void apply_occupancy(SimWorld* world, const Occupancy& occupancy) {
   const bool enemy_outpost_controlled = world->enemy_outpost_control.held_by_us;
   set_bits(&event, 22, 3, our_outpost_controlled ? (occupancy.our_outpost_buff ? 1u : 0u) : 4u);
   set_bits(&event, 25, 3, enemy_outpost_controlled ? (occupancy.enemy_outpost_buff ? 1u : 0u) : 4u);
+  // 中央高地增益点：bit 18-19 / 20-21；未控制对应阵地时发送 3。
+  set_bits(&event, 18, 2, our_outpost_controlled ? (occupancy.our_highland ? 1u : 0u) : 3u);
+  set_bits(&event, 20, 2, enemy_outpost_controlled ? (occupancy.enemy_highland ? 1u : 0u) : 3u);
   world->event_code = event;
 }
 

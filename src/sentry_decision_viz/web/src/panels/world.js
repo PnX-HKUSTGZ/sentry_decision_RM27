@@ -18,11 +18,25 @@ export function createWorldPanel(el) {
       html += row('金币', w.coins);
       html += row(
         '己方前哨 / 基地',
-        w.ourOutpostHp + ' / ' + w.baseHp + '（前哨 ' + w.ourOutpostControlName + '）'
+        w.ourOutpostHp +
+          ' / ' +
+          w.baseHp +
+          '（' +
+          w.ourOutpostControlName +
+          '，归属 ' +
+          w.ourOutpostOwnerName +
+          '）'
       );
       html += row(
         '敌方前哨 / 基地',
-        w.enemyOutpostHp + ' / ' + w.enemyBaseHp + '（前哨 ' + w.enemyOutpostControlName + '）'
+        w.enemyOutpostHp +
+          ' / ' +
+          w.enemyBaseHp +
+          '（' +
+          w.enemyOutpostControlName +
+          '，归属 ' +
+          w.enemyOutpostOwnerName +
+          '）'
       );
       html += row('剩余时间', w.gameTime + ' s');
       html += row('比赛阶段', w.gameStatus);

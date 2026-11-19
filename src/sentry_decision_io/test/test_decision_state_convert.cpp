@@ -57,6 +57,8 @@ void test_world_state_conversion() {
   world.upstream.enemy_outpost_hp = 1200;
   world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
   world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.our_outpost_owner = OutpostOwner::kEnemy;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kOwn;
   world.upstream.enemy_base_hp = 5000;
   world.upstream.can_rebuild_outpost = true;
   world.upstream.info2.stance = SentryStance::kMove;
@@ -88,6 +90,8 @@ void test_world_state_conversion() {
   CHECK(msg.enemy_outpost_hp == 1200);
   CHECK(msg.our_outpost_control == static_cast<std::uint8_t>(OutpostControl::kOwnTemporary));
   CHECK(msg.enemy_outpost_control == static_cast<std::uint8_t>(OutpostControl::kNotOwned));
+  CHECK(msg.our_outpost_owner == static_cast<std::uint8_t>(OutpostOwner::kEnemy));
+  CHECK(msg.enemy_outpost_owner == static_cast<std::uint8_t>(OutpostOwner::kOwn));
   CHECK(msg.enemy_base_hp == 5000);
   CHECK(msg.can_rebuild_outpost);
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kMove));

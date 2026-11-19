@@ -46,7 +46,7 @@ DecisionCommand → auto-aim → MCU
 
 ## 3. 关键状态
 
-- `WorldState`：`OutpostControl`、`supply_claimed_minutes` 等。
+- `WorldState`：`OutpostControl`、`OutpostOwner`（由重建事件维护）、`supply_claimed_minutes` 等。
 - `TaskSnapshot`：当前任务、`call`、`TaskState`、阶段、进度、metrics。
 - `TaskResult`：成功 / 失败 / 超时 / abort，只保留上一次给 `HistoryView`。
 - `TaskPlan.valid_for`：计划新鲜度（默认 1 s）。

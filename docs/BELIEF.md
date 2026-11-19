@@ -72,6 +72,8 @@ flowchart LR
 | `can_rebuild_outpost` | bool | `GameInfo.can_rebuild_outpost` | 己方是否可重建前哨站 |
 | `our_outpost_control` | `OutpostControl` | `event_data` bit 28-29 映射 | 己方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
 | `enemy_outpost_control` | `OutpostControl` | `event_data` bit 30-31 映射 | 对方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
+| `our_outpost_owner` | `OutpostOwner` | `WorldModel` belief | 己方半场前哨站归属：我方 / 敌方 / 未知 |
+| `enemy_outpost_owner` | `OutpostOwner` | `WorldModel` belief | 对方半场前哨站归属：我方 / 敌方 / 未知 |
 | `self_hp` | int | `SentryInfoOnline.self_health` | 自身血量 |
 | `self_ammo` | int | `SentryInfoOnline.bullets_remaining` | 自身允许发弹量 |
 | `cooling_value` | int | `SentryInfoOnline.cooling_value` | 冷却值 |
@@ -94,6 +96,11 @@ flowchart LR
 > `enemy_outpost_control` 写入 `UpstreamState`，Task 层不再看到恒定的 `kNotOwned`。
 > R/B → own/enemy 的映射在本层用 `RosIoNode` 的 `own_color` 参数做一次，Task 层不出现红蓝。
 > `GameInfo.event_code_2` 已加入消息，auto-aim 已转发；MCU 固件未按 33 B 上行前按 0 处理，此时基地控制状态不可用，前哨控制不受影响。
+>
+> **前哨站归属 belief**：前哨站不会回血，HP 上升只可能来自重建。按规则 5.6.1，
+> 重建只发生在「一方完全控制 -> 另一方完全控制」，因此 HP 上升时归属反转；
+> 1 s 后若能看到 full 控制方，用它校正。`kOwnTemporary` 不用于校正，因为
+> 「我方临时控制」也可能对应敌方归属。归属我方 / 未知时 `Outpost` 不允许攻击。
 
 > 复活（规则 5.2.2）：`info1.can_free_resurrect`（bit 19）表示当前可否确认免费复活，
 > 仿真裁判在待复活（`self_hp<=0`）期间置 1；`can_instant_resurrect`（bit 20）与成本（bit 21-30）

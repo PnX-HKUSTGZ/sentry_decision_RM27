@@ -34,6 +34,11 @@ gain_zones:
   our_outpost:   { point: own_outpost_buff }
   enemy_outpost: { point: enemy_outpost_buff }
   fort_buff:     { point: own_fort }
+  # 中央高地增益点：每侧由两个打击点组成，半径 0.5 m。
+  our_highland:
+    points: [own_outpost_side, enemy_outpost_opposite]
+  enemy_highland:
+    points: [enemy_outpost_side, own_outpost_opposite]
 # 面板「仿真效果」按钮的步长：对仿真世界真实值做减法（摧毁类直接置 0，无需步长）。
 effects:
   self_damage: 100

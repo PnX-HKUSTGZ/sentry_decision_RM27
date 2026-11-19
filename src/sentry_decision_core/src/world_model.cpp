@@ -15,6 +15,45 @@ WorldModel::WorldModel(UpstreamSource& upstream, OdometrySource& odometry,
                        NavigationSink& navigation, WorldTimeouts timeouts)
     : upstream_(upstream), odometry_(odometry), navigation_(navigation), timeouts_(timeouts) {}
 
+void WorldModel::update_outpost_owner(OutpostOwner* owner, int* previous_hp, bool* pending,
+                                      TimePoint* pending_at, int hp, OutpostControl control,
+                                      TimePoint now) {
+  // 前哨站不会回血；HP 上升只可能来自重建。按规则 5.6.1，重建只发生在
+  // 「一方完全控制 -> 另一方完全控制」，因此归属反转。
+  if (*previous_hp >= 0 && hp > *previous_hp) {
+    switch (*owner) {
+      case OutpostOwner::kOwn:
+        *owner = OutpostOwner::kEnemy;
+        break;
+      case OutpostOwner::kEnemy:
+        *owner = OutpostOwner::kOwn;
+        break;
+      case OutpostOwner::kUnknown:
+      default:
+        break;
+    }
+    *pending = true;
+    *pending_at = now;
+  }
+
+  // 1 s 后若已经能看到 full 控制方，用它校正；kOwnTemporary 不校正，
+  // 因为「我方临时控制」也可能对应敌方归属。
+  if (*pending && now - *pending_at >= Duration{1000}) {
+    if (control == OutpostControl::kOwnFull) {
+      *owner = OutpostOwner::kOwn;
+    } else if (control == OutpostControl::kNotOwned) {
+      *owner = OutpostOwner::kEnemy;
+    }
+    *pending = false;
+  }
+
+  // full 控制是最强证据，随时校正。
+  if (control == OutpostControl::kOwnFull) {
+    *owner = OutpostOwner::kOwn;
+  }
+  *previous_hp = hp;
+}
+
 WorldState WorldModel::snapshot(TimePoint now) {
   WorldState state;
   state.stamp = now;
@@ -23,6 +62,23 @@ WorldState WorldModel::snapshot(TimePoint now) {
   const bool has_upstream = upstream_.upstream(&upstream);
   upstream.valid = has_upstream && upstream.valid && fresh(upstream.stamp, now, timeouts_.upstream);
   state.upstream = upstream;
+  if (!upstream.valid || upstream.game_status != GameStatus::kRunning) {
+    our_outpost_owner_ = OutpostOwner::kOwn;
+    enemy_outpost_owner_ = OutpostOwner::kEnemy;
+    previous_our_outpost_hp_ = -1;
+    previous_enemy_outpost_hp_ = -1;
+    our_rebuild_pending_ = false;
+    enemy_rebuild_pending_ = false;
+  } else {
+    update_outpost_owner(&our_outpost_owner_, &previous_our_outpost_hp_,
+                         &our_rebuild_pending_, &our_rebuild_at_, upstream.our_outpost_hp,
+                         upstream.our_outpost_control, now);
+    update_outpost_owner(&enemy_outpost_owner_, &previous_enemy_outpost_hp_,
+                         &enemy_rebuild_pending_, &enemy_rebuild_at_, upstream.enemy_outpost_hp,
+                         upstream.enemy_outpost_control, now);
+  }
+  state.upstream.our_outpost_owner = our_outpost_owner_;
+  state.upstream.enemy_outpost_owner = enemy_outpost_owner_;
   if (upstream_was_valid_ != upstream.valid) {
     if (upstream.valid) {
       SD_LOG_ACT("world_model", "upstream data recovered");

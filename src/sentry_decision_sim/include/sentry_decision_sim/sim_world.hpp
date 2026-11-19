@@ -33,14 +33,17 @@ struct RespawnState {
 //   - 对方临时控制 -> 对方连续 5 s 不激活 -> 我方完全控制；
 //   - 前哨站被击毁时，控制方在完全 / 临时之间切换；临时控制方击毁后转为完全控制。
 //
-// held_by_us / full 共同表示「谁控制、是否完全控制」；challenge_ms 是挑战方
-// 连续激活增益点的累计时长；holder_absent_ms 是临时控制方连续不激活的时长。
+// held_by_us / full 共同表示「谁控制、是否完全控制」；owner_is_us 表示前哨站
+// 建筑归属（相对我方）。临时控制不改变归属；只有「一方完全控制 -> 另一方完全
+// 控制」时才重建并更新归属。challenge_ms 是挑战方连续激活增益点的累计时长；
+// holder_absent_ms 是临时控制方连续不激活的时长。
 //
-// 当前仿真只以对应前哨站增益点作为占点输入；中央高地增益点尚未标定，
-// 接入时把其区域并入对应前哨的 active 判定即可。
+// 占点输入包括对应前哨站增益点和中央高地增益点，两者在 evaluate_occupancy()
+// 里分别给出，由调用方并入 active 判定。
 struct OutpostControlState {
   bool held_by_us = false;
   bool full = true;
+  bool owner_is_us = true;
   bool enemy_present = false;  // 仿真输入：敌方机器人是否激活该前哨站增益点
   int challenge_ms = 0;
   int holder_absent_ms = 0;
@@ -89,8 +92,8 @@ struct SimWorld {
 
   // 2027 前哨阵地控制状态（仿真专属，写入 event_code bit 22-31）。
   // 开局时己方半场完全控制，敌方半场由对方完全控制。
-  OutpostControlState our_outpost_control{true, true};
-  OutpostControlState enemy_outpost_control{false, true};
+  OutpostControlState our_outpost_control{true, true, true};
+  OutpostControlState enemy_outpost_control{false, true, false};
 
   // TeamInfo
   int base_hp = 0;
@@ -195,13 +198,15 @@ struct GainZone {
   }
 };
 
-// 仿真场上的增益点区域（己方 / 敌方前哨站各一个）。
+// 仿真场上的增益点区域。中央高地增益点由多个圆组成（每侧两个打击点）。
 struct GainZones {
   GainZone supply;              // 己方补给区
   GainZone base_buff;           // 己方基地增益点
   GainZone our_outpost_buff;    // 己方前哨站增益点
   GainZone enemy_outpost_buff;  // 敌方前哨站增益点
   GainZone fort_buff;           // 己方堡垒增益点
+  std::vector<GainZone> our_highland;    // 己方中央高地增益点
+  std::vector<GainZone> enemy_highland;  // 敌方中央高地增益点
 };
 
 struct Occupancy {
@@ -210,6 +215,8 @@ struct Occupancy {
   bool our_outpost_buff = false;
   bool enemy_outpost_buff = false;
   bool fort_buff = false;
+  bool our_highland = false;
+  bool enemy_highland = false;
 
   // 规则表 5-8：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点之一。
   // 前哨站的「完全控制」条件由 EventCode::local_ammo_exchange_point() 判断。

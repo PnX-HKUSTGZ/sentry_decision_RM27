@@ -41,6 +41,7 @@ WorldState make_world() {
   world.upstream.self_ammo = 100;
   world.upstream.enemy_outpost_hp = 1000;
   world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
   return world;
 }
 

@@ -52,6 +52,9 @@ void test_apply_world_field() {
   CHECK(apply_world_field(&world, "enemy_outpost_control", number(1), &error));
   CHECK(world.enemy_outpost_control.held_by_us);
   CHECK(!world.enemy_outpost_control.full);
+  CHECK(!world.enemy_outpost_control.owner_is_us);
+  CHECK(apply_world_field(&world, "enemy_outpost_owner", boolean(false), &error));
+  CHECK(!world.enemy_outpost_control.owner_is_us);
   CHECK(apply_world_field(&world, "enemy_at_our_outpost_buff", boolean(true), &error));
   CHECK(world.our_outpost_control.enemy_present);
   CHECK(!apply_world_field(&world, "enemy_outpost_control", number(3), &error));

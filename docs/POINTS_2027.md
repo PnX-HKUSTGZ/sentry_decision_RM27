@@ -10,7 +10,7 @@
 - 命名点按**己方视角**固定：`own_*` 在己方半场，`enemy_*` 在对方半场。
 - Task 层只看到 `own` / `enemy`，不区分红蓝。
 - 2027 裁判事件位是 R/B；只在 IO / Belief 层用 `own_color` 映射一次，不进入 `TaskPlan` / `TaskState` / 命名点。
-- `own_base_supply`、`own_outpost_buff` 等区域点的第 4 位是区域半径；打击点半径填 0 或省略。
+- `own_base_supply`、`own_outpost_buff` 等区域点的第 4 位是区域半径；`front` 等纯打击点填 0 或省略；`side` / `opposite` 同时是高地增益点，填 0.5。
 - 导航到达半径由 `Navigate.arrive_radius` 决定（默认 0.2 m），不复用区域半径。
 
 ## 2. 点位清单（11 个）
@@ -24,12 +24,13 @@
 | `enemy_outpost_buff` | outpost_buff | 对方前哨站正下方增益点；己方完全控制时可用于 `Heal` |
 | `own_outpost_front` | strike | 己方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
 | `enemy_outpost_front` | strike | 对方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
-| `own_outpost_side` | strike_highland | 己方前哨站侧方打击点：同侧高地增益点内，较近但危险 |
-| `enemy_outpost_side` | strike_highland | 对方前哨站侧方打击点：同侧高地增益点内，较近但危险 |
-| `own_outpost_opposite` | strike_highland | 己方前哨站对面打击点：对侧高地增益点内，较远、较安全 |
-| `enemy_outpost_opposite` | strike_highland | 对方前哨站对面打击点：对侧高地增益点内，较远、较安全 |
+| `own_outpost_side` | strike_highland | 己方前哨站侧方打击点：同侧高地增益点内，较近但危险；半径 0.5 m |
+| `enemy_outpost_side` | strike_highland | 对方前哨站侧方打击点：同侧高地增益点内，较近但危险；半径 0.5 m |
+| `own_outpost_opposite` | strike_highland | 己方前哨站对面打击点：对侧高地增益点内，较远、较安全；半径 0.5 m |
+| `enemy_outpost_opposite` | strike_highland | 对方前哨站对面打击点：对侧高地增益点内，较远、较安全；半径 0.5 m |
 
-> `side` 和 `opposite` 都在高地增益点内，享有 25% 防御增益；`front` 不在增益点内。
+> `side` 和 `opposite` 都在高地增益点内，享有 25% 防御增益，并可作为前哨阵地的占点输入；`front` 不在增益点内。
+> 仿真中己方高地为 `own_outpost_side` + `enemy_outpost_opposite`，敌方高地为 `enemy_outpost_side` + `own_outpost_opposite`，半径均 0.5 m。
 > 四个 `*_outpost_front/side/opposite` 都是打击点，不需要区域半径。
 > “同侧 / 对侧”以中央高地为参照：同侧 = 靠近该前哨站的一侧高地，对侧 = 跨过中央高地的另一侧高地。
 

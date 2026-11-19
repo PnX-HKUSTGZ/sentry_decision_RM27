@@ -32,23 +32,32 @@ TaskOutput OutpostTask::tick(const WorldState& world, TimePoint) {
     return out;
   }
 
-  const int hp = params_.target_side == Side::kOwn ? world.upstream.our_outpost_hp
-                                                   : world.upstream.enemy_outpost_hp;
-  const OutpostControl control = params_.target_side == Side::kOwn
-                                     ? world.upstream.our_outpost_control
-                                     : world.upstream.enemy_outpost_control;
+  const bool own_side = params_.target_side == Side::kOwn;
+  const int hp = own_side ? world.upstream.our_outpost_hp : world.upstream.enemy_outpost_hp;
+  const OutpostControl control = own_side ? world.upstream.our_outpost_control
+                                          : world.upstream.enemy_outpost_control;
+  const OutpostOwner owner = own_side ? world.upstream.our_outpost_owner
+                                      : world.upstream.enemy_outpost_owner;
   out.metrics["outpost_hp"] = static_cast<double>(hp);
   out.metrics["outpost_control"] = static_cast<double>(control);
+  out.metrics["outpost_owner"] = static_cast<double>(owner);
 
+  // 只允许攻击敌方归属的前哨站；己方归属 / 未知一律不攻击。
+  if (owner != OutpostOwner::kEnemy) {
+    out.status = TaskStatus::kFailure;
+    out.detail = owner == OutpostOwner::kOwn ? "目标前哨站归属我方" : "目标前哨站归属未知";
+    return out;
+  }
   if (hp <= 0) {
     out.status = TaskStatus::kSuccess;
     out.progress = 1.0f;
     out.detail = "目标前哨站已被击毁";
     return out;
   }
-  if (control != OutpostControl::kNotOwned) {
-    out.status = TaskStatus::kFailure;
-    out.detail = "目标前哨站已被己方控制";
+  if (control == OutpostControl::kOwnFull) {
+    out.status = TaskStatus::kSuccess;
+    out.progress = 1.0f;
+    out.detail = "目标前哨站已由我方完全控制";
     return out;
   }
 

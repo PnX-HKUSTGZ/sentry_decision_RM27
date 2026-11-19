@@ -5,7 +5,8 @@ import { fieldExtent } from './field.js';
 
 export const TASK_STATES = ['idle', 'navigate', 'scan', 'outpost', 'resource', 'heal', 'respawn'];
 export const TASK_STATUSES = ['idle', 'running', 'success', 'failure', 'timeout', 'aborted'];
-export const OUTPOST_CONTROLS = ['我方完全控制', '我方临时控制', '敌方控制（未区分）'];
+export const OUTPOST_CONTROLS = ['我方完全控制', '我方临时控制', '敌方控制'];
+export const OUTPOST_OWNERS = ['未知', '我方', '敌方'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 // 比赛阶段：0 未开始 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中 / 5 结算。
 export const GAME_STAGES = ['未开始', '准备', '15s自检', '5s倒计时', '比赛中', '比赛结算'];
@@ -20,6 +21,10 @@ export function taskStatusName(status) {
 
 export function outpostControlName(control) {
   return OUTPOST_CONTROLS[control] || '未知';
+}
+
+export function outpostOwnerName(owner) {
+  return OUTPOST_OWNERS[owner] || '未知';
 }
 
 export function stanceName(stance) {
@@ -55,9 +60,13 @@ export function worldStateToView(msg) {
     ourOutpostHp: msg.our_outpost_hp,
     ourOutpostControl: msg.our_outpost_control,
     ourOutpostControlName: outpostControlName(msg.our_outpost_control),
+    ourOutpostOwner: msg.our_outpost_owner || 0,
+    ourOutpostOwnerName: outpostOwnerName(msg.our_outpost_owner || 0),
     enemyOutpostHp: msg.enemy_outpost_hp,
     enemyOutpostControl: msg.enemy_outpost_control,
     enemyOutpostControlName: outpostControlName(msg.enemy_outpost_control),
+    enemyOutpostOwner: msg.enemy_outpost_owner || 0,
+    enemyOutpostOwnerName: outpostOwnerName(msg.enemy_outpost_owner || 0),
     enemyBaseHp: msg.enemy_base_hp,
     canRebuild: msg.can_rebuild_outpost,
     upstreamValid: msg.upstream_valid,

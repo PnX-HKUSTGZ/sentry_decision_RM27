@@ -20,6 +20,13 @@ enum class OutpostControl : std::uint8_t {
   kNotOwned = 2,
 };
 
+// 前哨站建筑归属（相对己方）；由控制转换与重建事件维护。
+enum class OutpostOwner : std::uint8_t {
+  kUnknown = 0,
+  kOwn = 1,
+  kEnemy = 2,
+};
+
 // 下行执行状态：只表示当前在做什么。
 enum class TaskState : std::uint8_t {
   kIdle = 0,

@@ -128,6 +128,115 @@ void test_unavailable_source() {
   CHECK(!state.nav.valid);
 }
 
+WorldModel make_owner_model(FakeUpstream* upstream, FakeOdometry* odometry,
+                            FakeNavigation* navigation) {
+  const TimePoint t0{};
+  upstream->state.stamp = t0;
+  upstream->state.valid = true;
+  upstream->state.game_status = GameStatus::kRunning;
+  upstream->state.our_outpost_hp = 1000;
+  upstream->state.our_outpost_control = OutpostControl::kOwnFull;
+  upstream->state.enemy_outpost_hp = 1000;
+  upstream->state.enemy_outpost_control = OutpostControl::kNotOwned;
+  odometry->state.stamp = t0;
+  odometry->state.valid = true;
+  navigation->state.stamp = t0;
+  navigation->state.valid = true;
+  return WorldModel(*upstream, *odometry, *navigation,
+                    WorldTimeouts{Duration{10000}, Duration{10000}, Duration{10000}});
+}
+
+void test_outpost_owner_rebuild_toggles() {
+  const TimePoint t0{};
+  FakeUpstream upstream;
+  FakeOdometry odometry;
+  FakeNavigation navigation;
+  WorldModel model = make_owner_model(&upstream, &odometry, &navigation);
+
+  const WorldState initial = model.snapshot(t0);
+  CHECK(initial.upstream.our_outpost_owner == OutpostOwner::kOwn);
+  CHECK(initial.upstream.enemy_outpost_owner == OutpostOwner::kEnemy);
+
+  // 己方完全控制被击毁 -> 己方临时控制，HP 0；归属不变。
+  upstream.state.stamp = t0 + Duration{100};
+  upstream.state.our_outpost_hp = 0;
+  upstream.state.our_outpost_control = OutpostControl::kOwnTemporary;
+  const WorldState broken = model.snapshot(t0 + Duration{100});
+  CHECK(broken.upstream.our_outpost_owner == OutpostOwner::kOwn);
+
+  // HP 上升 = 重建；控制方为敌方，归属反转到敌方。
+  upstream.state.stamp = t0 + Duration{200};
+  upstream.state.our_outpost_hp = 500;
+  upstream.state.our_outpost_control = OutpostControl::kNotOwned;
+  const WorldState rebuilt = model.snapshot(t0 + Duration{200});
+  CHECK(rebuilt.upstream.our_outpost_owner == OutpostOwner::kEnemy);
+
+  const WorldState settled = model.snapshot(t0 + Duration{1300});
+  CHECK(settled.upstream.our_outpost_owner == OutpostOwner::kEnemy);
+}
+
+void test_outpost_owner_temporary_lag_keeps_toggle() {
+  const TimePoint t0{};
+  FakeUpstream upstream;
+  FakeOdometry odometry;
+  FakeNavigation navigation;
+  WorldModel model = make_owner_model(&upstream, &odometry, &navigation);
+
+  upstream.state.stamp = t0 + Duration{100};
+  upstream.state.enemy_outpost_hp = 0;
+  upstream.state.enemy_outpost_control = OutpostControl::kOwnTemporary;
+  const WorldState broken = model.snapshot(t0 + Duration{100});
+  CHECK(broken.upstream.enemy_outpost_owner == OutpostOwner::kEnemy);
+
+  // 路径 1 击毁：HP 0 -> 500；控制位暂时仍是「我方临时」，不能据此改成己方。
+  upstream.state.stamp = t0 + Duration{200};
+  upstream.state.enemy_outpost_hp = 500;
+  const WorldState rebuilt = model.snapshot(t0 + Duration{200});
+  CHECK(rebuilt.upstream.enemy_outpost_owner == OutpostOwner::kOwn);
+
+  const WorldState settled = model.snapshot(t0 + Duration{1300});
+  CHECK(settled.upstream.enemy_outpost_owner == OutpostOwner::kOwn);
+}
+
+void test_outpost_owner_full_control_corrects() {
+  const TimePoint t0{};
+  FakeUpstream upstream;
+  FakeOdometry odometry;
+  FakeNavigation navigation;
+  WorldModel model = make_owner_model(&upstream, &odometry, &navigation);
+
+  upstream.state.stamp = t0 + Duration{100};
+  upstream.state.enemy_outpost_control = OutpostControl::kOwnFull;
+  const WorldState state = model.snapshot(t0 + Duration{100});
+  CHECK(state.upstream.enemy_outpost_owner == OutpostOwner::kOwn);
+}
+
+void test_outpost_owner_resets_outside_match() {
+  const TimePoint t0{};
+  FakeUpstream upstream;
+  FakeOdometry odometry;
+  FakeNavigation navigation;
+  WorldModel model = make_owner_model(&upstream, &odometry, &navigation);
+
+  upstream.state.stamp = t0 + Duration{100};
+  upstream.state.our_outpost_hp = 0;
+  upstream.state.our_outpost_control = OutpostControl::kOwnTemporary;
+  const WorldState broken = model.snapshot(t0 + Duration{100});
+  CHECK(broken.upstream.our_outpost_owner == OutpostOwner::kOwn);
+
+  upstream.state.stamp = t0 + Duration{200};
+  upstream.state.our_outpost_hp = 500;
+  upstream.state.our_outpost_control = OutpostControl::kNotOwned;
+  const WorldState changed = model.snapshot(t0 + Duration{200});
+  CHECK(changed.upstream.our_outpost_owner == OutpostOwner::kEnemy);
+
+  upstream.state.stamp = t0 + Duration{300};
+  upstream.state.game_status = GameStatus::kPreparation;
+  const WorldState reset = model.snapshot(t0 + Duration{300});
+  CHECK(reset.upstream.our_outpost_owner == OutpostOwner::kOwn);
+  CHECK(reset.upstream.enemy_outpost_owner == OutpostOwner::kEnemy);
+}
+
 void test_navigation_sink() {
   const TimePoint t0{};
   FakeUpstream upstream;
@@ -151,6 +260,10 @@ int main() {
   test_fresh_inputs();
   test_timeout_marks_invalid();
   test_unavailable_source();
+  test_outpost_owner_rebuild_toggles();
+  test_outpost_owner_temporary_lag_keeps_toggle();
+  test_outpost_owner_full_control_corrects();
+  test_outpost_owner_resets_outside_match();
   test_navigation_sink();
   if (g_failures == 0) {
     std::printf("all core world_model tests passed\n");

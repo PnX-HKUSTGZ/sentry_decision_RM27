@@ -180,6 +180,23 @@ void test_occupancy() {
   event = decode_event_code(outpost_world.event_code, 0, TeamColor::kRed);
   CHECK(event.enemy_outpost_buff_status == 4);  // 未控制时不发送增益点状态
   CHECK(event.enemy_outpost_control == OutpostControl::kNotOwned);
+
+  // 中央高地增益点：控制对应阵地时写 1，未控制时写 3。
+  SimWorld highland_world;
+  highland_world.enemy_outpost_control.held_by_us = true;
+  highland_world.enemy_outpost_control.full = true;
+  Occupancy highland;
+  highland.our_highland = true;
+  highland.enemy_highland = true;
+  apply_occupancy(&highland_world, highland);
+  event = decode_event_code(highland_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.own_central_highland_status == 1);
+  CHECK(event.enemy_central_highland_status == 1);
+
+  highland_world.enemy_outpost_control.held_by_us = false;
+  apply_occupancy(&highland_world, highland);
+  event = decode_event_code(highland_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.enemy_central_highland_status == 3);
 }
 
 // 2027 前哨控制：两条转化路径 + 己方前哨失守。
@@ -204,6 +221,7 @@ void test_outpost_control_paths() {
     destroy_outpost(&world.enemy_outpost_control, &world.enemy_outpost_hp, true);
     CHECK(world.enemy_outpost_control.held_by_us);
     CHECK(world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_control.owner_is_us);
     CHECK(world.enemy_outpost_hp == 500);
   }
 
@@ -221,6 +239,7 @@ void test_outpost_control_paths() {
     step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, false, 1);
     CHECK(world.enemy_outpost_control.held_by_us);
     CHECK(world.enemy_outpost_control.full);
+    CHECK(world.enemy_outpost_control.owner_is_us);
     CHECK(world.enemy_outpost_hp == 500);
   }
 
@@ -236,6 +255,7 @@ void test_outpost_control_paths() {
     step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, false, 5000);
     CHECK(!world.our_outpost_control.held_by_us);
     CHECK(world.our_outpost_control.full);
+    CHECK(!world.our_outpost_control.owner_is_us);
     CHECK(world.our_outpost_hp == 500);
   }
 
@@ -251,7 +271,39 @@ void test_outpost_control_paths() {
     destroy_outpost(&world.our_outpost_control, &world.our_outpost_hp, false);
     CHECK(!world.our_outpost_control.held_by_us);
     CHECK(world.our_outpost_control.full);
+    CHECK(!world.our_outpost_control.owner_is_us);
     CHECK(world.our_outpost_hp == 500);
+  }
+
+  // 同方临时 -> 完全：不重建，保持 0 血（正常流程不应出现，仅验证规则边界）。
+  {
+    SimWorld world;
+    world.our_outpost_hp = 1000;
+    world.our_outpost_control.held_by_us = true;
+    world.our_outpost_control.full = false;
+    world.our_outpost_control.owner_is_us = true;
+    destroy_outpost(&world.our_outpost_control, &world.our_outpost_hp, true);
+    CHECK(world.our_outpost_control.held_by_us);
+    CHECK(world.our_outpost_control.full);
+    CHECK(world.our_outpost_control.owner_is_us);
+    CHECK(world.our_outpost_hp == 0);
+  }
+
+  // 中央高地增益点也可作为前哨阵地的占点输入。
+  {
+    GainZones zones;
+    zones.enemy_highland = {{0.0, 0.0, 0.5}};
+    const Occupancy highland = evaluate_occupancy(zones, 0.2, 0.2);
+    CHECK(highland.enemy_highland);
+    CHECK(!highland.enemy_outpost_buff);
+
+    SimWorld world;
+    world.enemy_outpost_hp = 1000;
+    step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp,
+                         highland.enemy_highland, 5000);
+    CHECK(world.enemy_outpost_control.held_by_us);
+    CHECK(!world.enemy_outpost_control.full);
+    CHECK(!world.enemy_outpost_control.owner_is_us);
   }
 
   // 双方同时激活：占领进度暂停；单方离开后进度按同速倒退。

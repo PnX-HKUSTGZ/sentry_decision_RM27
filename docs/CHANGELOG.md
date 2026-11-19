@@ -15,10 +15,15 @@
 
 - 无头策略冒烟：`strategy_smoke` 场景覆盖进攻前哨、Scan、低血 Heal、Resource、战亡 Respawn 的完整策略流程；`low_ammo_reset_smoke` 覆盖低弹兑换与重置恢复；`nav_reset_smoke` 覆盖导航成功后重置再启动。
 - 面板「资源与动作」显示当前 `TaskSnapshot`（任务、状态、阶段、参数、已进行时间、指标）与上一次 `TaskResult`。
-- 世界状态面板显示两处前哨阵地的控制方（我方完全 / 我方临时 / 敌方控制（未区分））。
+- 世界状态面板显示两处前哨阵地的控制方（我方完全 / 我方临时 / 敌方控制）。
 - 世界状态面板移除未启用的“期望 / 当前姿态”行；2027 Task 层当前不输出姿态。
 - 仿真控制新增「己方前哨 / 对方前哨」快捷行：切换完全 / 临时 / 未控制，以及敌方占点 / 离开。
 - 仿真裁判 2027 前哨控制：增益点 5 s 占点、击毁后的完全 / 临时控制转换、前哨站 500 血重建，以及前哨站增益点按补给区 50% 速率回血（不领免费发弹量）。
+- 仿真前哨站归属：`OutpostControlState.owner_is_us`；只有完全控制换到另一方时才重建 500 血，同方恢复不重建。
+- 仿真中央高地增益点：`own_outpost_side` + `enemy_outpost_opposite` 并入己方前哨占点，`enemy_outpost_side` + `own_outpost_opposite` 并入敌方前哨占点，半径 0.5 m。
+- 决策层前哨站归属 belief：`OutpostOwner`、`WorldState.upstream.our_outpost_owner/enemy_outpost_owner`；HP 上升视为重建并反转归属，1 s 后用 full 控制方校正。
+- `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
+- 世界状态面板显示前哨站归属。
 - `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
 - `core/task_runtime`：`TaskRegistry`、Task 生命周期、超时、抢占、结果与 `DecisionEpoch`。
 - `core/task_policy` / `core/task_runner`：手写 Task 选择 + Policy/Runtime 组合根。
