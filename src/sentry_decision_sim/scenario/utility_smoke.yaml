@@ -1,4 +1,4 @@
-# 端到端 utility 冒烟：在敌方高地射击位应选择 Outpost；打掉后回己方半场防守。
+# 端到端 utility 冒烟：在敌方高地射击位选择 Outpost；打掉后留在高地 Scan 争控制。
 name: utility_smoke
 start_pose: [3.16, 3.30, 0.0]
 world:
@@ -23,4 +23,4 @@ timeline:
       enemy_outpost_hp: 0
   - at: 16.0
     expect:
-      task_state: navigate
+      task_state: scan

@@ -100,6 +100,62 @@ void test_own_risk_does_not_overextend() {
   }
 }
 
+void test_own_risk_overrides_enemy_attack_from_far() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-2.0, 2.0);  // 敌方高地
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.our_outpost_trend.under_attack = true;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task != "Outpost");
+  if (plan.call->task == "Navigate") {
+    CHECK(target_of(plan).rfind("own_", 0) == 0);
+  }
+}
+
+void test_own_highland_does_not_hop_to_other_highland() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 2.0);  // 己方 side
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.our_outpost_trend.under_attack = true;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(!(plan.call->task == "Navigate" &&
+          target_of(plan).rfind("own_outpost_", 0) == 0));
+}
+
+void test_invalid_own_buff_moves_to_highland() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 0.0);  // 己方 buff
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.our_outpost_trend.under_attack = true;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Navigate");
+  const std::string target = target_of(plan);
+  CHECK(target == "own_outpost_side" || target == "own_outpost_opposite");
+}
+
+void test_full_own_outpost_under_attack_stays_buff() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 0.0);  // 己方 buff
+  world.our_outpost_trend.under_attack = true;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Scan" || plan.call->task == "Heal");
+  if (plan.call->task == "Heal") {
+    CHECK(target_of(plan) == "own_outpost_buff");
+  }
+}
+
 void test_both_full_defends_enemy_half() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
@@ -124,6 +180,47 @@ void test_enemy_outpost_attack_from_highland() {
   CHECK(plan.call.has_value());
   CHECK(plan.call->task == "Outpost");
   CHECK(std::get<OutpostParams>(plan.call->params).target_side == Side::kEnemy);
+}
+
+void test_front_prefers_highland_when_capture_needed() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-1.0, 0.0);
+  world.upstream.enemy_outpost_hp = 1000;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Navigate");
+  const std::string target = target_of(plan);
+  CHECK(target == "enemy_outpost_side" || target == "enemy_outpost_opposite");
+}
+
+void test_front_finishes_low_hp_outpost() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-1.0, 0.0);
+  world.upstream.enemy_outpost_hp = 100;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Outpost");
+}
+
+void test_destroyed_enemy_outpost_is_contested() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-1.0, 0.0);  // 敌方 front
+  world.upstream.enemy_outpost_hp = 0;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Navigate");
+  const std::string target = target_of(plan);
+  CHECK(target == "enemy_outpost_side" || target == "enemy_outpost_opposite");
 }
 
 void test_full_hp_at_base_does_not_select_empty_heal() {
@@ -167,8 +264,15 @@ void test_owned_outpost_is_not_attacked() {
 int main() {
   test_dead_respawns();
   test_own_risk_does_not_overextend();
+  test_own_risk_overrides_enemy_attack_from_far();
+  test_own_highland_does_not_hop_to_other_highland();
+  test_invalid_own_buff_moves_to_highland();
+  test_full_own_outpost_under_attack_stays_buff();
   test_both_full_defends_enemy_half();
   test_enemy_outpost_attack_from_highland();
+  test_front_prefers_highland_when_capture_needed();
+  test_front_finishes_low_hp_outpost();
+  test_destroyed_enemy_outpost_is_contested();
   test_full_hp_at_base_does_not_select_empty_heal();
   test_no_navigate_churn_at_destination();
   test_owned_outpost_is_not_attacked();

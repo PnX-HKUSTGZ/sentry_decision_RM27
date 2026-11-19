@@ -67,7 +67,9 @@ void test_navigate_failure_nav_failed() {
 
   WorldState world = make_world(0.0, 0.0);
   world.nav.failed = true;
-  TaskOutput out = task.tick(world, now);
+  TaskOutput stale = task.tick(world, now);
+  CHECK(stale.status == TaskStatus::kRunning);  // 新目标刚下发，旧 failed 不算数
+  TaskOutput out = task.tick(world, now + Duration{600});
   CHECK(out.status == TaskStatus::kFailure);
   CHECK(out.detail == "导航失败");
 }

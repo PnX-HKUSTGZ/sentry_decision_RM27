@@ -31,6 +31,7 @@ class NavigateTask : public Task {
   const Point2D* target_ = nullptr;
   bool started_ = false;
   bool invalid_ = false;
+  TimePoint started_at_{};
   std::string invalid_reason_;
 };
 

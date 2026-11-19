@@ -174,6 +174,13 @@ UtilityTaskPolicy::Context UtilityTaskPolicy::make_context(const WorldState& wor
     }
     context.own_attack += (1.0 - context.own_hp_ratio) * 0.5;
   }
+  // 敌方前哨站已被击毁但归属仍是敌方：需要去增益点把控制拿回来/守住。
+  context.enemy_convert = 0.0;
+  if (up.enemy_outpost_owner == OutpostOwner::kEnemy && !context.enemy_alive &&
+      up.enemy_outpost_control != OutpostControl::kOwnFull) {
+    context.enemy_convert = up.enemy_outpost_control == OutpostControl::kOwnTemporary ? 1.2 : 1.0;
+  }
+
   context.enemy_attack = 0.0;
   if (up.enemy_outpost_owner == OutpostOwner::kEnemy && context.enemy_alive) {
     context.enemy_attack = 1.0;
@@ -210,13 +217,18 @@ double UtilityTaskPolicy::score_navigate(const WorldState& world, const Context&
     }
   } else if (point == point_name(points2027::kOwnOutpostSide) ||
              point == point_name(points2027::kOwnOutpostOpposite)) {
-    value = 1.8 * context.own_risk + 1.4 * context.own_attack + 0.3;
+    // 己方完全控制且存活时，buff 是默认防守锚点；高地只在需要争夺/恢复控制时优先。
+    value = context.own_full && context.own_alive
+                ? 1.0 * context.own_risk + 0.3
+                : 3.4 * context.own_risk + 1.4 * context.own_attack + 0.5;
   } else if (point == point_name(points2027::kOwnOutpostFront)) {
     value = context.own_attack > 0.0 ? 0.8 * context.own_attack : 0.15;
   } else if (point == point_name(points2027::kEnemyOutpostSide) ||
              point == point_name(points2027::kEnemyOutpostOpposite)) {
     if (context.enemy_attack > 0.0) {
       value = 1.8 * context.enemy_attack + 0.6 * context.enemy_hold + 0.3;
+    } else if (context.enemy_convert > 0.0) {
+      value = 2.1 * context.enemy_convert + 0.3;
     } else {
       value = 1.4 * context.enemy_hold + 0.25;
     }
@@ -229,7 +241,7 @@ double UtilityTaskPolicy::score_navigate(const WorldState& world, const Context&
   // 己方半场有风险时，不要过度深入敌方半场。
   const bool enemy_half = point.rfind("enemy_", 0) == 0;
   if (enemy_half) {
-    value -= 0.45 * context.own_risk;
+    value -= 0.7 * context.own_risk;
     if (up.self_hp < 100 || up.self_ammo < 40) {
       value -= 0.35;
     }
@@ -254,7 +266,8 @@ double UtilityTaskPolicy::score_heal(const WorldState& world, const Context& con
     return 2.0 * hp_need + 1.2 * context.own_hold + 0.4 * context.own_risk;
   }
   if (point == point_name(points2027::kEnemyOutpostBuff)) {
-    return 1.6 * hp_need + 1.2 * context.enemy_hold + 0.2 * context.enemy_attack;
+    return 1.6 * hp_need + 1.2 * context.enemy_hold + 0.2 * context.enemy_attack -
+           0.8 * context.own_risk;
   }
   return -1.0e6;
 }
@@ -277,6 +290,8 @@ double UtilityTaskPolicy::score_outpost(const WorldState& world, const Context& 
   double value = 2.5 * attack + 0.8 * (1.0 - hp_ratio);
   if (side == Side::kEnemy) {
     value += 0.35;  // 敌方基地暴露
+    // 己方半场有风险时，优先回防，不为了敌方前哨继续深入。
+    value -= 1.8 * context.own_risk;
   } else {
     value += 0.4 * context.own_risk;
   }
@@ -291,7 +306,12 @@ double UtilityTaskPolicy::score_outpost(const WorldState& world, const Context& 
     value += need_capture ? 0.55 : 0.25;
   }
   if (at_front) {
-    value += need_capture ? -0.25 : 0.2;
+    // front 只适合收尾；满血/高血量且需要占点时，优先转到高地。
+    if (need_capture) {
+      value -= hp_ratio > 0.35 ? 1.2 : 0.2;
+    } else {
+      value += 0.2;
+    }
   }
   if (up.self_hp < 100 || up.self_ammo < 30) {
     value -= 0.5;
@@ -311,21 +331,37 @@ double UtilityTaskPolicy::score_scan(const WorldState& world, const Context& con
   }
   if (at_point(world, point_name(points2027::kEnemyOutpostBuff), 0.5) && context.enemy_full &&
       context.enemy_alive) {
-    return 1.9 * context.enemy_hold + 0.4 * hp_need + 0.4;
+    return 1.9 * context.enemy_hold + 0.4 * hp_need + 0.4 - 0.6 * context.own_risk;
   }
   if (at_point(world, point_name(points2027::kOwnOutpostSide), 0.5) ||
       at_point(world, point_name(points2027::kOwnOutpostOpposite), 0.5)) {
-    return 1.3 * context.own_risk + 0.6 * context.own_attack + 0.35;
+    return 2.0 * context.own_risk + 0.8 * context.own_attack + 0.35;
   }
   if (at_point(world, point_name(points2027::kEnemyOutpostSide), 0.5) ||
       at_point(world, point_name(points2027::kEnemyOutpostOpposite), 0.5)) {
-    return 1.2 * context.enemy_attack + 0.5 * context.enemy_hold + 0.3;
+    return 1.2 * context.enemy_attack + 1.6 * context.enemy_convert +
+           0.5 * context.enemy_hold + 0.3 - 0.7 * context.own_risk;
   }
   return 0.3;
 }
 
 void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const Context& context,
                                                 std::vector<Candidate>* out) const {
+  const bool at_own_highland =
+      at_point(world, point_name(points2027::kOwnOutpostSide), 0.5) ||
+      at_point(world, point_name(points2027::kOwnOutpostOpposite), 0.5);
+  const bool at_own_buff_valid =
+      at_point(world, point_name(points2027::kOwnOutpostBuff), 0.5) && context.own_full &&
+      context.own_alive;
+  const bool at_enemy_highland =
+      at_point(world, point_name(points2027::kEnemyOutpostSide), 0.5) ||
+      at_point(world, point_name(points2027::kEnemyOutpostOpposite), 0.5);
+  const bool at_enemy_buff_valid =
+      at_point(world, point_name(points2027::kEnemyOutpostBuff), 0.5) && context.enemy_full &&
+      context.enemy_alive;
+  const bool at_own_gain = at_own_highland || at_own_buff_valid;
+  const bool at_enemy_gain = at_enemy_highland || at_enemy_buff_valid;
+
   const std::vector<std::string> points = {
       point_name(points2027::kOwnOutpostBuff),
       point_name(points2027::kEnemyOutpostBuff),
@@ -342,6 +378,22 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
     }
     // 已在目标点附近时不再生成同点 Navigate，避免到达后反复成功/重启。
     if (distance_to(world, point) <= 0.2) {
+      continue;
+    }
+    // 已站在同一阵地的任一增益点时，不要在高地/前哨 buff 之间来回跳；
+    // 用 Scan/Outpost 驻留，只有跨半场转场才重新 Navigate。
+    if (at_own_gain && point.rfind("own_outpost_", 0) == 0) {
+      continue;
+    }
+    if (at_enemy_gain && point.rfind("enemy_outpost_", 0) == 0) {
+      continue;
+    }
+    // 已站在同一阵地的任一增益点时，不要在高地/前哨 buff 之间来回跳；
+    // 用 Scan/Outpost 驻留，只有跨半场转场才重新 Navigate。
+    if (at_own_gain && point.rfind("own_outpost_", 0) == 0) {
+      continue;
+    }
+    if (at_enemy_gain && point.rfind("enemy_outpost_", 0) == 0) {
       continue;
     }
     TaskCall call{"Navigate", NavigateParams{point, 0.2}, kNavigateTimeout};

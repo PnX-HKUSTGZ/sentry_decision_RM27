@@ -1,0 +1,34 @@
+# utility 防守优先级冒烟：己方前哨掉到临时控制时，从敌方半场回防。
+name: utility_defense_smoke
+start_pose: [3.16, 3.30, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 240
+  coins: 500
+  self_hp: 400
+  self_ammo: 200
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: outpost
+  - at: 8.0
+    set_world:
+      our_outpost_control: 1
+      our_outpost_hp: 500
+  - at: 10.0
+    expect:
+      task_state: navigate
+  - at: 20.0
+    expect:
+      task_state: scan
+  - at: 22.0
+    set_world:
+      our_outpost_control: 0
+      our_outpost_hp: 1000
+  - at: 35.0
+    expect:
+      task_state: outpost

@@ -40,6 +40,7 @@ class UtilityTaskPolicy : public TaskPolicy {
     double own_risk = 0.0;
     double own_attack = 0.0;
     double enemy_attack = 0.0;
+    double enemy_convert = 0.0;
     double enemy_hold = 0.0;
     double own_hold = 0.0;
   };

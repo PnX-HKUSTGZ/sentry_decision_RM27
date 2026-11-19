@@ -93,9 +93,10 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   }
 
   // 继续当前任务：除死亡 / 低血 / 低弹外，不在任务未结束时换任务。
-  // 任务结束后 Runtime 清空 active，下一拍再按规则选下一个。
+  // Scan 是无限任务，不算“进行中的承诺”；每拍允许重新评估，否则新出现的前哨目标
+  // 会被一直挡住。
   if (active_task.has_value() && active_task->status == TaskStatus::kRunning &&
-      active_task->call.has_value()) {
+      active_task->call.has_value() && active_task->task != "Scan") {
     return plan_with(world, *active_task->call);
   }
 

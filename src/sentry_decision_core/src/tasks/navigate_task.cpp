@@ -12,8 +12,9 @@ bool NavigateTask::can_start(const WorldState& world) const {
   return world.self.valid && world.nav.valid;
 }
 
-void NavigateTask::start(const TaskCall& call, TimePoint) {
+void NavigateTask::start(const TaskCall& call, TimePoint now) {
   started_ = true;
+  started_at_ = now;
   invalid_ = false;
   invalid_reason_.clear();
   target_ = nullptr;
@@ -32,7 +33,7 @@ void NavigateTask::start(const TaskCall& call, TimePoint) {
   }
 }
 
-TaskOutput NavigateTask::tick(const WorldState& world, TimePoint) {
+TaskOutput NavigateTask::tick(const WorldState& world, TimePoint now) {
   TaskOutput out;
   out.task_state = TaskState::kNavigate;
   out.phase = "move";
@@ -49,7 +50,8 @@ TaskOutput NavigateTask::tick(const WorldState& world, TimePoint) {
     return out;
   }
 
-  if (world.nav.failed) {
+  // 新目标刚下发时，上游可能还残留上一个目标的 failed；给一个很短的稳定窗口。
+  if (world.nav.failed && now - started_at_ >= Duration{500}) {
     out.status = TaskStatus::kFailure;
     out.detail = "导航失败";
     return out;

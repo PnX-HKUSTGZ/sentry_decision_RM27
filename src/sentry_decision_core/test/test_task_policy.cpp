@@ -140,6 +140,22 @@ void test_heal_success_at_base_does_not_use_main_resource() {
   CHECK(plan.call->task == "Scan");
 }
 
+void test_scan_does_not_block_new_outpost_target() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{5.0, 0.0, 0.0};
+
+  TaskSnapshot scan;
+  scan.task = "Scan";
+  scan.call = TaskCall{"Scan", ScanParams{}, Duration{0}};
+  scan.status = TaskStatus::kRunning;
+
+  const TaskPlan plan = policy.decide(world, scan, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Outpost");
+}
+
 void test_enemy_outpost_far_selects_navigate() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
@@ -193,6 +209,7 @@ int main() {
   test_low_ammo_at_base_with_free_batch_selects_heal();
   test_low_ammo_at_base_without_ammo_source_does_not_loop_heal();
   test_heal_success_at_base_does_not_use_main_resource();
+  test_scan_does_not_block_new_outpost_target();
   test_enemy_outpost_far_selects_navigate();
   test_enemy_outpost_near_selects_outpost();
   test_no_outpost_selects_scan();

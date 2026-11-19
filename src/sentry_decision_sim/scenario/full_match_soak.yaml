@@ -1,0 +1,64 @@
+# 完整 420s headless soak：默认 rule 策略 + 本地裁判仿真。
+# 不是默认 ctest（墙钟约 7 分钟）；手动运行：
+#   tools/scenario_smoke_test.sh src/sentry_decision_sim/scenario/full_match_soak.yaml
+name: full_match_soak
+start_pose: [-12.37, -3.35, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 800
+  self_hp: 400
+  self_ammo: 300
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: navigate
+  - at: 10.0
+    expect:
+      task_state: outpost
+  - at: 20.0
+    set_world:
+      enemy_outpost_hp: 0
+  - at: 25.0
+    expect:
+      task_state: scan
+  - at: 65.0
+    set_world:
+      self_hp: 100
+  - at: 70.0
+    expect:
+      task_state: heal
+  - at: 80.0
+    set_world:
+      self_hp: 400
+  - at: 120.0
+    set_world:
+      enemy_outpost_hp: 1000
+  - at: 145.0
+    expect:
+      task_state: outpost
+  - at: 180.0
+    set_world:
+      self_hp: 0
+  - at: 185.0
+    expect:
+      task_state: respawn
+  - at: 300.0
+    set_world:
+      enemy_outpost_hp: 0
+  - at: 310.0
+    expect:
+      task_state: scan
+  - at: 418.0
+    set_world:
+      game_status: 5
+  - at: 419.0
+    expect:
+      task_state: idle
+  - at: 420.0
+    set_world:
+      game_status: 5

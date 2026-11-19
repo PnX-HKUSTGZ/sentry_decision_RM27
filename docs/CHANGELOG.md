@@ -28,6 +28,9 @@
 - `UtilityTaskPolicy`：合法 TaskCall 生成 + 控制/基地/生存/转场/切换成本打分；`strategy.use_utility` 切换，并提供 `profiles_rmuc27_utility.yaml` A/B。
 - `TaskResult.call`：保留完整 TaskCall，供 utility 做同点连续性/迟滞。
 - 端到端 `utility_smoke`：敌方高地射击位选择 Outpost，打掉后回己方半场。
+- 端到端 `utility_defense_smoke`：己方前哨掉到临时控制时回防。
+- 手动 420s headless soak 场景 `full_match_soak.yaml`（不加入默认 ctest）。
+- `Navigate` 新目标 500 ms 内忽略上一个目标的 `nav.failed`，避免 utility/rule 反复选同一点并立即失败。
 - `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
 - 世界状态面板显示前哨站归属。
 - `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
@@ -64,6 +67,7 @@
 - 跨局 `HistoryView` 未清空，可能导致新局误选 `Resource`。
 - 面板急停状态硬编码为 false。
 - `Outpost` / `Resource` / `Respawn` 在裁判数据失效时仍使用旧值。
+- `Scan` 是无限任务，rule 策略此前会一直返回当前 `Scan`，导致新出现的前哨目标无法触发进攻；现在 `Scan` 允许每拍重新评估。
 - 前哨站被击毁后仿真仍上报前哨站增益点、仍按前哨站 buff 回血/兑换；现在 `hp=0` 时 buff 失效。
 
 ### Removed
