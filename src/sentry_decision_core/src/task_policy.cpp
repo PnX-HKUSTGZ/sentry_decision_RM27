@@ -11,8 +11,6 @@ namespace {
 
 constexpr Duration kNavigateTimeout{30000};
 constexpr Duration kPlanValidFor{1000};
-constexpr int kResourceBatch = 100;
-constexpr int kAmmoExchangeUnit = 10;
 
 TaskCall call(TaskId id, TaskParams params, Duration timeout = Duration{0}) {
   return TaskCall{std::move(id), std::move(params), timeout};
@@ -61,7 +59,7 @@ RuleBasedTaskPolicy::RuleBasedTaskPolicy(const PolicyConfig& config) : config_(c
 
 TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
                                      const std::optional<TaskSnapshot>& active_task,
-                                     const HistoryView& history) const {
+                                     const HistoryView& /*history*/) const {
   if (!world.upstream.valid || world.upstream.game_status != GameStatus::kRunning) {
     return plan_with(world, std::nullopt);
   }
@@ -73,10 +71,6 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   const bool low_hp = low_threshold(config_, "nav.retreat_hp", world.upstream.self_hp);
   const bool low_ammo = low_threshold(config_, "nav.low_ammo", world.upstream.self_ammo);
   const bool at_base = point_near(world, config_, std::string(points2027::kOwnBaseSupply));
-  const int remaining_exchange = 1000 - world.upstream.info1.ammo_exchanged_local;
-  const bool can_buy_ammo = at_base && remaining_exchange >= kResourceBatch &&
-                            world.upstream.coins >= kResourceBatch &&
-                            kResourceBatch % kAmmoExchangeUnit == 0;
 
   // 低血优先回血。
   if (low_hp) {
@@ -90,12 +84,8 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
     return plan_with(world,
                      call("Heal", HealParams{std::string(points2027::kOwnBaseSupply), true}));
   }
-  if (low_ammo && can_buy_ammo) {
-    return plan_with(world, call("Resource", ResourceParams{std::string(points2027::kOwnBaseSupply),
-                                                            kResourceBatch}));
-  }
-  // 低弹且在基地但买不起：如果还有免费发弹批次，Heal 可领取；否则继续后续目标，
-  // 不能让 Heal 空转。
+  // 低弹且在基地但还有免费发弹批次：Heal 可领取。买弹本身由独立 Resource
+  // 辅助栏在后台完成，不占主栏。
   if (low_ammo && at_base && free_ammo_available(world, config_)) {
     return plan_with(world,
                      call("Heal", HealParams{std::string(points2027::kOwnBaseSupply), true}));
@@ -106,15 +96,6 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   if (active_task.has_value() && active_task->status == TaskStatus::kRunning &&
       active_task->call.has_value()) {
     return plan_with(world, *active_task->call);
-  }
-
-  const bool previous_heal = history.previous_task.has_value() &&
-                             history.previous_task->task == "Heal" &&
-                             history.previous_task->status == TaskStatus::kSuccess;
-  if (previous_heal && at_base && remaining_exchange >= kResourceBatch &&
-      world.upstream.coins >= kResourceBatch && kResourceBatch % kAmmoExchangeUnit == 0) {
-    return plan_with(world, call("Resource", ResourceParams{std::string(points2027::kOwnBaseSupply),
-                                                            kResourceBatch}));
   }
 
   if (world.upstream.enemy_outpost_hp > 0 &&

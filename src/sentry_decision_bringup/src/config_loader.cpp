@@ -34,6 +34,11 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"nav.low_ammo", {true, true}},
       {"nav.supply_ammo", {true, true}},
       {"nav.patrol_dwell_s", {false, true}},
+      {"resource.low_ammo", {true, true}},
+      {"resource.batch", {true, true}},
+      {"resource.reserve_coins", {true, true}},
+      {"resource.dwell_s", {false, true}},
+      {"resource.retry_s", {false, true}},
       {"resource.exchange_ammo_step", {true, true}},
       {"resource.hp_exchange_threshold", {true, true}},
       {"resource.min_coins", {true, true}},
@@ -227,6 +232,12 @@ ConfigLoadResult load_policy_config(const std::string& profiles_path) {
   }
 
   // 规则约束：17mm 增益点兑换最小 10 发；远程兑换每次只能 +1 次。
+  const auto batch = result.config.number("resource.batch");
+  if (batch.has_value() &&
+      static_cast<int>(batch.value()) % sentry_decision::kAmmoExchangeUnit != 0) {
+    result.errors.push_back("resource.batch 必须是 " +
+                            std::to_string(sentry_decision::kAmmoExchangeUnit) + " 的倍数");
+  }
   const auto ammo_step = result.config.number("resource.exchange_ammo_step");
   if (ammo_step.has_value() &&
       static_cast<int>(ammo_step.value()) % sentry_decision::kAmmoExchangeUnit != 0) {

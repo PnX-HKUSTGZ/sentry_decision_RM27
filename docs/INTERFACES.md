@@ -89,6 +89,8 @@ MCU  <--串口(USB-CDC)-->  auto-aim (io::Gimbal + 串口帧 v1)
 | 5 | `kHeal` |
 | 6 | `kRespawn` |
 
+> `kResource` 现在由独立 Resource 辅助栏执行，不写主栏 `task_state`；值 4 仅为枚举兼容 / 显式主栏 Resource 保留。
+
 `task_state` 变化时立即发送，并以 10 Hz 心跳重发；MCU 只锁存，不写入 `0x0120`。
 `action.kind=0` 表示本帧只更新 `task_state`，不携带动作。
 `request_id` 只用于日志关联；每个请求只发一次，不复用 id 做重试。

@@ -41,12 +41,16 @@ void ResourceTask::start(const TaskCall& call, TimePoint now) {
   params_ = *params;
 
   const bool base = params_.exchange_point == point_name(points2027::kOwnBaseSupply);
-  const bool outpost = params_.exchange_point == point_name(points2027::kOwnOutpostBuff);
-  if (!base && !outpost) {
+  const bool own_outpost = params_.exchange_point == point_name(points2027::kOwnOutpostBuff);
+  const bool enemy_outpost = params_.exchange_point == point_name(points2027::kEnemyOutpostBuff);
+  if (!base && !own_outpost && !enemy_outpost) {
     invalid_ = true;
-    invalid_reason_ = "Resource 点必须是 own_base_supply 或 own_outpost_buff";
+    invalid_reason_ =
+        "Resource 点必须是 own_base_supply、own_outpost_buff 或 enemy_outpost_buff";
     return;
   }
+  zone_ = base ? ZoneKind::kBaseSupply
+               : (own_outpost ? ZoneKind::kOwnOutpost : ZoneKind::kEnemyOutpost);
   if (params_.amount <= 0 || params_.amount % kAmmoExchangeUnit != 0) {
     invalid_ = true;
     invalid_reason_ = "Resource amount 必须是 10 的正整数倍";
@@ -69,24 +73,43 @@ TaskOutput ResourceTask::tick(const WorldState& world, TimePoint now) {
     return out;
   }
 
-  const bool base = params_.exchange_point == point_name(points2027::kOwnBaseSupply);
-  const bool outpost = params_.exchange_point == point_name(points2027::kOwnOutpostBuff);
-
   if (!sent_) {
-    if (base && !world.upstream.event.supply_zone_occupied) {
+    if (zone_ == ZoneKind::kBaseSupply && !world.upstream.event.supply_zone_occupied) {
       out.status = TaskStatus::kFailure;
       out.detail = "不在己方基地补给区";
       return out;
     }
-    if (outpost) {
+    if (zone_ == ZoneKind::kOwnOutpost) {
       if (world.upstream.our_outpost_control != OutpostControl::kOwnFull) {
         out.status = TaskStatus::kFailure;
         out.detail = "己方前哨站未完全控制";
         return out;
       }
-      if (world.upstream.event.our_outpost_buff_status == 0) {
+      if (world.upstream.our_outpost_hp <= 0) {
+        out.status = TaskStatus::kFailure;
+        out.detail = "己方前哨站已被击毁";
+        return out;
+      }
+      if (!EventCode::own_active(world.upstream.event.our_outpost_buff_status)) {
         out.status = TaskStatus::kFailure;
         out.detail = "不在己方前哨站增益点";
+        return out;
+      }
+    }
+    if (zone_ == ZoneKind::kEnemyOutpost) {
+      if (world.upstream.enemy_outpost_control != OutpostControl::kOwnFull) {
+        out.status = TaskStatus::kFailure;
+        out.detail = "敌方前哨站未完全控制";
+        return out;
+      }
+      if (world.upstream.enemy_outpost_hp <= 0) {
+        out.status = TaskStatus::kFailure;
+        out.detail = "敌方前哨站已被击毁";
+        return out;
+      }
+      if (!EventCode::own_active(world.upstream.event.enemy_outpost_buff_status)) {
+        out.status = TaskStatus::kFailure;
+        out.detail = "不在敌方前哨站增益点";
         return out;
       }
     }

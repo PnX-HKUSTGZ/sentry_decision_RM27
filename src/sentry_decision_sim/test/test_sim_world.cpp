@@ -181,6 +181,16 @@ void test_occupancy() {
   CHECK(event.enemy_outpost_buff_status == 4);  // 未控制时不发送增益点状态
   CHECK(event.enemy_outpost_control == OutpostControl::kNotOwned);
 
+  // 前哨站被击毁后，前哨站增益点失效。
+  outpost_world.enemy_outpost_hp = 0;
+  outpost_world.enemy_outpost_control.held_by_us = true;
+  outpost_world.enemy_outpost_control.full = true;
+  apply_occupancy(&outpost_world, enemy_buff);
+  apply_outpost_control_bits(&outpost_world);
+  event = decode_event_code(outpost_world.event_code, 0, TeamColor::kRed);
+  CHECK(event.enemy_outpost_buff_status == 4);
+  CHECK(!event.local_ammo_exchange_point());
+
   // 中央高地增益点：控制对应阵地时写 1，未控制时写 3。
   SimWorld highland_world;
   highland_world.enemy_outpost_control.held_by_us = true;

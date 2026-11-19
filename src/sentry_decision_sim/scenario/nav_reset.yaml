@@ -7,11 +7,11 @@ world:
   game_time_remaining: 420
   coins: 200
   self_hp: 400
-  self_ammo: 100
-  base_hp: 5000
+  self_ammo: 300
+  base_hp: 10000
   our_outpost_hp: 1000
   enemy_outpost_hp: 1000
-  enemy_base_hp: 5000
+  enemy_base_hp: 10000
 timeline:
   - at: 0.0
     set_world:

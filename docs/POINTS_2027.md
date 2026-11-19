@@ -21,7 +21,7 @@
 | `own_fort` | fort | 己方堡垒增益点 |
 | `enemy_fort` | fort | 对方堡垒增益点 |
 | `own_outpost_buff` | outpost_buff | 己方前哨站正下方增益点；己方完全控制时可用于 `Heal` / `Resource` |
-| `enemy_outpost_buff` | outpost_buff | 对方前哨站正下方增益点；己方完全控制时可用于 `Heal` |
+| `enemy_outpost_buff` | outpost_buff | 对方前哨站正下方增益点；己方完全控制且前哨站存活时可用于 `Heal` / `Resource` |
 | `own_outpost_front` | strike | 己方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
 | `enemy_outpost_front` | strike | 对方前哨站前方打击点：靠近前哨站、朝中央高地一侧、不在增益点内 |
 | `own_outpost_side` | strike_highland | 己方前哨站侧方打击点：同侧高地增益点内，较近但危险；半径 0.5 m |
@@ -30,6 +30,7 @@
 | `enemy_outpost_opposite` | strike_highland | 对方前哨站对面打击点：对侧高地增益点内，较远、较安全；半径 0.5 m |
 
 > `side` 和 `opposite` 都在高地增益点内，享有 25% 防御增益，并可作为前哨阵地的占点输入；`front` 不在增益点内。
+> 前哨站增益点只在前哨站存活且己方完全控制时有效；被击毁或失去完全控制后，应改用中央高地增益点。
 > 仿真中己方高地为 `own_outpost_side` + `enemy_outpost_opposite`，敌方高地为 `enemy_outpost_side` + `own_outpost_opposite`，半径均 0.5 m。
 > 四个 `*_outpost_front/side/opposite` 都是打击点，不需要区域半径。
 > “同侧 / 对侧”以中央高地为参照：同侧 = 靠近该前哨站的一侧高地，对侧 = 跨过中央高地的另一侧高地。
@@ -97,7 +98,7 @@ points:
 |---|---|
 | `Navigate` | 以上任意 11 个点 |
 | `Heal` | `own_base_supply`、`own_outpost_buff` 或 `enemy_outpost_buff`（后两者要求己方完全控制） |
-| `Resource` | `own_base_supply` 或 `own_outpost_buff`（后者要求己方完全控制） |
+| `Resource` | `own_base_supply`、`own_outpost_buff` 或 `enemy_outpost_buff`（后两者要求己方完全控制且前哨站存活） |
 
 `Heal` / `Resource` 通过点名区分补给区类型，不额外传 `zone_kind`。
 新增补给点时必须同时更新 `TASK_CATALOG.md` 与本表。

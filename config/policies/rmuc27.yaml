@@ -13,6 +13,15 @@ nav:
   supply_ammo: 150
   patrol_dwell_s: 5.0
 
+# 独立 Resource 辅助栏：不占主任务，不写 TaskState。
+resource:
+  enabled: true
+  low_ammo: 80                 # 低于该弹量才考虑买弹
+  batch: 100                   # 每次目标发数，必须是 10 的倍数
+  reserve_coins: 150           # 为立即复活 / 远程兑换保留的金币
+  dwell_s: 0.5                 # 在兑换点驻留确认，避免路过误触发
+  retry_s: 2.0                 # 失败后的重试冷却
+
 safety:
   max_vx: 3.0
   max_vy: 3.0

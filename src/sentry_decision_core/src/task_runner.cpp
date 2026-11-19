@@ -11,7 +11,7 @@ constexpr Duration kDecisionPeriod{1000};
 }  // namespace
 
 TaskRunner::TaskRunner(const PolicyConfig& config, int max_hp, Duration match_duration)
-    : runtime_(registry_), policy_(config), match_duration_(match_duration) {
+    : runtime_(registry_), policy_(config), resource_(config), match_duration_(match_duration) {
   register_default_tasks(registry_, config, max_hp, match_duration);
 }
 
@@ -57,6 +57,7 @@ void TaskRunner::tick(const WorldState& world, TimePoint now) {
     decision_due_ = false;
   }
   runtime_.tick(view, now);
+  resource_.tick(view, now);
 
   std::optional<TaskResult> result = runtime_.take_result();
   if (result.has_value()) {

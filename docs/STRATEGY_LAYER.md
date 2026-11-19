@@ -84,8 +84,8 @@ DecisionOutput
 - 需要同时评估「继续当前任务」和「切换新任务」，不能只做 argmax。
 - 允许输出：
   - 当前只输出一个主任务；
-  - 资源任务放入主任务栏；远程兑换暂不实现；
-  - 姿态 / 并行任务暂缓，不设并行栏。
+  - 买弹由独立 `ResourceController` 辅助栏执行，不占主任务栏；远程兑换暂不实现；
+  - 姿态 / 其他并行任务暂缓。
 
 ### 4.3 TaskRuntime
 
@@ -134,9 +134,9 @@ DecisionOutput
 
 ### 5.1 并发
 
-- 当前只有一个主任务栏，不再设 domain。
-- 每个时刻最多一个 active Task；资源任务也在主任务栏执行。
-- 姿态 / 并行栏暂缓；远程兑换暂不实现。
+- 主任务栏每时刻最多一个 active Task；`Resource` 由独立辅助栏执行，不占主任务栏。
+- 主栏 `task_state` / `nav_goal` 不受辅助栏影响；辅助栏只在主栏没有 action 时下发买弹动作。
+- 姿态 / 其他并行栏暂缓；远程兑换暂不实现。
 - 任务切换必须满足当前任务的 `can_abort()`；不设 `min_commit` / `lease`。
 
 ### 5.2 打断规则
@@ -234,7 +234,7 @@ else: switch
 | `Navigate` | 主任务 | 到达定位点即结束 | 不处理占点；默认 `arrive_radius=0.2 m`、`timeout=30 s` |
 | `Scan` | 主任务 | 不自动结束；由动作层主动切换 | 原地旋转；检测/开火由自瞄完成；Runtime 仍按事件/1 s 触发决策 |
 | `Outpost` | 主任务 | 目标前哨站血量归零或已由我方完全控制；目标必须归属敌方 | 只下发 `TaskState=kOutpost`；不含导航；`target_side` 只表示位于己方/敌方半场；`kOwnTemporary` 继续攻击 |
-| `Resource` | 主任务 | 兑换累计值到账/失败 | 状态型，不导航；基地补给区或己方完全控制前哨站增益点；5 s 检测；一般 `Heal` 后选择 |
+| `Resource` | 辅助栏 | 兑换累计值到账/失败 | 状态型，不导航；基地补给区或己方完全控制且存活的前哨站增益点；5 s 检测；不写主栏 `TaskState` |
 | `Heal` | 主任务 | 血量回满；基地补给区按需确认免费发弹到账 | 导航至基地补给区/己方完全控制前哨站；默认领取免费发弹；前哨站只回血 |
 | `Respawn` | 主任务 | 免费复活成功 | 发送免费复活确认并等待；`Heal` 由动作层另选 |
 
@@ -301,6 +301,7 @@ enum class ReplanReason {
 - `TaskState` 在变化时立即发送，并额外以 **10 Hz** 心跳重发；MCU 锁存最近值，不转发到 `0x0120`。
 - 非 `kRunning`、无 active Task 时发送 `kIdle`。
 - `TaskState` 不进 `DecisionAction`，避免和兑换 / 复活动作混用。
+- `kResource` 由独立辅助栏执行，不写主栏 `task_state`；值 4 仅保留枚举兼容。
 
 ### 10.2 任务参数 / TaskCall / TaskPlan
 
@@ -334,7 +335,7 @@ struct TaskPlan {
   std::uint64_t id = 0;
   TimePoint created_at{};
   Duration valid_for{1000};  // 计划新鲜度，默认 1 s
-  std::optional<TaskCall> call;  // 当前只允许一个主任务
+  std::optional<TaskCall> call;  // 当前只允许一个主任务；Resource 不走此字段
   std::string rationale;
 };
 ```
@@ -342,7 +343,7 @@ struct TaskPlan {
 - `TaskId` 与 `TaskParams` 的 variant 必须匹配；Runtime 启动前校验，不匹配直接拒绝。
 - `TaskPlan.valid_for`：超过 `created_at + valid_for` 才应用视为过期，Runtime 丢弃并发 `kPlanExpired`，不启动任务。
 - `TaskCall.timeout`：任务启动后计时；0 表示不超时。超时由 Runtime 结束任务并回调 `kTimeout`。
-- 不再有 `TaskCall.lease` / `priority` / `domain`；当前只有一个主任务栏。
+- 不再有 `TaskCall.lease` / `priority` / `domain`；主任务栏每时刻最多一个 active Task，`Resource` 由独立辅助栏执行。
 
 ### 10.3 TaskSnapshot / TaskResult
 
@@ -464,14 +465,14 @@ using Strategy = std::function<TaskPlan(
 - `Command` 是下游指令层，不属于本战术层；本层只到 `TaskRuntime` / `TaskOutput`。
 - 动作层无固定周期：事件触发；无事件时最长 1 s 触发一次。`TaskRuntime` 仍为 `10–20 Hz`。
 - 打断默认允许；仅特定任务不可中断，由任务级 `Task::can_abort()` 决定；不设 `min_commit` / `abort_if` / `lease`。
-- 当前只有主任务栏；每时刻最多一个 active Task，资源任务也在主任务栏，远程兑换暂不做。
+- 主任务栏每时刻最多一个 active Task；`Resource` 由独立辅助栏执行，远程兑换暂不做。
 - 所有点位使用 [POINTS_2027.md](POINTS_2027.md) 的 11 个命名点；Task 层只看到 `own` / `enemy`，红蓝映射只在 IO / Belief 做一次。
 - `HistoryView` 只保留上一次任务及结果；`TacticalMode` 完全删除，调试改用 `task_state`。
 - 所有 Task 不做内部重试；失败/超时交给动作层。裁判兑换类任务只设 5 s 检测窗口，不重发。`ActionDispatcher` 已改为单次发送，旧重试字段已删除。
 - `Scan` / `Outpost` 是同级、互斥的 state-only 主任务；`Outpost` 不含导航。
 - `Respawn`：待复活期间发送免费复活确认（`kFreeResurrect`）；成功后结束，`Heal` 由动作层另选。整个任务保持 `TaskState = kRespawn`。
 - `Heal`：基地补给区自动领取累积免费发弹（每满 1 分钟 100 发），5 s 内确认；`claim_free_ammo` 默认 true，前哨站忽略；前哨站（己方或敌方半场，只要己方完全控制）只回血。
-- `Resource`：状态型任务，不导航；在 `own_base_supply` / `own_outpost_buff` 花金币兑换；只发一次，5 s 等 `info1.ammo_exchanged_local` 追上目标。
+- `Resource`：辅助栏状态型任务，不导航；在 `own_base_supply` / `own_outpost_buff` / `enemy_outpost_buff`（后两者要求完全控制且存活）花金币兑换；只发一次，5 s 等 `info1.ammo_exchanged_local` 追上目标。
 - `Tunnel`、`Rune` 2027 第一版不做。
 - 2027 `0x0101`：`event_data` / `event_data_2` 解码；R/B 用 `own_color` 映射为 own/enemy；`GameInfo.event_code_2` 已加。
 - `TaskState` 串口字段：`DecisionCommand.task_state:uint8`，payload 10 B；取值 0–6。

@@ -18,6 +18,7 @@ add_library(${PROJECT_NAME}
   src/logging.cpp
   src/nav_goal_tracker.cpp
   src/referee_protocol.cpp
+  src/resource_controller.cpp
   src/safety_supervisor.cpp
   src/tasks/heal_task.cpp
   src/tasks/navigate_task.cpp
@@ -96,6 +97,10 @@ if(BUILD_TESTING)
   add_executable(test_heal_resource test/test_heal_resource.cpp)
   target_link_libraries(test_heal_resource ${PROJECT_NAME})
   add_test(NAME test_heal_resource COMMAND test_heal_resource)
+
+  add_executable(test_resource_controller test/test_resource_controller.cpp)
+  target_link_libraries(test_resource_controller ${PROJECT_NAME})
+  add_test(NAME test_resource_controller COMMAND test_resource_controller)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

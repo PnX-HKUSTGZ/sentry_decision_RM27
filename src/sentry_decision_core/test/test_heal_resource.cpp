@@ -134,8 +134,32 @@ void test_heal_enemy_outpost_requires_full_control() {
   HealTask controlled(config, 400, Duration{420000});
   controlled.start(heal_call("enemy_outpost_buff"), now);
   world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_hp = 1000;
   TaskOutput full = controlled.tick(world, now);
   CHECK(full.status == TaskStatus::kSuccess);
+}
+
+void test_heal_outpost_rejects_destroyed_building() {
+  const PolicyConfig config = make_config();
+  const TimePoint now{};
+
+  HealTask own(config, 400, Duration{420000});
+  own.start(heal_call("own_outpost_buff"), now);
+  WorldState world = make_world(5.0, 0.0);
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_hp = 0;
+  TaskOutput own_out = own.tick(world, now);
+  CHECK(own_out.status == TaskStatus::kFailure);
+  CHECK(own_out.detail == "己方前哨站已被击毁");
+
+  HealTask enemy(config, 400, Duration{420000});
+  enemy.start(heal_call("enemy_outpost_buff"), now);
+  world = make_world(-5.0, 0.0);
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_hp = 0;
+  TaskOutput enemy_out = enemy.tick(world, now);
+  CHECK(enemy_out.status == TaskStatus::kFailure);
+  CHECK(enemy_out.detail == "敌方前哨站已被击毁");
 }
 
 void test_heal_without_claim_succeeds_at_full_hp() {
@@ -188,6 +212,42 @@ void test_resource_timeout() {
   CHECK(out.detail == "兑换 5 s 内未到账");
 }
 
+void test_resource_allows_enemy_outpost_buff() {
+  ResourceTask task;
+  const TimePoint now{};
+  task.start(TaskCall{"Resource", ResourceParams{"enemy_outpost_buff", 50}, Duration{0}}, now);
+
+  WorldState world = make_world(-5.0, 0.0);
+  world.upstream.event.supply_zone_occupied = false;
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_hp = 1000;
+  world.upstream.event.enemy_outpost_buff_status = 1;
+  world.upstream.coins = 100;
+  TaskOutput sent = task.tick(world, now);
+  CHECK(sent.status == TaskStatus::kRunning);
+  CHECK(sent.action.has_value());
+  CHECK(sent.action->target == 50);
+
+  world.upstream.info1.ammo_exchanged_local = 50;
+  CHECK(task.tick(world, now + Duration{1000}).status == TaskStatus::kSuccess);
+}
+
+void test_resource_rejects_destroyed_outpost_buff() {
+  ResourceTask task;
+  const TimePoint now{};
+  task.start(TaskCall{"Resource", ResourceParams{"own_outpost_buff", 50}, Duration{0}}, now);
+
+  WorldState world = make_world(5.0, 0.0);
+  world.upstream.event.supply_zone_occupied = false;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.event.our_outpost_buff_status = 1;
+  world.upstream.coins = 100;
+  TaskOutput out = task.tick(world, now);
+  CHECK(out.status == TaskStatus::kFailure);
+  CHECK(out.detail == "己方前哨站已被击毁");
+}
+
 void test_resource_rejects_bad_amount_and_coins() {
   ResourceTask task;
   const TimePoint now{};
@@ -213,9 +273,12 @@ int main() {
   test_heal_ammo_window_resets_after_leaving();
   test_heal_outpost_requires_full_control();
   test_heal_enemy_outpost_requires_full_control();
+  test_heal_outpost_rejects_destroyed_building();
   test_heal_without_claim_succeeds_at_full_hp();
   test_resource_sends_once_and_waits();
   test_resource_timeout();
+  test_resource_allows_enemy_outpost_buff();
+  test_resource_rejects_destroyed_outpost_buff();
   test_resource_rejects_bad_amount_and_coins();
 
   if (g_failures == 0) {

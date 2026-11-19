@@ -98,32 +98,31 @@ void test_supply_claim_updates_belief() {
   CHECK(result->status == TaskStatus::kSuccess);
 }
 
-void test_history_reset_between_matches() {
+void test_heal_then_scan_without_main_resource() {
   const PolicyConfig config = make_config();
   TaskRunner runner(config, 400, Duration{420000});
   WorldState world = make_world();
-  // 低弹且不在基地 -> Heal 负责回到基地；到基地后满血、无待领取分钟，Heal 成功。
-  world.self.pose = Point2D{5.0, 0.0, 0.0};
-  world.upstream.self_ammo = 10;
+  // 低血触发 Heal；Heal 成功后主栏回到 Scan，买弹交给独立 Resource 辅助栏。
+  world.self.pose = Point2D{0.0, 0.0, 0.0};
+  world.upstream.self_hp = 30;
+  world.upstream.self_ammo = 100;
   world.upstream.coins = 200;
   world.upstream.game_time_remaining = 420;
   world.upstream.enemy_outpost_hp = 0;
 
   runner.tick(world, TimePoint{});
   CHECK(runner.task_state() == TaskState::kHeal);
-  world.self.pose = Point2D{0.0, 0.0, 0.0};
-  world.upstream.self_ammo = 100;
+  world.upstream.self_hp = 400;
   runner.tick(world, TimePoint{} + Duration{500});
   const auto heal = runner.take_result();
   CHECK(heal.has_value());
   CHECK(heal->task == "Heal");
   CHECK(heal->status == TaskStatus::kSuccess);
 
-  // 离开比赛中再重新开始：上一局 Heal 的成功不应触发本局 Resource。
+  // 离开比赛中再重新开始：不会出现主栏 Resource。
   world.upstream.game_status = GameStatus::kPreparation;
   runner.tick(world, TimePoint{} + Duration{1000});
   world.upstream.game_status = GameStatus::kRunning;
-  world.upstream.self_ammo = 100;
   runner.tick(world, TimePoint{} + Duration{2000});
   CHECK(runner.task_state() == TaskState::kScan);
 }
@@ -146,7 +145,7 @@ int main() {
   test_dead_starts_respawn();
   test_low_hp_starts_heal();
   test_supply_claim_updates_belief();
-  test_history_reset_between_matches();
+  test_heal_then_scan_without_main_resource();
 
   if (g_failures == 0) {
     std::printf("all task_runner tests passed\n");

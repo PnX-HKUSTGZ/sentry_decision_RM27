@@ -37,6 +37,14 @@ panel.render({
       elapsed_ms: 9000,
       metrics: 'distance_remaining=0.100',
     },
+    resource: {
+      id: 'Resource',
+      status: 1,
+      phase: 'exchange',
+      detail: '等待到账',
+      params: 'exchange_point=own_base_supply, amount=100',
+      metrics: 'target=100.000',
+    },
   },
 });
 
@@ -51,6 +59,9 @@ check(el.innerHTML.includes('Navigate'), '上一次任务');
 check(el.innerHTML.includes('success'), '上一次结果');
 check(el.innerHTML.includes('到达 own_base_supply'), '上一次原因');
 check(el.innerHTML.includes('9.0 s'), '上一次用时');
+check(el.innerHTML.includes('辅助兑换'), '辅助兑换行');
+check(el.innerHTML.includes('exchange_point=own_base_supply'), '辅助兑换参数');
+check(el.innerHTML.includes('target=100.000'), '辅助兑换指标');
 check(el.innerHTML.includes('否'), '急停状态');
 
 if (failures !== 0) {

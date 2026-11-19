@@ -12,11 +12,11 @@ world:
   game_time_remaining: 0
   coins: 220
   self_hp: 400
-  self_ammo: 100
-  base_hp: 5000
-  our_outpost_hp: 1500
-  enemy_outpost_hp: 1200
-  enemy_base_hp: 5000
+  self_ammo: 300
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
   can_rebuild_outpost: true
 
 # 至少需要一个事件（解析器要求）；该事件只做无副作用的世界回填。

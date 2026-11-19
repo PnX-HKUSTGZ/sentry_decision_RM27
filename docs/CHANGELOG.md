@@ -13,7 +13,7 @@
 
 ### Added
 
-- 无头策略冒烟：`strategy_smoke` 场景覆盖进攻前哨、Scan、低血 Heal、Resource、战亡 Respawn 的完整策略流程；`low_ammo_reset_smoke` 覆盖低弹兑换与重置恢复；`nav_reset_smoke` 覆盖导航成功后重置再启动。
+- 无头策略冒烟：`strategy_smoke` 场景覆盖进攻前哨、Scan、低血 Heal、战亡 Respawn 的完整策略流程；`low_ammo_reset_smoke` 覆盖低弹兑换与重置恢复；`nav_reset_smoke` 覆盖导航成功后重置再启动。
 - 面板「资源与动作」显示当前 `TaskSnapshot`（任务、状态、阶段、参数、已进行时间、指标）与上一次 `TaskResult`。
 - 世界状态面板显示两处前哨阵地的控制方（我方完全 / 我方临时 / 敌方控制）。
 - 世界状态面板移除未启用的“期望 / 当前姿态”行；2027 Task 层当前不输出姿态。
@@ -22,6 +22,8 @@
 - 仿真前哨站归属：`OutpostControlState.owner_is_us`；只有完全控制换到另一方时才重建 500 血，同方恢复不重建。
 - 仿真中央高地增益点：`own_outpost_side` + `enemy_outpost_opposite` 并入己方前哨占点，`enemy_outpost_side` + `own_outpost_opposite` 并入敌方前哨占点，半径 0.5 m。
 - 决策层前哨站归属 belief：`OutpostOwner`、`WorldState.upstream.our_outpost_owner/enemy_outpost_owner`；HP 上升视为重建并反转归属，1 s 后用 full 控制方校正。
+- 独立 `ResourceController` 辅助栏：自己的状态机 / 配置 / 快照，不占主任务栏、不产生 `DecisionEpoch`，主栏有 action 时让位。
+- 面板增加 Resource 辅助栏显示；Resource 配置新增低弹阈值、批量、保留金币、驻留与重试冷却。
 - `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
 - 世界状态面板显示前哨站归属。
 - `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
@@ -37,7 +39,9 @@
 
 - 所有 Task 不重试；裁判兑换类任务只设 5 s 检测窗口。
 - `Heal`：基地补给区按每分钟 100 发累积确认；前哨站只回血。
-- `Resource`：状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账。
+- `Resource`：辅助栏状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账；支持 `enemy_outpost_buff`，前哨站增益点要求完全控制且 `hp > 0`。
+- 主策略不再选择主栏 `Resource`；低弹买弹交给独立辅助栏。
+- 仿真默认/场景数值对齐 2027：基地 10000、前哨站 1000、初始弹 300。
 - `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`。
 - `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
 - `TaskState`：变化即发，并补 10 Hz 心跳。
@@ -45,7 +49,7 @@
 ### Fixed
 
 - 重置后 `nav.reached` / `nav.failed` 残留，下一次 `Navigate` 会误判“导航已结束但不在到达半径内”并反复失败；现在取消目标时清空旧结果。
-- 低弹且已在基地时策略仍反复选择 `Heal`（满血立即成功），任务态反复回到 `idle` 且弹药不增加；现在优先选择 `Resource`，买不起且无免费批次时不再空转。
+- 低弹且已在基地时策略反复选择 `Heal`（满血立即成功），任务态反复回到 `idle` 且弹药不增加；现在买弹由独立 Resource 辅助栏处理，主栏不再因此空转。
 - `RosIoNode::status` 只在发送导航目标后置 `nav.valid`，导致首个 `Navigate` 永远无法启动；现在以 action server 就绪为可用条件，并在查询时刷新心跳。
 - 仿真补给区 / 前哨站回血会把 `self_hp=0` 的机器人“救活”，导致 `Respawn` 被取消；现在战亡期间不执行回血。
 - `sentry_bridge` 未把 `event_code` 中已解码的前哨控制状态写入 `UpstreamState`，导致 Task 层始终看到 `kNotOwned`。
@@ -56,6 +60,7 @@
 - 跨局 `HistoryView` 未清空，可能导致新局误选 `Resource`。
 - 面板急停状态硬编码为 false。
 - `Outpost` / `Resource` / `Respawn` 在裁判数据失效时仍使用旧值。
+- 前哨站被击毁后仿真仍上报前哨站增益点、仍按前哨站 buff 回血/兑换；现在 `hp=0` 时 buff 失效。
 
 ### Removed
 

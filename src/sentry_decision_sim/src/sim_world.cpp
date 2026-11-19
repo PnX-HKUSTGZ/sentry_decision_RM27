@@ -664,8 +664,14 @@ void apply_occupancy(SimWorld* world, const Occupancy& occupancy) {
   // 否则发送 4。能否兑换 / 回血仍由 EventCode 的完全控制判断。
   const bool our_outpost_controlled = world->our_outpost_control.held_by_us;
   const bool enemy_outpost_controlled = world->enemy_outpost_control.held_by_us;
-  set_bits(&event, 22, 3, our_outpost_controlled ? (occupancy.our_outpost_buff ? 1u : 0u) : 4u);
-  set_bits(&event, 25, 3, enemy_outpost_controlled ? (occupancy.enemy_outpost_buff ? 1u : 0u) : 4u);
+  // 前哨站被击毁后其增益点失效；即使控制状态仍为完全控制，也不再上报激活。
+  const bool our_buff_alive = world->our_outpost_hp > 0;
+  const bool enemy_buff_alive = world->enemy_outpost_hp > 0;
+  set_bits(&event, 22, 3,
+           our_outpost_controlled && our_buff_alive ? (occupancy.our_outpost_buff ? 1u : 0u) : 4u);
+  set_bits(&event, 25, 3,
+           enemy_outpost_controlled && enemy_buff_alive ? (occupancy.enemy_outpost_buff ? 1u : 0u)
+                                                        : 4u);
   // 中央高地增益点：bit 18-19 / 20-21；未控制对应阵地时发送 3。
   set_bits(&event, 18, 2, our_outpost_controlled ? (occupancy.our_highland ? 1u : 0u) : 3u);
   set_bits(&event, 20, 2, enemy_outpost_controlled ? (occupancy.enemy_highland ? 1u : 0u) : 3u);

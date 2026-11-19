@@ -163,6 +163,22 @@ class TaskDecisionNode : public rclcpp::Node {
           << json_escape(previous->reason) << "\",\"elapsed_ms\":" << previous->elapsed.count()
           << ",\"metrics\":\"" << json_escape(metrics_text(previous->metrics)) << "\"}";
     }
+
+    const std::optional<sentry_decision::TaskSnapshot> resource = runner_.resource_snapshot();
+    out << ",\"resource\":";
+    if (!resource.has_value()) {
+      out << "null";
+    } else {
+      const std::string params =
+          resource->call.has_value() ? task_params_text(*resource->call) : std::string{};
+      out << "{\"id\":\"" << json_escape(resource->task)
+          << "\",\"status\":" << static_cast<int>(resource->status)
+          << ",\"phase\":\"" << json_escape(resource->phase) << "\",\"detail\":\""
+          << json_escape(resource->detail) << "\",\"progress\":" << resource->progress
+          << ",\"elapsed_ms\":" << resource->elapsed.count() << ",\"params\":\""
+          << json_escape(params) << "\",\"metrics\":\""
+          << json_escape(metrics_text(resource->metrics)) << "\"}";
+    }
     return out.str();
   }
 
@@ -205,6 +221,10 @@ class TaskDecisionNode : public rclcpp::Node {
       SD_LOG_ACT("task", "任务结束 %s status=%d reason=%s", result->task.c_str(),
                  static_cast<int>(result->status), result->reason.c_str());
     }
+    if (const auto result = runner_.take_resource_result(); result.has_value()) {
+      SD_LOG_ACT("resource", "辅助兑换结束 status=%d reason=%s",
+                 static_cast<int>(result->status), result->reason.c_str());
+    }
     while (auto epoch = runner_.take_epoch()) {
       SD_LOG_DEBUG("task", "DecisionEpoch reason=%d", static_cast<int>(epoch->reason));
     }
@@ -216,7 +236,13 @@ class TaskDecisionNode : public rclcpp::Node {
     const sentry_decision::TaskState state = runner_.task_state();
     sentry_decision::DecisionOutput output;
     output.nav_goal = runner_.nav_goal();
-    output.action = runner_.action().value_or(sentry_decision::ActionRequest{});
+    // 主栏动作优先；主栏本拍没有动作时，才让 Resource 辅助栏占用唯一的 action 槽。
+    std::optional<sentry_decision::ActionRequest> merged_action = runner_.action();
+    if (!merged_action.has_value() ||
+        merged_action->kind == sentry_decision::DecisionActionKind::kNone) {
+      merged_action = runner_.resource_action();
+    }
+    output.action = merged_action.value_or(sentry_decision::ActionRequest{});
     output.task_state = state;
     const sentry_decision::SafetyResult safe = safety_.apply(world, output);
     safety_emergency_json_ = safe.emergency;

@@ -6,8 +6,9 @@
 
 namespace sentry_decision {
 
-// Resource：在己方基地补给区 / 己方完全控制的前哨站增益点，向裁判兑换
-// 允许发弹量。状态型任务，不导航；只发送一次，5 s 内等累计值到账。
+// Resource：在己方基地补给区 / 己方完全控制且存活的前哨站增益点，向裁判
+// 兑换允许发弹量。状态型任务，不导航；只发送一次，5 s 内等累计值到账。
+// 由独立的 ResourceController 辅助栏执行，不占主任务栏。
 class ResourceTask : public Task {
  public:
   bool can_start(const WorldState& world) const override;
@@ -22,7 +23,14 @@ class ResourceTask : public Task {
   }
 
  private:
+  enum class ZoneKind {
+    kBaseSupply,
+    kOwnOutpost,
+    kEnemyOutpost,
+  };
+
   ResourceParams params_{};
+  ZoneKind zone_ = ZoneKind::kBaseSupply;
   bool started_ = false;
   bool invalid_ = false;
   bool sent_ = false;

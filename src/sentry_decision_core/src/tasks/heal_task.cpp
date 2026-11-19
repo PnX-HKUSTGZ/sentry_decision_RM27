@@ -101,6 +101,17 @@ TaskOutput HealTask::tick(const WorldState& world, TimePoint now) {
     out.detail = "敌方前哨站未完全控制";
     return out;
   }
+  // 前哨站被击毁后buff失效，即使控制状态仍是完全控制也不能回血。
+  if (zone_ == ZoneKind::kOwnOutpost && world.upstream.our_outpost_hp <= 0) {
+    out.status = TaskStatus::kFailure;
+    out.detail = "己方前哨站已被击毁";
+    return out;
+  }
+  if (zone_ == ZoneKind::kEnemyOutpost && world.upstream.enemy_outpost_hp <= 0) {
+    out.status = TaskStatus::kFailure;
+    out.detail = "敌方前哨站已被击毁";
+    return out;
+  }
 
   const double distance =
       std::hypot(world.self.pose.x - target_->x, world.self.pose.y - target_->y);

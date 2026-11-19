@@ -85,16 +85,17 @@ void test_low_ammo_far_from_base_selects_heal() {
   CHECK(plan.call->task == "Heal");
 }
 
-void test_low_ammo_at_base_selects_resource() {
+void test_low_ammo_at_base_does_not_use_main_resource() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
   WorldState world = make_world();
   world.upstream.self_ammo = 20;
   world.upstream.coins = 200;
+  world.upstream.game_time_remaining = 420;  // 无免费发弹批次
+  world.upstream.enemy_outpost_hp = 0;       // 让主栏落到 Scan
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
-  CHECK(plan.call->task == "Resource");
-  CHECK(std::get<ResourceParams>(plan.call->params).amount == 100);
+  CHECK(plan.call->task == "Scan");
 }
 
 void test_low_ammo_at_base_with_free_batch_selects_heal() {
@@ -124,19 +125,19 @@ void test_low_ammo_at_base_without_ammo_source_does_not_loop_heal() {
   CHECK(plan.call->task == "Scan");
 }
 
-void test_heal_success_at_base_selects_resource() {
+void test_heal_success_at_base_does_not_use_main_resource() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
   WorldState world = make_world();
   world.upstream.coins = 200;
+  world.upstream.enemy_outpost_hp = 0;
   HistoryView history;
   history.previous_task = TaskResult{};
   history.previous_task->task = "Heal";
   history.previous_task->status = TaskStatus::kSuccess;
   const TaskPlan plan = policy.decide(world, std::nullopt, history);
   CHECK(plan.call.has_value());
-  CHECK(plan.call->task == "Resource");
-  CHECK(std::get<ResourceParams>(plan.call->params).amount == 100);
+  CHECK(plan.call->task == "Scan");
 }
 
 void test_enemy_outpost_far_selects_navigate() {
@@ -188,10 +189,10 @@ int main() {
   test_dead_selects_respawn();
   test_low_hp_selects_heal();
   test_low_ammo_far_from_base_selects_heal();
-  test_low_ammo_at_base_selects_resource();
+  test_low_ammo_at_base_does_not_use_main_resource();
   test_low_ammo_at_base_with_free_batch_selects_heal();
   test_low_ammo_at_base_without_ammo_source_does_not_loop_heal();
-  test_heal_success_at_base_selects_resource();
+  test_heal_success_at_base_does_not_use_main_resource();
   test_enemy_outpost_far_selects_navigate();
   test_enemy_outpost_near_selects_outpost();
   test_no_outpost_selects_scan();

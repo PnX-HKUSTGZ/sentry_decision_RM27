@@ -39,10 +39,10 @@ DecisionCommand → auto-aim → MCU
 | `Scan` | 原地扫描，不自动结束 |
 | `Outpost` | 只下发 `TaskState=kOutpost`，由自瞄攻击 |
 | `Heal` | 导航到基地 / 己方完全控制前哨站并回血；基地确认免费发弹 |
-| `Resource` | 状态型买弹，5 s 等累计值到账 |
+| `Resource` | 辅助栏状态型买弹，5 s 等累计值到账；不占主栏 |
 | `Respawn` | 发送免费复活确认并等待 |
 
-所有 Task 不做内部重试；失败 / 超时回到 `TaskPolicy`。
+所有 Task 不做内部重试；失败 / 超时回到 `TaskPolicy`。`Resource` 由独立辅助栏执行，主栏 `TaskState` 不变。
 
 ## 3. 关键状态
 

@@ -3,6 +3,7 @@
 #include <deque>
 #include <optional>
 
+#include "sentry_decision_core/resource_controller.hpp"
 #include "sentry_decision_core/task_policy.hpp"
 #include "sentry_decision_core/task_runtime.hpp"
 
@@ -22,6 +23,15 @@ class TaskRunner {
   std::optional<ActionRequest> action() const {
     return runtime_.action();
   }
+  std::optional<ActionRequest> resource_action() const {
+    return resource_.action();
+  }
+  std::optional<TaskSnapshot> resource_snapshot() const {
+    return resource_.snapshot();
+  }
+  std::optional<TaskResult> take_resource_result() {
+    return resource_.take_result();
+  }
   TaskState task_state() const {
     return runtime_.task_state();
   }
@@ -38,6 +48,7 @@ class TaskRunner {
   TaskRegistry registry_;
   TaskRuntime runtime_;
   RuleBasedTaskPolicy policy_;
+  ResourceController resource_;
   HistoryView history_;
   Duration match_duration_{0};
   bool belief_initialized_ = false;

@@ -24,7 +24,7 @@ TaskCall {
 - 每个 tick 调用 BT；BT 返回 `RUNNING / SUCCESS / FAILURE`。
 - 超时由 `TaskRuntime` 计时，超时后回调失败。
 - 任务结束后，`TaskRuntime` 产生 `DecisionEpoch`，动作层立即选择下一个任务。
-- 当前只允许一个主任务；不做姿态并行栏。
+- 主任务栏每时刻最多一个 active Task；`Resource` 买弹由独立的辅助栏执行，不占主任务栏。姿态并行栏暂不做。
 - 当前 Task 都是原子单元；多步目标由动作层根据新状态连续选择，不内嵌其他 Task。
 - 所有 Task 仅在比赛状态 `kRunning` 时由 `TaskRuntime` 启动；任务定义不再重复该前置条件。
 - 所有点位统一使用 [POINTS_2027.md](POINTS_2027.md) 的命名点，不直接传坐标。
@@ -374,31 +374,32 @@ HealTask
 
 - 到达目标点后持续等待至回满血；超时则失败。
 - 基地补给区 5 s 领取确认窗口；前哨站只回血，不领取免费发弹量。
-- `Heal` 不是组合 Task；内部导航是 BT 原语，任务结束后由动作层另选 `Resource`。
+- `Heal` 不是组合 Task；内部导航是 BT 原语。买弹由独立 `ResourceController` 辅助栏在后台处理，不占主任务栏。
 
 ---
 
-## 6. Resource
+## 6. Resource（辅助栏）
 
 ### 6.1 目的
 
 在己方基地补给区或己方完全控制的前哨站增益点，向裁判系统**兑换**允许发弹量。
-`Resource` 是状态型任务：**不导航**，要求机器人已经在兑换点内；通常由动作层在 `Heal` 结束后选择。
-免费发弹量由 `Heal` 负责，`Resource` 只做花金币的本地兑换。
+`Resource` 是状态型任务：**不导航**，要求机器人已经在兑换点内。
+它由独立的 `ResourceController` 辅助栏执行，不占主任务栏，也不写主栏 `TaskState`；
+免费发弹量仍由 `Heal` 负责，`Resource` 只做花金币的本地兑换。
 
 ### 6.2 参数
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `exchange_point` | named point | 是 | 只允许 `own_base_supply` / `own_outpost_buff` |
+| `exchange_point` | named point | 是 | 只允许 `own_base_supply` / `own_outpost_buff` / `enemy_outpost_buff`（后两者要求己方完全控制且前哨站存活） |
 | `amount` | int | 是 | 本次兑换发数；必须是 10 的整数倍，且不超过 `1000 - info1.ammo_exchanged_local` |
 | `timeout` | Duration | 否 | 0 = 不超时 |
-| `task_state` | 固定 | — | `TaskState::kResource` |
+| `task_state` | 固定 | — | 辅助栏不写主栏 `TaskState`；`TaskState::kResource` 仅枚举兼容 |
 
 ### 6.3 前置条件
 
 - 机器人存活，且已在 `exchange_point` 区域内。
-- `own_outpost_buff`：己方前哨站必须由己方完全控制；发送前失去控制则失败。
+- `own_outpost_buff` / `enemy_outpost_buff`：对应前哨站必须由己方完全控制且 `hp > 0`；发送前失去控制或前哨站被击毁则失败。
 - `info1.ammo_exchanged_local + amount <= 1000`。
 - `coins >= amount`（17mm 本地兑换 1 金币/发）。
 
@@ -427,13 +428,14 @@ ResourceTask
 
 ### 6.7 输出与 metrics
 
-- `TaskState = kResource`。
+- 辅助栏不写主栏 `TaskState`；`TaskState::kResource` 仅为枚举兼容保留。
 - metrics：`amount`、`baseline`、`target`、`current`、`coins`、`in_zone`、`outpost_control`。
 
 ### 6.8 实现约定
 
-- 不导航；需要换点时由动作层先选 `Navigate` / `Heal`。
+- 不导航；需要换点时由主栏先选 `Navigate` / `Heal`，辅助栏只在兑换点内工作。
 - 只发送一次，不重发；5 s 检测窗口内等 `0x020D` 累计值追上目标。
+- 主栏有动作时辅助栏让位；主栏 `nav_goal` / `task_state` 不受辅助栏影响。
 - 不使用 `ActionDispatcher` 的重试状态机。
 
 ---

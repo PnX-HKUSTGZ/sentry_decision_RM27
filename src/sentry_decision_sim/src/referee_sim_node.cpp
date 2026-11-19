@@ -557,11 +557,13 @@ class RefereeSimNode : public rclcpp::Node {
       return HealZone::kSupply;
     }
     if (in_zone(our_outpost_center_x_, our_outpost_center_y_, our_outpost_radius_) &&
-        world_.our_outpost_control.held_by_us && world_.our_outpost_control.full) {
+        world_.our_outpost_hp > 0 && world_.our_outpost_control.held_by_us &&
+        world_.our_outpost_control.full) {
       return HealZone::kOurOutpost;
     }
     if (in_zone(enemy_outpost_center_x_, enemy_outpost_center_y_, enemy_outpost_radius_) &&
-        world_.enemy_outpost_control.held_by_us && world_.enemy_outpost_control.full) {
+        world_.enemy_outpost_hp > 0 && world_.enemy_outpost_control.held_by_us &&
+        world_.enemy_outpost_control.full) {
       return HealZone::kEnemyOutpost;
     }
     return HealZone::kNone;
