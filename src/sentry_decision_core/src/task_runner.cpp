@@ -11,7 +11,8 @@ constexpr Duration kDecisionPeriod{1000};
 }  // namespace
 
 TaskRunner::TaskRunner(const PolicyConfig& config, int max_hp, Duration match_duration)
-    : runtime_(registry_), policy_(config), resource_(config), match_duration_(match_duration) {
+    : runtime_(registry_), policy_(make_task_policy(config)), resource_(config),
+      match_duration_(match_duration) {
   register_default_tasks(registry_, config, max_hp, match_duration);
 }
 
@@ -49,7 +50,7 @@ void TaskRunner::tick(const WorldState& world, TimePoint now) {
                    now - last_decision_at_ >= kDecisionPeriod || !world.upstream.valid ||
                    world.upstream.game_status != GameStatus::kRunning;
   if (due) {
-    TaskPlan plan = policy_.decide(view, runtime_.snapshot(), history_);
+    TaskPlan plan = policy_->decide(view, runtime_.snapshot(), history_);
     plan.created_at = now;
     plan.valid_for = kPlanValidFor;
     runtime_.apply(plan, view, now);

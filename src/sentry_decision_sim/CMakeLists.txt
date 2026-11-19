@@ -115,6 +115,14 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/scenario/strategy_smoke.yaml)
   set_tests_properties(strategy_smoke PROPERTIES TIMEOUT 120)
 
+  # 端到端：utility policy 在敌方高地射击位选择 Outpost，打掉后回防。
+  add_test(NAME utility_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/utility_smoke.yaml)
+  set_tests_properties(utility_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_TASK_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles_rmuc27_utility.yaml"
+    TIMEOUT 30)
+
   # 端到端：前哨控制位从 event_data 解码到 Task 层，控制后不再进攻。
   add_test(NAME control_gate_smoke
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
@@ -136,8 +144,8 @@ if(BUILD_TESTING)
 
   # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
   set_tests_properties(
-    match_smoke sim_effects_smoke referee_guard_smoke strategy_smoke control_gate_smoke
-    low_ammo_reset_smoke nav_reset_smoke
+    match_smoke sim_effects_smoke referee_guard_smoke strategy_smoke utility_smoke
+    control_gate_smoke low_ammo_reset_smoke nav_reset_smoke
     PROPERTIES RUN_SERIAL TRUE)
 endif()
 

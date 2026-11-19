@@ -134,6 +134,8 @@ void test_task_success() {
   const auto result = runtime.take_result();
   CHECK(result.has_value());
   CHECK(result->task == "Fake");
+  CHECK(result->call.has_value());
+  CHECK(result->call->task == "Fake");
   CHECK(result->status == TaskStatus::kSuccess);
   CHECK(result->reason == "done");
   CHECK(result->metrics.at("ticks") == 1.0);
@@ -285,6 +287,7 @@ void test_can_start_is_enforced() {
   CHECK(!runtime.snapshot().has_value());
   const auto result = runtime.take_result();
   CHECK(result.has_value());
+  CHECK(result->call.has_value());
   CHECK(result->status == TaskStatus::kFailure);
   CHECK(result->reason == "task cannot start");
 }

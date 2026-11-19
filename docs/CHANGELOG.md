@@ -24,6 +24,10 @@
 - 决策层前哨站归属 belief：`OutpostOwner`、`WorldState.upstream.our_outpost_owner/enemy_outpost_owner`；HP 上升视为重建并反转归属，1 s 后用 full 控制方校正。
 - 独立 `ResourceController` 辅助栏：自己的状态机 / 配置 / 快照，不占主任务栏、不产生 `DecisionEpoch`，主栏有 action 时让位。
 - 面板增加 Resource 辅助栏显示；Resource 配置新增低弹阈值、批量、保留金币、驻留与重试冷却。
+- 前哨站血量趋势：`OutpostTrend`（1 s 差分 + 最近受击），用于己方半场安全判定。
+- `UtilityTaskPolicy`：合法 TaskCall 生成 + 控制/基地/生存/转场/切换成本打分；`strategy.use_utility` 切换，并提供 `profiles_rmuc27_utility.yaml` A/B。
+- `TaskResult.call`：保留完整 TaskCall，供 utility 做同点连续性/迟滞。
+- 端到端 `utility_smoke`：敌方高地射击位选择 Outpost，打掉后回己方半场。
 - `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
 - 世界状态面板显示前哨站归属。
 - `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
@@ -42,7 +46,7 @@
 - `Resource`：辅助栏状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账；支持 `enemy_outpost_buff`，前哨站增益点要求完全控制且 `hp > 0`。
 - 主策略不再选择主栏 `Resource`；低弹买弹交给独立辅助栏。
 - 仿真默认/场景数值对齐 2027：基地 10000、前哨站 1000、初始弹 300。
-- `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`。
+- `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`；`strategy.use_utility` 选择 rule / utility。
 - `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
 - `TaskState`：变化即发，并补 10 Hz 心跳。
 

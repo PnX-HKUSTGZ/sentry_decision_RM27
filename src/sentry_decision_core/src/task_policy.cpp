@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "sentry_decision_core/points_2027.hpp"
+#include "sentry_decision_core/utility_task_policy.hpp"
 
 namespace sentry_decision {
 namespace {
@@ -110,6 +111,13 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   }
 
   return plan_with(world, call("Scan", ScanParams{}));
+}
+
+std::unique_ptr<TaskPolicy> make_task_policy(const PolicyConfig& config) {
+  if (config.flag("strategy.use_utility").value_or(false)) {
+    return std::make_unique<UtilityTaskPolicy>(config);
+  }
+  return std::make_unique<RuleBasedTaskPolicy>(config);
 }
 
 }  // namespace sentry_decision

@@ -42,6 +42,7 @@ TaskCall {
 ```text
 TaskResult {
   task: TaskId,
+  call: TaskCall,       // 完整调用，供连续性 / 同点迟滞
   status: SUCCESS | FAILURE | TIMEOUT | ABORTED,
   finished_at: TimePoint,
   elapsed: Duration,

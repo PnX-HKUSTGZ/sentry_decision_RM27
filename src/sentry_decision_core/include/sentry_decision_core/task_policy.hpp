@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 
 #include "sentry_decision_core/config.hpp"
@@ -31,5 +32,8 @@ class RuleBasedTaskPolicy : public TaskPolicy {
  private:
   const PolicyConfig& config_;
 };
+
+// 根据 config 的 strategy.use_utility 选择 rule / utility。
+std::unique_ptr<TaskPolicy> make_task_policy(const PolicyConfig& config);
 
 }  // namespace sentry_decision

@@ -237,6 +237,40 @@ void test_outpost_owner_resets_outside_match() {
   CHECK(reset.upstream.enemy_outpost_owner == OutpostOwner::kEnemy);
 }
 
+void test_outpost_hp_trend_and_attack_flag() {
+  const TimePoint t0{};
+  FakeUpstream upstream;
+  FakeOdometry odometry;
+  FakeNavigation navigation;
+  WorldModel model = make_owner_model(&upstream, &odometry, &navigation);
+
+  const WorldState initial = model.snapshot(t0);
+  CHECK(initial.our_outpost_trend.hp_delta_1s == 0);
+  CHECK(!initial.our_outpost_trend.under_attack);
+
+  upstream.state.stamp = t0 + Duration{100};
+  upstream.state.our_outpost_hp = 700;
+  const WorldState hit = model.snapshot(t0 + Duration{100});
+  CHECK(hit.our_outpost_trend.under_attack);
+
+  upstream.state.stamp = t0 + Duration{1100};
+  upstream.state.our_outpost_hp = 600;
+  const WorldState trend = model.snapshot(t0 + Duration{1100});
+  CHECK(trend.our_outpost_trend.hp_delta_1s == -400);
+
+  upstream.state.stamp = t0 + Duration{2700};
+  upstream.state.our_outpost_hp = 600;
+  const WorldState settled = model.snapshot(t0 + Duration{2700});
+  CHECK(!settled.our_outpost_trend.under_attack);
+
+  upstream.state.stamp = t0 + Duration{2800};
+  upstream.state.our_outpost_hp = 600;
+  upstream.state.game_status = GameStatus::kPreparation;
+  const WorldState reset = model.snapshot(t0 + Duration{2800});
+  CHECK(reset.our_outpost_trend.hp_delta_1s == 0);
+  CHECK(!reset.our_outpost_trend.under_attack);
+}
+
 void test_navigation_sink() {
   const TimePoint t0{};
   FakeUpstream upstream;
@@ -264,6 +298,7 @@ int main() {
   test_outpost_owner_temporary_lag_keeps_toggle();
   test_outpost_owner_full_control_corrects();
   test_outpost_owner_resets_outside_match();
+  test_outpost_hp_trend_and_attack_flag();
   test_navigation_sink();
   if (g_failures == 0) {
     std::printf("all core world_model tests passed\n");

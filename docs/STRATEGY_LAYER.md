@@ -203,6 +203,11 @@ else: switch
 
 - 迟滞与紧急事件覆盖由 TaskRuntime 与任务参数共同保证；不设 `min_commit` / `abort_if`。
 - Utility AI 是 baseline；后续可替换为学习效用 / 分层 RL，接口不变。
+- 2027 实现：`UtilityTaskPolicy` 先生成合法 TaskCall，再按控制收益、基地风险、血量/弹药、转场、切换成本打分；
+  `config/policies/rmuc27.yaml` 的 `strategy.use_utility=true` 切换，默认仍为 `RuleBasedTaskPolicy`。
+  A/B 可直接用 `config/profiles_rmuc27_utility.yaml` 启动。
+- 硬过滤只用于非法/不可执行候选（死亡、归属不为敌方、前哨站 hp=0、buff 失效、点位无效）；
+  “己方半场优先 / 双方全占守敌方半场 / 低血回防”属于 utility 权重，不作为模式门限。
 
 ## 8. 日志与回放
 
@@ -364,6 +369,7 @@ struct TaskSnapshot {
 
 struct TaskResult {
   TaskId task;
+  std::optional<TaskCall> call;  // 完整调用，供连续性 / 同点迟滞
   TaskStatus status = TaskStatus::kIdle;  // 仅 kSuccess / kFailure / kTimeout / kAborted
   TimePoint finished_at{};
   Duration elapsed{0};

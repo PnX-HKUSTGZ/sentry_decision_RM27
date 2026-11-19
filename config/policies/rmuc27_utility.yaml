@@ -1,0 +1,46 @@
+# rmuc27 utility 策略 profile：用于与 rule baseline 做 A/B。
+# 用法：task_node --config config/profiles_rmuc27_utility.yaml
+strategy:
+  use_utility: true
+
+self:
+  max_hp: 400
+
+match:
+  duration_s: 420
+
+nav:
+  retreat_hp: 100
+  recovery_hp: 400
+  low_ammo: 50
+  supply_ammo: 150
+  patrol_dwell_s: 5.0
+
+utility:
+  safe_hp_ratio: 0.55
+  low_hp_ratio: 0.35
+  attack_radius: 0.65
+  travel_weight: 0.06
+  switch_penalty: 0.35
+  continue_bonus: 0.55
+  last_call_bonus: 0.15
+
+resource:
+  enabled: true
+  low_ammo: 80
+  batch: 100
+  reserve_coins: 150
+  dwell_s: 0.5
+  retry_s: 2.0
+
+safety:
+  max_vx: 3.0
+  max_vy: 3.0
+  max_wz: 6.0
+  require_upstream: true
+  require_odometry: true
+
+timeouts:
+  upstream_ms: 500
+  odometry_ms: 500
+  navigation_ms: 500

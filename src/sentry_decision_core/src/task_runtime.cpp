@@ -28,6 +28,7 @@ void TaskRuntime::start(const TaskCall& call, const WorldState& world, TimePoint
   if (!task) {
     TaskResult result;
     result.task = call.task;
+    result.call = call;
     result.status = TaskStatus::kFailure;
     result.finished_at = now;
     result.reason = "unknown task";
@@ -39,6 +40,7 @@ void TaskRuntime::start(const TaskCall& call, const WorldState& world, TimePoint
   if (!task->can_start(world)) {
     TaskResult result;
     result.task = call.task;
+    result.call = call;
     result.status = TaskStatus::kFailure;
     result.finished_at = now;
     result.reason = "task cannot start";
@@ -71,6 +73,7 @@ void TaskRuntime::finish(TaskStatus status, TimePoint now, const std::string& re
 
   TaskResult result;
   result.task = active_->call.task;
+  result.call = active_->call;
   result.status = status;
   result.finished_at = now;
   result.elapsed = std::chrono::duration_cast<Duration>(now - active_->started_at);

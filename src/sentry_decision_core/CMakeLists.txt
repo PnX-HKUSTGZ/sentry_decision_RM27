@@ -20,6 +20,7 @@ add_library(${PROJECT_NAME}
   src/referee_protocol.cpp
   src/resource_controller.cpp
   src/safety_supervisor.cpp
+  src/utility_task_policy.cpp
   src/tasks/heal_task.cpp
   src/tasks/navigate_task.cpp
   src/tasks/outpost_task.cpp
@@ -101,6 +102,10 @@ if(BUILD_TESTING)
   add_executable(test_resource_controller test/test_resource_controller.cpp)
   target_link_libraries(test_resource_controller ${PROJECT_NAME})
   add_test(NAME test_resource_controller COMMAND test_resource_controller)
+
+  add_executable(test_utility_policy test/test_utility_policy.cpp)
+  target_link_libraries(test_utility_policy ${PROJECT_NAME})
+  add_test(NAME test_utility_policy COMMAND test_utility_policy)
 endif()
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

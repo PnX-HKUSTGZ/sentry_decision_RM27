@@ -127,6 +127,23 @@ void test_heal_then_scan_without_main_resource() {
   CHECK(runner.task_state() == TaskState::kScan);
 }
 
+void test_utility_flag_selects_outpost_at_highland() {
+  PolicyConfig config = make_config();
+  config.flags["strategy.use_utility"] = true;
+  config.points["enemy_outpost_side"] = Point2D{5.0, 2.0, 0.0};
+  config.point_radius["enemy_outpost_side"] = 0.5;
+  TaskRunner runner(config, 400, Duration{420000});
+  WorldState world = make_world();
+  world.self.pose = Point2D{5.0, 2.0, 0.0};
+  world.upstream.enemy_outpost_hp = 1000;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kEnemy;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+
+  runner.tick(world, TimePoint{});
+  CHECK(runner.task_state() == TaskState::kOutpost);
+}
+
 void test_low_hp_starts_heal() {
   const PolicyConfig config = make_config();
   TaskRunner runner(config, 400, Duration{420000});
@@ -143,6 +160,7 @@ void test_low_hp_starts_heal() {
 int main() {
   test_navigate_then_success();
   test_dead_starts_respawn();
+  test_utility_flag_selects_outpost_at_highland();
   test_low_hp_starts_heal();
   test_supply_claim_updates_belief();
   test_heal_then_scan_without_main_resource();

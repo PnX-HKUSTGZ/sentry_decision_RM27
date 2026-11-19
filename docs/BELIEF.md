@@ -116,6 +116,7 @@ flowchart LR
 | 字段 | 类型 | 来源 | 说明 |
 | --- | --- | --- | --- |
 | `supply_claimed_minutes` | int | `TaskRunner` 信念跟踪 | 己方补给区免费发弹已领取到第几个整分钟；只在补给区内观测到 `self_ammo` 正增量、且 `info1.ammo_exchanged_local` 未同步增加时更新 |
+| `our_outpost_trend` / `enemy_outpost_trend` | `OutpostTrend` | `WorldModel` | 前哨站最近 1 s 血量差 + 最近 1.5 s 是否掉血；只供策略判断，不进入上行/下行协议 |
 
 ## 5. SelfState 字段
 

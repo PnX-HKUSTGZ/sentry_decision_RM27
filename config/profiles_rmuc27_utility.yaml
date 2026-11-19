@@ -1,0 +1,7 @@
+# 2027 utility A/B 入口；与 config/profiles.yaml 共用地图。
+map_profile: RMUC27
+strategy_profile: rmuc27_utility
+
+pre_match:
+  enemy_engineer_can_climb_stairs: false
+  allow_cross_undulation: false

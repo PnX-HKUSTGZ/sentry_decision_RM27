@@ -1,5 +1,8 @@
 # rmuc27 策略阈值 / 时间窗（由 profiles.yaml 的 strategy_profile 选择）。
-# 2027 第一版仍使用 RuleBasedTaskPolicy；这些阈值供该 baseline 使用。
+# 2027 第一版默认 RuleBasedTaskPolicy；strategy.use_utility=true 时切换 utility。
+strategy:
+  use_utility: false
+
 self:
   max_hp: 400
 
@@ -12,6 +15,16 @@ nav:
   low_ammo: 50                 # 低于该弹量 -> 回补给区
   supply_ammo: 150
   patrol_dwell_s: 5.0
+
+# Utility policy 参数（strategy.use_utility=true 时生效）。
+utility:
+  safe_hp_ratio: 0.55
+  low_hp_ratio: 0.35
+  attack_radius: 0.65
+  travel_weight: 0.06
+  switch_penalty: 0.35
+  continue_bonus: 0.55
+  last_call_bonus: 0.15
 
 # 独立 Resource 辅助栏：不占主任务，不写 TaskState。
 resource:

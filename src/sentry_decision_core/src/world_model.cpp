@@ -54,6 +54,31 @@ void WorldModel::update_outpost_owner(OutpostOwner* owner, int* previous_hp, boo
   *previous_hp = hp;
 }
 
+void WorldModel::update_outpost_trend(OutpostTrend* trend, int* last_hp,
+                                      TimePoint* last_sample, TimePoint* last_damage,
+                                      bool* initialized, int hp, TimePoint now) {
+  if (!*initialized) {
+    *initialized = true;
+    *last_hp = hp;
+    *last_sample = now;
+    *last_damage = now - Duration{10000};
+    trend->hp_delta_1s = 0;
+    trend->under_attack = false;
+    return;
+  }
+
+  const int delta = hp - *last_hp;
+  if (now - *last_sample >= Duration{1000}) {
+    trend->hp_delta_1s = delta;
+    *last_hp = hp;
+    *last_sample = now;
+  }
+  if (delta < 0) {
+    *last_damage = now;
+  }
+  trend->under_attack = now - *last_damage < Duration{1500};
+}
+
 WorldState WorldModel::snapshot(TimePoint now) {
   WorldState state;
   state.stamp = now;
@@ -69,6 +94,10 @@ WorldState WorldModel::snapshot(TimePoint now) {
     previous_enemy_outpost_hp_ = -1;
     our_rebuild_pending_ = false;
     enemy_rebuild_pending_ = false;
+    our_trend_initialized_ = false;
+    enemy_trend_initialized_ = false;
+    state.our_outpost_trend = OutpostTrend{};
+    state.enemy_outpost_trend = OutpostTrend{};
   } else {
     update_outpost_owner(&our_outpost_owner_, &previous_our_outpost_hp_,
                          &our_rebuild_pending_, &our_rebuild_at_, upstream.our_outpost_hp,
@@ -76,6 +105,12 @@ WorldState WorldModel::snapshot(TimePoint now) {
     update_outpost_owner(&enemy_outpost_owner_, &previous_enemy_outpost_hp_,
                          &enemy_rebuild_pending_, &enemy_rebuild_at_, upstream.enemy_outpost_hp,
                          upstream.enemy_outpost_control, now);
+    update_outpost_trend(&state.our_outpost_trend, &last_our_trend_hp_,
+                         &last_our_trend_sample_, &last_our_damage_at_,
+                         &our_trend_initialized_, upstream.our_outpost_hp, now);
+    update_outpost_trend(&state.enemy_outpost_trend, &last_enemy_trend_hp_,
+                         &last_enemy_trend_sample_, &last_enemy_damage_at_,
+                         &enemy_trend_initialized_, upstream.enemy_outpost_hp, now);
   }
   state.upstream.our_outpost_owner = our_outpost_owner_;
   state.upstream.enemy_outpost_owner = enemy_outpost_owner_;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <memory>
 #include <optional>
 
 #include "sentry_decision_core/resource_controller.hpp"
@@ -47,7 +48,7 @@ class TaskRunner {
  private:
   TaskRegistry registry_;
   TaskRuntime runtime_;
-  RuleBasedTaskPolicy policy_;
+  std::unique_ptr<TaskPolicy> policy_;
   ResourceController resource_;
   HistoryView history_;
   Duration match_duration_{0};

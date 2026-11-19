@@ -160,6 +160,7 @@ void ResourceController::tick_resource(const WorldState& world, TimePoint now) {
 
   TaskResult result;
   result.task = call_->task;
+  result.call = call_;
   result.status = out.status;
   result.finished_at = now;
   result.elapsed = snapshot_->elapsed;

@@ -25,6 +25,8 @@ class WorldModel {
   void update_outpost_owner(OutpostOwner* owner, int* previous_hp, bool* pending,
                             TimePoint* pending_at, int hp, OutpostControl control,
                             TimePoint now);
+  void update_outpost_trend(OutpostTrend* trend, int* last_hp, TimePoint* last_sample,
+                            TimePoint* last_damage, bool* initialized, int hp, TimePoint now);
 
   UpstreamSource& upstream_;
   OdometrySource& odometry_;
@@ -44,6 +46,16 @@ class WorldModel {
   bool enemy_rebuild_pending_ = false;
   TimePoint our_rebuild_at_{};
   TimePoint enemy_rebuild_at_{};
+
+  // 前哨站血量趋势：1 s 差分 + 最近受击时间；只服务策略，不进协议。
+  bool our_trend_initialized_ = false;
+  bool enemy_trend_initialized_ = false;
+  int last_our_trend_hp_ = 0;
+  int last_enemy_trend_hp_ = 0;
+  TimePoint last_our_trend_sample_{};
+  TimePoint last_enemy_trend_sample_{};
+  TimePoint last_our_damage_at_{};
+  TimePoint last_enemy_damage_at_{};
 };
 
 }  // namespace sentry_decision

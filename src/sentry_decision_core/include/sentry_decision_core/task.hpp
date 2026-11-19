@@ -112,6 +112,7 @@ struct TaskSnapshot {
 
 struct TaskResult {
   TaskId task;
+  std::optional<TaskCall> call;  // 完整调用，供连续性/同点迟滞
   TaskStatus status = TaskStatus::kIdle;  // 仅 kSuccess / kFailure / kTimeout / kAborted
   TimePoint finished_at{};
   Duration elapsed{0};

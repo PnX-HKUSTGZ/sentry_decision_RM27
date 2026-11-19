@@ -3,6 +3,7 @@
 set -euo pipefail
 
 # 使用独立 ROS_DOMAIN_ID，避免与同批次其它集成测试的节点互相干扰。
+# 可选：SCENARIO_TASK_CONFIG=<profiles.yaml> 指定 task_node 的配置（用于 rule/utility A/B）。
 export ROS_DOMAIN_ID="${SCENARIO_DOMAIN_ID:-41}"
 
 SCENARIO="${1:-}"
@@ -24,7 +25,11 @@ set -u
 DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/task_node"
 SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_sim_node"
 
-"${DECISION_BIN}" --rate 20 >/tmp/scenario_decision.log 2>&1 &
+CONFIG_ARGS=()
+if [[ -n "${SCENARIO_TASK_CONFIG:-}" ]]; then
+  CONFIG_ARGS+=(--config "${SCENARIO_TASK_CONFIG}")
+fi
+"${DECISION_BIN}" --rate 20 "${CONFIG_ARGS[@]}" >/tmp/scenario_decision.log 2>&1 &
 DECISION_PID=$!
 trap 'kill "${DECISION_PID}" 2>/dev/null || true' EXIT
 sleep 2
