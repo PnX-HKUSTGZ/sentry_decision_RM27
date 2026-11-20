@@ -40,6 +40,28 @@ ScenarioValue text(const std::string& value) {
   return out;
 }
 
+void test_set_world_hp_zero_triggers_outpost_destroy() {
+  SimWorld world;
+  world.enemy_outpost_hp = 1000;
+  world.enemy_outpost_control.held_by_us = false;
+  world.enemy_outpost_control.full = true;
+  world.enemy_outpost_control.owner_is_us = false;
+
+  // 先占点 5 s -> 我方临时控制，归属仍是敌方。
+  step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 5000);
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(!world.enemy_outpost_control.full);
+  CHECK(!world.enemy_outpost_control.owner_is_us);
+
+  // set_world 直接置 0 也应走击毁结算：临时控制方击毁 -> 我方完全控制并重建。
+  std::string error;
+  CHECK(apply_world_field(&world, "enemy_outpost_hp", number(0), &error));
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(world.enemy_outpost_control.full);
+  CHECK(world.enemy_outpost_control.owner_is_us);
+  CHECK(world.enemy_outpost_hp == 500);
+}
+
 void test_apply_world_field() {
   SimWorld world;
   std::string error;
@@ -109,6 +131,7 @@ void test_load_scenario(const std::string& path) {
 
 int main(int argc, char** argv) {
   test_apply_world_field();
+  test_set_world_hp_zero_triggers_outpost_destroy();
   test_check_expect();
   if (argc > 1) {
     test_load_scenario(argv[1]);

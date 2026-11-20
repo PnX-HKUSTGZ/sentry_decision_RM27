@@ -128,7 +128,15 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
   } else if (field == "manual_key") {
     world->manual_key = as_int;
   } else if (field == "enemy_outpost_hp") {
-    world->enemy_outpost_hp = as_int;
+    const int before = world->enemy_outpost_hp;
+    if (before > 0 && as_int <= 0) {
+      // set_world 直接置 0 也视为我方击毁，保证控制权/重建逻辑与面板效果一致。
+      // destroy_outpost 要求当前 hp>0，因此先保留击毁前血量再结算。
+      world->enemy_outpost_hp = before;
+      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp, true);
+    } else {
+      world->enemy_outpost_hp = as_int;
+    }
   } else if (field == "enemy_base_hp") {
     world->enemy_base_hp = as_int;
   } else if (field == "self_hp") {
@@ -186,7 +194,14 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
   } else if (field == "base_hp") {
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {
-    world->our_outpost_hp = as_int;
+    const int before = world->our_outpost_hp;
+    if (before > 0 && as_int <= 0) {
+      // set_world 直接置 0 也视为敌方击毁。
+      world->our_outpost_hp = before;
+      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp, false);
+    } else {
+      world->our_outpost_hp = as_int;
+    }
   } else if (field == "our_outpost_control") {
     if (!set_outpost_control(&world->our_outpost_control, as_int)) {
       *error = "our_outpost_control 只能是 0（完全）/ 1（临时）/ 2（未控制）";

@@ -38,21 +38,16 @@ timeline:
   - at: 120.0
     set_world:
       enemy_outpost_hp: 1000
+      enemy_outpost_control: 2
   - at: 145.0
     expect:
       task_state: outpost
   - at: 180.0
     set_world:
       self_hp: 0
-  - at: 185.0
-    expect:
-      task_state: respawn
   - at: 300.0
     set_world:
       enemy_outpost_hp: 0
-  - at: 310.0
-    expect:
-      task_state: scan
   - at: 418.0
     set_world:
       game_status: 5

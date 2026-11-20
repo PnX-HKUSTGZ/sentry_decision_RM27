@@ -354,7 +354,7 @@ double UtilityTaskPolicy::score_scan(const WorldState& world, const Context& con
   if (at_point(world, point_name(points2027::kEnemyOutpostSide), 0.5) ||
       at_point(world, point_name(points2027::kEnemyOutpostOpposite), 0.5)) {
     return 1.2 * context.enemy_attack + 1.6 * context.enemy_convert +
-           0.5 * context.enemy_hold + 0.3 - 0.7 * context.own_risk;
+           1.4 * context.enemy_hold + 0.3 - 0.7 * context.own_risk;
   }
   return 0.3;
 }
