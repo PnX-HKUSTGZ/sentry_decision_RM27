@@ -62,6 +62,26 @@ void test_set_world_hp_zero_triggers_outpost_destroy() {
   CHECK(world.enemy_outpost_hp == 500);
 }
 
+void test_set_world_our_temporary_holder_destroy_rebuilds() {
+  SimWorld world;
+  world.our_outpost_hp = 1000;
+  world.our_outpost_control.held_by_us = false;
+  world.our_outpost_control.full = true;
+  world.our_outpost_control.owner_is_us = false;
+
+  step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, true, 5000);
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(!world.our_outpost_control.full);
+  CHECK(!world.our_outpost_control.owner_is_us);
+
+  std::string error;
+  CHECK(apply_world_field(&world, "our_outpost_hp", number(0), &error));
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(world.our_outpost_control.full);
+  CHECK(world.our_outpost_control.owner_is_us);
+  CHECK(world.our_outpost_hp == 500);
+}
+
 void test_apply_world_field() {
   SimWorld world;
   std::string error;
@@ -132,6 +152,7 @@ void test_load_scenario(const std::string& path) {
 int main(int argc, char** argv) {
   test_apply_world_field();
   test_set_world_hp_zero_triggers_outpost_destroy();
+  test_set_world_our_temporary_holder_destroy_rebuilds();
   test_check_expect();
   if (argc > 1) {
     test_load_scenario(argv[1]);

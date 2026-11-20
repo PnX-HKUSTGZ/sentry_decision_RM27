@@ -356,6 +356,29 @@ void test_temporary_holder_destroy_rebuilds_as_us() {
   CHECK(world.enemy_outpost_hp == 500);
 }
 
+void test_our_temporary_holder_destroy_rebuilds_as_us() {
+  SimWorld world;
+  world.our_outpost_hp = 1000;
+  world.our_outpost_control.held_by_us = false;
+  world.our_outpost_control.full = true;
+  world.our_outpost_control.owner_is_us = false;
+
+  // 敌方完全控制 -> 我方占点 5 s -> 我方临时控制，归属仍敌方。
+  step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, true, 5000);
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(!world.our_outpost_control.full);
+  CHECK(!world.our_outpost_control.owner_is_us);
+
+  // 我方在临时控制下击毁 -> 我方完全控制并重建。
+  SimEffects effects;
+  const EffectResult result = apply_effect(&world, "our_outpost_destroy", effects);
+  CHECK(result.applied);
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(world.our_outpost_control.full);
+  CHECK(world.our_outpost_control.owner_is_us);
+  CHECK(world.our_outpost_hp == 500);
+}
+
 void test_dead_holder_loses_temporary_control_and_rebuilds_enemy() {
   SimWorld world;
   world.our_outpost_control.held_by_us = true;
@@ -689,6 +712,7 @@ int main() {
   test_dead_robot_does_not_occupy_gain_points();
   test_dead_holder_loses_temporary_control_and_rebuilds_enemy();
   test_temporary_holder_destroy_rebuilds_as_us();
+  test_our_temporary_holder_destroy_rebuilds_as_us();
   test_outpost_control_paths();
   test_supply_ammo();
   test_remote_hp_delay();

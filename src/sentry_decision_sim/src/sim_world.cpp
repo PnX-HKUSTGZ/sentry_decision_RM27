@@ -49,6 +49,12 @@ bool set_outpost_control(OutpostControlState* state, int value) {
   return true;
 }
 
+// 直接改 HP=0 / 通用“摧毁”效果没有显式攻击方时的推断：
+// 己方完全控制时，更可能是敌方摧毁；其余状态（我方临时、敌方控制）更可能是我方在打。
+bool destroyer_is_us_for_state(const OutpostControlState& state) {
+  return !(state.held_by_us && state.full);
+}
+
 bool parse_task_state(const std::string& name, int* out) {
   if (name == "idle") {
     *out = 0;
@@ -133,7 +139,8 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
       // set_world 直接置 0 也视为我方击毁，保证控制权/重建逻辑与面板效果一致。
       // destroy_outpost 要求当前 hp>0，因此先保留击毁前血量再结算。
       world->enemy_outpost_hp = before;
-      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp, true);
+      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                      destroyer_is_us_for_state(world->enemy_outpost_control));
     } else {
       world->enemy_outpost_hp = as_int;
     }
@@ -198,7 +205,8 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
     if (before > 0 && as_int <= 0) {
       // set_world 直接置 0 也视为敌方击毁。
       world->our_outpost_hp = before;
-      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp, false);
+      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                      destroyer_is_us_for_state(world->our_outpost_control));
     } else {
       world->our_outpost_hp = as_int;
     }
@@ -399,7 +407,8 @@ EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimE
     const int before = world->our_outpost_hp;
     const int after = damage(before, effects.our_outpost_damage);
     if (after == 0 && before > 0) {
-      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp, false);
+      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                      destroyer_is_us_for_state(world->our_outpost_control));
     } else {
       world->our_outpost_hp = after;
     }
@@ -407,7 +416,8 @@ EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimE
     result.detail =
         "己方前哨站血量 -" + std::to_string(static_cast<int>(effects.our_outpost_damage));
   } else if (effect == "our_outpost_destroy") {
-    destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp, false);
+    destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                    destroyer_is_us_for_state(world->our_outpost_control));
     result.new_value = world->our_outpost_hp;
     result.detail = "己方前哨站被摧毁";
   } else if (effect == "our_base_damage") {
@@ -418,7 +428,8 @@ EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimE
     const int before = world->enemy_outpost_hp;
     const int after = damage(before, effects.enemy_outpost_damage);
     if (after == 0 && before > 0) {
-      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp, true);
+      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                      destroyer_is_us_for_state(world->enemy_outpost_control));
     } else {
       world->enemy_outpost_hp = after;
     }
@@ -426,7 +437,8 @@ EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimE
     result.detail =
         "敌方前哨站血量 -" + std::to_string(static_cast<int>(effects.enemy_outpost_damage));
   } else if (effect == "enemy_outpost_destroy") {
-    destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp, true);
+    destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                    destroyer_is_us_for_state(world->enemy_outpost_control));
     result.new_value = world->enemy_outpost_hp;
     result.detail = "敌方前哨站被摧毁";
   } else if (effect == "enemy_base_damage") {
