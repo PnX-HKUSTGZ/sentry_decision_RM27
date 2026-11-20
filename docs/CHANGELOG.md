@@ -29,6 +29,7 @@
 - `TaskResult.call`：保留完整 TaskCall，供 utility 做同点连续性/迟滞。
 - 端到端 `utility_smoke`：敌方高地射击位选择 Outpost，打掉后回己方半场。
 - 端到端 `utility_defense_smoke`：己方前哨掉到临时控制时回防。
+- 端到端 `utility_recover_smoke` / `utility_respawn_recover_smoke`：低血/低弹、复活后自动 Heal 回基地。
 - 手动 420s headless soak 场景 `full_match_soak.yaml`（不加入默认 ctest）。
 - `Navigate` 新目标 500 ms 内忽略上一个目标的 `nav.failed`，避免 utility/rule 反复选同一点并立即失败。
 - `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
@@ -68,6 +69,8 @@
 - 面板急停状态硬编码为 false。
 - `Outpost` / `Resource` / `Respawn` 在裁判数据失效时仍使用旧值。
 - `Scan` 是无限任务，rule 策略此前会一直返回当前 `Scan`，导致新出现的前哨目标无法触发进攻；现在 `Scan` 允许每拍重新评估。
+- 阵亡机器人仍被算作激活增益点，导致尸体占点/阻止敌方夺回；现在 `self_hp<=0` 时占用为空，己方临时控制会按 5 s 缺席转为敌方完全控制并重建。
+- utility 低血时未优先回基地、低弹时不主动回基地；现在低血/低弹会生成恢复候选，低血时只允许 Heal，Heal 开始后持续到满血，不再被回防/占点抢断。
 - 前哨站被击毁后仿真仍上报前哨站增益点、仍按前哨站 buff 回血/兑换；现在 `hp=0` 时 buff 失效。
 
 ### Removed

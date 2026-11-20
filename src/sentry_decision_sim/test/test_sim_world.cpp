@@ -335,6 +335,40 @@ void test_outpost_control_paths() {
   }
 }
 
+void test_dead_holder_loses_temporary_control_and_rebuilds_enemy() {
+  SimWorld world;
+  world.our_outpost_control.held_by_us = true;
+  world.our_outpost_control.full = false;
+  world.our_outpost_control.owner_is_us = true;
+  world.our_outpost_hp = 0;
+  world.our_outpost_control.enemy_present = false;
+
+  // 阵亡后本拍 our_active=false；临时控制方连续 5 s 不激活。
+  step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, false, 5000);
+  CHECK(!world.our_outpost_control.held_by_us);
+  CHECK(world.our_outpost_control.full);
+  CHECK(!world.our_outpost_control.owner_is_us);
+  CHECK(world.our_outpost_hp == 500);
+}
+
+void test_dead_robot_does_not_occupy_gain_points() {
+  GainZones zones;
+  zones.supply = {0.0, 0.0, 1.0};
+  zones.our_outpost_buff = {0.0, 0.0, 1.0};
+  zones.enemy_highland = {{0.0, 0.0, 1.0}};
+
+  const Occupancy dead = evaluate_occupancy_if_alive(zones, 0.0, 0.0, false);
+  CHECK(!dead.supply);
+  CHECK(!dead.our_outpost_buff);
+  CHECK(!dead.enemy_highland);
+  CHECK(!dead.local_ammo_exchange_point());
+
+  const Occupancy alive = evaluate_occupancy_if_alive(zones, 0.0, 0.0, true);
+  CHECK(alive.supply);
+  CHECK(alive.our_outpost_buff);
+  CHECK(alive.enemy_highland);
+}
+
 DecisionAction make_action(DecisionActionKind kind, int value) {
   DecisionAction action;
   action.kind = kind;
@@ -631,6 +665,8 @@ int main() {
   test_supply_heal_ready();
   test_apply_effects();
   test_occupancy();
+  test_dead_robot_does_not_occupy_gain_points();
+  test_dead_holder_loses_temporary_control_and_rebuilds_enemy();
   test_outpost_control_paths();
   test_supply_ammo();
   test_remote_hp_delay();

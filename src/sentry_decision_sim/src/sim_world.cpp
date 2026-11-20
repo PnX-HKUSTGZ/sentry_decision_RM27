@@ -527,6 +527,11 @@ RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up) {
   return result;
 }
 
+Occupancy evaluate_occupancy_if_alive(const GainZones& zones, double x, double y,
+                                         bool alive) {
+  return alive ? evaluate_occupancy(zones, x, y) : Occupancy{};
+}
+
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
   Occupancy occupancy;
   occupancy.supply = zones.supply.contains(x, y);

@@ -227,6 +227,8 @@ struct Occupancy {
 
 // 按机器人位置判定占领了哪些增益点。
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y);
+// 阵亡机器人不能激活任何增益点。
+Occupancy evaluate_occupancy_if_alive(const GainZones& zones, double x, double y, bool alive);
 
 // 把占领状态写回 SimWorld 的 event_code 位段（只改占领相关位，保留其它位）。
 void apply_occupancy(SimWorld* world, const Occupancy& occupancy);

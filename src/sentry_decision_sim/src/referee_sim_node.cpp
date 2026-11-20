@@ -699,8 +699,10 @@ class RefereeSimNode : public rclcpp::Node {
       zones.enemy_highland.push_back({zone.x, zone.y, zone.radius});
     }
     const sentry_decision::Point2D pose = current_pose();
+    // 阵亡机器人不能激活任何增益点：否则尸体仍会占点/阻止敌方夺回。
     const sentry_decision_sim::Occupancy occupancy =
-        sentry_decision_sim::evaluate_occupancy(zones, pose.x, pose.y);
+        sentry_decision_sim::evaluate_occupancy_if_alive(zones, pose.x, pose.y,
+                                                         world_.self_hp > 0);
 
     // 2027 前哨控制：只在比赛中推进，按真实步长结算（限制单拍步长，避免阻塞后瞬移）。
     const TimePoint now = SteadyClock::now();

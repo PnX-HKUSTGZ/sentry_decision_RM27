@@ -36,6 +36,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"nav.patrol_dwell_s", {false, true}},
       {"utility.safe_hp_ratio", {false, true}},
       {"utility.low_hp_ratio", {false, true}},
+      {"utility.critical_hp_ratio", {false, true}},
       {"utility.attack_radius", {false, true}},
       {"utility.travel_weight", {false, true}},
       {"utility.switch_penalty", {false, true}},

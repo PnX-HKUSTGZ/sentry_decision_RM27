@@ -78,6 +78,7 @@ class UtilityTaskPolicy : public TaskPolicy {
   const PolicyConfig& config_;
   double safe_hp_ratio_ = 0.55;
   double low_hp_ratio_ = 0.35;
+  double critical_hp_ratio_ = 0.5;
   double attack_radius_ = 0.65;
   double travel_weight_ = 0.06;
   double switch_penalty_ = 0.35;

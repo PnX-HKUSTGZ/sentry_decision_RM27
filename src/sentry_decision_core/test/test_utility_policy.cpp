@@ -142,6 +142,63 @@ void test_invalid_own_buff_moves_to_highland() {
   CHECK(target == "own_outpost_side" || target == "own_outpost_opposite");
 }
 
+void test_active_heal_is_not_preempted_before_full() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-2.0, -2.0);
+  world.upstream.self_hp = 280;
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.our_outpost_trend.under_attack = true;
+
+  TaskSnapshot heal;
+  heal.task = "Heal";
+  heal.call = TaskCall{"Heal", HealParams{"own_base_supply", true}, Duration{0}};
+  heal.status = TaskStatus::kRunning;
+
+  const TaskPlan plan = policy.decide(world, heal, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
+void test_low_ammo_returns_to_base() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-2.0, -2.0);  // 敌方 opposite
+  world.upstream.self_ammo = 10;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Navigate");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
+void test_low_hp_after_respawn_heals_at_base() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-2.0, -2.0);
+  world.upstream.self_hp = 40;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
+void test_destroyed_own_buff_low_hp_heals_at_base() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 0.0);  // 己方 buff
+  world.upstream.self_hp = 40;
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.upstream.our_outpost_hp = 0;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
 void test_full_own_outpost_under_attack_stays_buff() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
@@ -267,6 +324,10 @@ int main() {
   test_own_risk_overrides_enemy_attack_from_far();
   test_own_highland_does_not_hop_to_other_highland();
   test_invalid_own_buff_moves_to_highland();
+  test_active_heal_is_not_preempted_before_full();
+  test_low_ammo_returns_to_base();
+  test_low_hp_after_respawn_heals_at_base();
+  test_destroyed_own_buff_low_hp_heals_at_base();
   test_full_own_outpost_under_attack_stays_buff();
   test_both_full_defends_enemy_half();
   test_enemy_outpost_attack_from_highland();

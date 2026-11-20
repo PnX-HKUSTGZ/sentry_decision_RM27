@@ -45,6 +45,9 @@ UtilityTaskPolicy::UtilityTaskPolicy(const PolicyConfig& config) : config_(confi
   if (const auto value = config_.number("utility.low_hp_ratio")) {
     low_hp_ratio_ = clamp01(*value);
   }
+  if (const auto value = config_.number("utility.critical_hp_ratio")) {
+    critical_hp_ratio_ = clamp01(*value);
+  }
   if (const auto value = config_.number("utility.attack_radius")) {
     attack_radius_ = std::max(0.1, *value);
   }
@@ -198,11 +201,19 @@ double UtilityTaskPolicy::score_navigate(const WorldState& world, const Context&
                                          const std::string& point,
                                          const TaskCall& /*call*/) const {
   const auto& up = world.upstream;
-  const double hp_need =
-      clamp01(1.0 - static_cast<double>(up.self_hp) / std::max(1, 400));
+  const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
+  const double hp_need = clamp01(1.0 - static_cast<double>(up.self_hp) / std::max(1, max_hp));
+  const double low_ammo = config_.number("nav.low_ammo").value_or(50.0);
+  const double ammo_need =
+      clamp01(1.0 - static_cast<double>(up.self_ammo) / std::max(1.0, low_ammo * 2.0));
   double value = 0.0;
 
-  if (point == point_name(points2027::kOwnOutpostBuff)) {
+  if (point == point_name(points2027::kOwnBaseSupply)) {
+    value = 2.2 * ammo_need + 1.0 * hp_need;
+    if (up.self_ammo < low_ammo) {
+      value += 4.0;  // 低弹时，回基地本身比继续交战更重要
+    }
+  } else if (point == point_name(points2027::kOwnOutpostBuff)) {
     if (context.own_full && context.own_alive) {
       value = 1.4 * context.own_hold + 1.0 * context.own_risk + 0.5 * hp_need + 0.4;
     } else {
@@ -260,7 +271,10 @@ double UtilityTaskPolicy::score_heal(const WorldState& world, const Context& con
       clamp01(1.0 - static_cast<double>(up.self_ammo) / std::max(1.0, low_ammo * 2.0));
 
   if (point == point_name(points2027::kOwnBaseSupply)) {
-    return 2.4 * hp_need + 0.9 * ammo_need + 0.2;
+    double value = 2.4 * hp_need + 0.9 * ammo_need + 0.2;
+    // 复活后 / 极低血时，先回基地，不要为了前哨继续换血。
+    value += 3.0 * clamp01((hp_need - 0.5) / 0.5);
+    return value;
   }
   if (point == point_name(points2027::kOwnOutpostBuff)) {
     return 2.0 * hp_need + 1.2 * context.own_hold + 0.4 * context.own_risk;
@@ -363,6 +377,7 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
   const bool at_enemy_gain = at_enemy_highland || at_enemy_buff_valid;
 
   const std::vector<std::string> points = {
+      point_name(points2027::kOwnBaseSupply),
       point_name(points2027::kOwnOutpostBuff),
       point_name(points2027::kEnemyOutpostBuff),
       point_name(points2027::kOwnOutpostSide),
@@ -372,8 +387,14 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
       point_name(points2027::kEnemyOutpostOpposite),
       point_name(points2027::kEnemyOutpostFront),
   };
+  const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
   for (const auto& point : points) {
     if (!valid_point(point)) {
+      continue;
+    }
+    // 低血时由 Heal 直接负责导航 + 等待回血，不要用 Navigate 抢走主任务。
+    if (point == point_name(points2027::kOwnBaseSupply) &&
+        world.upstream.self_hp < max_hp * 0.6) {
       continue;
     }
     // 已在目标点附近时不再生成同点 Navigate，避免到达后反复成功/重启。
@@ -477,6 +498,23 @@ TaskPlan UtilityTaskPolicy::decide(const WorldState& world,
 
   const Context context = make_context(world);
   std::vector<Candidate> list = candidates(world, context);
+  const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
+  const bool critical_hp =
+      world.upstream.self_hp > 0 && world.upstream.self_hp < max_hp * critical_hp_ratio_;
+  const bool healing = active_task.has_value() && active_task->status == TaskStatus::kRunning &&
+                       active_task->task == "Heal" && world.upstream.self_hp < max_hp;
+  if (critical_hp || healing) {
+    // 低血 / 正在回血时只允许恢复类任务，避免 Heal 被“回防/占点”抢断并在任务间抖动。
+    std::vector<Candidate> heals;
+    for (const auto& candidate : list) {
+      if (candidate.call.task == "Heal") {
+        heals.push_back(candidate);
+      }
+    }
+    if (!heals.empty()) {
+      list = std::move(heals);
+    }
+  }
   for (auto& candidate : list) {
     if (active_task.has_value() && active_task->status == TaskStatus::kRunning &&
         active_task->call.has_value() && *active_task->call == candidate.call) {
