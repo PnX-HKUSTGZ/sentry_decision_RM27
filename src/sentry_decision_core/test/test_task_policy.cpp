@@ -24,6 +24,10 @@ PolicyConfig make_config() {
   config.numbers["match.duration_s"] = 420.0;
   config.points["own_base_supply"] = Point2D{0.0, 0.0, 0.0};
   config.point_radius["own_base_supply"] = 0.5;
+  config.points["own_outpost_buff"] = Point2D{3.0, 3.0, 0.0};
+  config.point_radius["own_outpost_buff"] = 0.5;
+  config.points["enemy_outpost_buff"] = Point2D{-3.0, 0.0, 0.0};
+  config.point_radius["enemy_outpost_buff"] = 0.5;
   config.points["enemy_outpost_front"] = Point2D{5.0, 0.0, 0.0};
   config.point_radius["enemy_outpost_front"] = 0.2;
   return config;
@@ -69,6 +73,73 @@ void test_low_hp_selects_heal() {
   WorldState world = make_world();
   world.upstream.self_hp = 50;
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
+}
+
+void test_low_hp_on_own_highland_heals_at_own_outpost_buff() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{3.0, 3.0, 0.0};
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_outpost_buff");
+}
+
+void test_low_hp_with_low_ammo_heals_at_base() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{3.0, 3.0, 0.0};
+  world.upstream.self_hp = 50;
+  world.upstream.self_ammo = 20;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
+}
+
+void test_low_hp_does_not_use_destroyed_outpost_buff() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{3.0, 3.0, 0.0};
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 0;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
+}
+
+void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{3.0, 3.0, 0.0};
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+
+  TaskSnapshot heal;
+  heal.task = "Heal";
+  heal.call = TaskCall{"Heal", HealParams{"own_base_supply", true}, Duration{0}};
+  heal.status = TaskStatus::kRunning;
+
+  const TaskPlan plan = policy.decide(world, heal, HistoryView{});
   CHECK(plan.call.has_value());
   CHECK(plan.call->task == "Heal");
   CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
@@ -204,6 +275,10 @@ int main() {
   test_stopped_returns_empty_plan();
   test_dead_selects_respawn();
   test_low_hp_selects_heal();
+  test_low_hp_on_own_highland_heals_at_own_outpost_buff();
+  test_low_hp_with_low_ammo_heals_at_base();
+  test_low_hp_does_not_use_destroyed_outpost_buff();
+  test_active_heal_keeps_its_point_when_passing_outpost_buff();
   test_low_ammo_far_from_base_selects_heal();
   test_low_ammo_at_base_does_not_use_main_resource();
   test_low_ammo_at_base_with_free_batch_selects_heal();

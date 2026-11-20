@@ -123,6 +123,20 @@ if(BUILD_TESTING)
     ENVIRONMENT "SCENARIO_TASK_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles_rmuc27_utility.yaml"
     TIMEOUT 30)
 
+  # 端到端：己方前哨可用时，在己方高地低血应就近去前哨站增益点。
+  add_test(NAME heal_outpost_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/heal_outpost_smoke.yaml)
+  set_tests_properties(heal_outpost_smoke PROPERTIES TIMEOUT 25)
+
+  # 端到端：同一回血选点在 utility 策略下也应成立。
+  add_test(NAME heal_outpost_utility_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/heal_outpost_smoke.yaml)
+  set_tests_properties(heal_outpost_utility_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_TASK_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles_rmuc27_utility.yaml"
+    TIMEOUT 25)
+
   # 端到端：utility 低血/低弹时从被毁前哨 buff 回基地恢复。
   add_test(NAME utility_recover_smoke
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
@@ -169,6 +183,7 @@ if(BUILD_TESTING)
   # 这些端到端用例各自拉起 ROS 图，串行执行，避免并发抢占导致的超时抖动。
   set_tests_properties(
     match_smoke sim_effects_smoke referee_guard_smoke strategy_smoke utility_smoke
+    heal_outpost_smoke heal_outpost_utility_smoke
     utility_defense_smoke utility_recover_smoke utility_respawn_recover_smoke
     control_gate_smoke low_ammo_reset_smoke nav_reset_smoke
     PROPERTIES RUN_SERIAL TRUE)

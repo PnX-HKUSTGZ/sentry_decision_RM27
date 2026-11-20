@@ -161,6 +161,24 @@ void test_active_heal_is_not_preempted_before_full() {
   CHECK(target_of(plan) == "own_base_supply");
 }
 
+void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 2.0);  // 己方 side 高地
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 200;
+
+  TaskSnapshot heal;
+  heal.task = "Heal";
+  heal.call = TaskCall{"Heal", HealParams{"own_base_supply", true}, Duration{0}};
+  heal.status = TaskStatus::kRunning;
+
+  const TaskPlan plan = policy.decide(world, heal, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
 void test_low_ammo_returns_to_base() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
@@ -178,6 +196,32 @@ void test_low_hp_after_respawn_heals_at_base() {
   UtilityTaskPolicy policy(config);
   WorldState world = make_world(-2.0, -2.0);
   world.upstream.self_hp = 40;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_base_supply");
+}
+
+void test_low_hp_on_own_highland_heals_at_own_outpost_buff() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 2.0);  // 己方 side 高地
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 200;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_outpost_buff");
+}
+
+void test_low_hp_with_low_ammo_heals_at_base() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 2.0);
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 40;
 
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
@@ -327,6 +371,9 @@ int main() {
   test_active_heal_is_not_preempted_before_full();
   test_low_ammo_returns_to_base();
   test_low_hp_after_respawn_heals_at_base();
+  test_low_hp_on_own_highland_heals_at_own_outpost_buff();
+  test_low_hp_with_low_ammo_heals_at_base();
+  test_active_heal_keeps_its_point_when_passing_outpost_buff();
   test_destroyed_own_buff_low_hp_heals_at_base();
   test_full_own_outpost_under_attack_stays_buff();
   test_both_full_defends_enemy_half();

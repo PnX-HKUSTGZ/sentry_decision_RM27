@@ -12,6 +12,7 @@ namespace sentry_decision {
 namespace {
 
 constexpr double kOutpostMaxHp = 1000.0;
+constexpr double kOutpostHealRadius = 5.0;
 constexpr Duration kNavigateTimeout{30000};
 
 std::string point_name(std::string_view name) {
@@ -272,16 +273,17 @@ double UtilityTaskPolicy::score_heal(const WorldState& world, const Context& con
 
   if (point == point_name(points2027::kOwnBaseSupply)) {
     double value = 2.4 * hp_need + 0.9 * ammo_need + 0.2;
-    // 复活后 / 极低血时，先回基地，不要为了前哨继续换血。
-    value += 3.0 * clamp01((hp_need - 0.5) / 0.5);
-    return value;
+    // 极低血时先回基地；普通低血可以和前哨站增益点比较距离后再决定。
+    value += 3.0 * clamp01((hp_need - 0.75) / 0.25);
+    return value - travel_cost(world, point);
   }
   if (point == point_name(points2027::kOwnOutpostBuff)) {
-    return 2.0 * hp_need + 1.2 * context.own_hold + 0.4 * context.own_risk;
+    return 2.0 * hp_need + 1.2 * context.own_hold + 0.4 * context.own_risk -
+           travel_cost(world, point);
   }
   if (point == point_name(points2027::kEnemyOutpostBuff)) {
     return 1.6 * hp_need + 1.2 * context.enemy_hold + 0.2 * context.enemy_attack -
-           0.8 * context.own_risk;
+           0.8 * context.own_risk - travel_cost(world, point);
   }
   return -1.0e6;
 }
@@ -429,21 +431,28 @@ void UtilityTaskPolicy::add_heal_candidates(const WorldState& world, const Conte
                                             std::vector<Candidate>* out) const {
   const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
   const bool hp_not_full = world.upstream.self_hp < max_hp;
+  const bool low_ammo =
+      static_cast<double>(world.upstream.self_ammo) <
+      config_.number("nav.low_ammo").value_or(50.0);
   const std::string base(point_name(points2027::kOwnBaseSupply));
   if (valid_point(base) && (hp_not_full || free_supply_ammo_pending(world))) {
     TaskCall call{"Heal", HealParams{base, true}, Duration{0}};
     out->push_back(Candidate{call, score_heal(world, context, base, call), "heal " + base});
   }
 
-  if (hp_not_full) {
+  // 前哨站只回血、不补弹；低弹时必须回基地，避免为了回血错过补弹。
+  if (hp_not_full && !low_ammo) {
+    // 前哨站回血只在附近有意义；远离时回基地，避免跨半场只为吃 buff。
     const std::string own(point_name(points2027::kOwnOutpostBuff));
-    if (valid_point(own) && context.own_full && context.own_alive) {
+    if (valid_point(own) && context.own_full && context.own_alive &&
+        distance_to(world, own) <= kOutpostHealRadius) {
       TaskCall call{"Heal", HealParams{own, false}, Duration{0}};
       out->push_back(Candidate{call, score_heal(world, context, own, call), "heal " + own});
     }
 
     const std::string enemy(point_name(points2027::kEnemyOutpostBuff));
-    if (valid_point(enemy) && context.enemy_full && context.enemy_alive) {
+    if (valid_point(enemy) && context.enemy_full && context.enemy_alive &&
+        distance_to(world, enemy) <= kOutpostHealRadius) {
       TaskCall call{"Heal", HealParams{enemy, false}, Duration{0}};
       out->push_back(Candidate{call, score_heal(world, context, enemy, call), "heal " + enemy});
     }
@@ -503,6 +512,21 @@ TaskPlan UtilityTaskPolicy::decide(const WorldState& world,
       world.upstream.self_hp > 0 && world.upstream.self_hp < max_hp * critical_hp_ratio_;
   const bool healing = active_task.has_value() && active_task->status == TaskStatus::kRunning &&
                        active_task->task == "Heal" && world.upstream.self_hp < max_hp;
+  if (healing && active_task->call.has_value()) {
+    const auto* heal = std::get_if<HealParams>(&active_task->call->params);
+    const bool base_heal =
+        heal != nullptr && heal->heal_point == point_name(points2027::kOwnBaseSupply);
+    const bool low_ammo =
+        static_cast<double>(world.upstream.self_ammo) <
+        config_.number("nav.low_ammo").value_or(50.0);
+    // 回血过程中保持同一个点，避免去基地途中经过前哨站增益点时改目标。
+    // 低弹且当前不在基地时例外，必须回基地补弹。
+    if (heal != nullptr && (!low_ammo || base_heal)) {
+      plan.call = *active_task->call;
+      plan.rationale = "continue heal " + heal->heal_point;
+      return plan;
+    }
+  }
   if (critical_hp || healing) {
     // 低血 / 正在回血时只允许恢复类任务，避免 Heal 被“回防/占点”抢断并在任务间抖动。
     std::vector<Candidate> heals;
