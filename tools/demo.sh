@@ -8,7 +8,8 @@
 # 用法（默认启动网页面板 8080/9090；导航侧窗口默认关闭）：
 #   tools/demo.sh                    # 仿真 + 决策 + 网页面板
 #   tools/demo.sh --headless         # 无头模式：不启动网页面板，也不开任何窗口
-#   tools/demo.sh --with-nav         # 双仓库联调：额外起真实导航容器（导航 RViz/Gazebo 默认关闭）
+#   tools/demo.sh --with-nav         # 双仓库联调：额外起导航容器（默认真值定位 + legacy Nav2）
+#   tools/demo.sh --with-nav --nav-real  # 双仓库联调：Point-LIO + MINCO + 全局重定位
 #   tools/demo.sh --gazebo           # 打开导航侧 Gazebo 客户端窗口
 #   tools/demo.sh --with-nav --nav-viz  # 打开导航 RViz
 #   tools/demo.sh --viz              # 兼容旧写法：显式打开网页面板（现在默认已开）
@@ -35,6 +36,7 @@ if [[ ! -f /.dockerenv ]]; then
   nav_viz=0         # 导航 RViz，默认关闭
   nav_gazebo=0      # 导航侧 Gazebo 客户端窗口，默认关闭
   nav_gimbal_panel=0
+  nav_real=0        # --nav-real：Point-LIO + MINCO + 全局重定位；默认真值 + legacy
   need_build=0
   with_nav=0
   for arg in "$@"; do
@@ -46,6 +48,7 @@ if [[ ! -f /.dockerenv ]]; then
       --nav-viz|--nav-rviz) nav_viz=1 ;;
       --nav-silent) nav_viz=0 ;;
       --nav-gimbal-panel) nav_gimbal_panel=1 ;;
+      --nav-real) nav_real=1 ;;
       --build) need_build=1 ;;
       --with-nav) with_nav=1 ;;
     esac
@@ -103,10 +106,16 @@ if [[ ! -f /.dockerenv ]]; then
         fi
       fi
     fi
+    nav_mode_args=(navigation_mode:=legacy use_ground_truth_odom:=true)
+    nav_mode_label="真值定位 + legacy"
+    if [[ "${nav_real}" == 1 ]]; then
+      nav_mode_args=(navigation_mode:=minco use_ground_truth_odom:=false)
+      nav_mode_label="Point-LIO + MINCO + 全局重定位"
+    fi
     docker run -d --name "${NAV_CONTAINER}" --network "${NETWORK}" "${nav_display[@]}" \
       -v "${NAV_REPO}/src/pnx-launch/launch_bringup/pcd/simulation":/pcd:ro \
-      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2027 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2027.pcd"
-    echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
+      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2027 nav_world:=auto slam:=False ${nav_mode_args[*]} enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2027.pcd"
+    echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（模式=${nav_mode_label}，RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
     cleanup_nav() { docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true; }
     trap cleanup_nav EXIT INT TERM
     nav_ok=0
@@ -156,8 +165,8 @@ while [[ $# -gt 0 ]]; do
     --viz|--gui) with_viz=1; shift ;;
     --no-viz) with_viz=0; shift ;;
     --with-nav) with_nav=1; shift ;;
-    # 导航侧窗口（RViz / Gazebo / 云台面板）在宿主解析并传给导航容器，容器内忽略。
-    --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel) shift ;;
+    # 导航侧窗口 / 定位模式在宿主解析并传给导航容器，容器内忽略。
+    --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel|--nav-real) shift ;;
     --build) do_build=1; shift ;;
     --scenario) scenario="$2"; shift 2 ;;
     --config) config="$2"; shift 2 ;;

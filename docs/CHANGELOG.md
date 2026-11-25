@@ -53,6 +53,7 @@
 - `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`；`strategy.use_utility` 选择 rule / utility。
 - `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
 - `TaskState`：变化即发，并补 10 Hz 心跳。
+- `tools/demo.sh --with-nav`：默认真值定位 + legacy Nav2，自动出生并直接提供 `/navigate_to_pose`；`--nav-real` 保留 Point-LIO + MINCO + 全局重定位。
 
 ### Fixed
 
