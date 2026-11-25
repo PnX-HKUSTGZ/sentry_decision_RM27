@@ -15,6 +15,7 @@
 #   tools/demo.sh --no-viz           # 兼容旧写法：只关闭网页面板
 #   tools/demo.sh --nav-silent       # 兼容旧写法：强制关闭导航 RViz
 #   tools/demo.sh --nav-gimbal-panel # 打开导航仿真里的云台控制面板（Tk 窗口）
+#   tools/demo.sh --nav-build        # 从本地导航仓库重建 rm27_nav:jazzy 镜像
 #   tools/demo.sh --build            # 先构建工作区
 #   tools/demo.sh --scenario <path>  # 指定场景（容器内路径）
 #   tools/demo.sh --config <path>    # 指定 profiles.yaml（默认 RMUC27）
@@ -35,6 +36,7 @@ if [[ ! -f /.dockerenv ]]; then
   nav_viz=0         # 导航 RViz，默认关闭
   nav_gazebo=0      # 导航侧 Gazebo 客户端窗口，默认关闭
   nav_gimbal_panel=0
+  nav_build=0       # --nav-build：先从本地导航仓库重建 rm27_nav 镜像
   need_build=0
   with_nav=0
   for arg in "$@"; do
@@ -46,6 +48,7 @@ if [[ ! -f /.dockerenv ]]; then
       --nav-viz|--nav-rviz) nav_viz=1 ;;
       --nav-silent) nav_viz=0 ;;
       --nav-gimbal-panel) nav_gimbal_panel=1 ;;
+      --nav-build) nav_build=1 ;;
       --build) need_build=1 ;;
       --with-nav) with_nav=1 ;;
     esac
@@ -69,6 +72,9 @@ if [[ ! -f /.dockerenv ]]; then
   if [[ "${with_nav}" == 1 ]]; then
     NAV_REPO="${NAV_REPO:-$(cd "${ROOT}/../sentry_navgation_RM27" && pwd)}"
     NAV_IMAGE="${NAV_IMAGE:-rm27_nav:jazzy}"
+    if [[ "${nav_build}" == 1 ]]; then
+      NAV_REPO="${NAV_REPO}" NAV_IMAGE="${NAV_IMAGE}" "${ROOT}/tools/build_nav_image.sh"
+    fi
     docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${NETWORK}" >/dev/null
     docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true
     nav_use_rviz=false
@@ -107,6 +113,9 @@ if [[ ! -f /.dockerenv ]]; then
       -v "${NAV_REPO}/src/pnx-launch/launch_bringup/pcd/simulation":/pcd:ro \
       "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2027 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2027.pcd"
     echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
+    if [[ "${nav_use_rviz}" == true ]]; then
+      echo "[demo] 请在 RViz 中点击 2D Pose Estimate，在左半场约 x=-11.7, y=3.1 处选择出生点并拖出朝向；否则导航会一直等待。"
+    fi
     cleanup_nav() { docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true; }
     trap cleanup_nav EXIT INT TERM
     nav_ok=0
@@ -156,8 +165,8 @@ while [[ $# -gt 0 ]]; do
     --viz|--gui) with_viz=1; shift ;;
     --no-viz) with_viz=0; shift ;;
     --with-nav) with_nav=1; shift ;;
-    # 导航侧窗口（RViz / Gazebo / 云台面板）在宿主解析并传给导航容器，容器内忽略。
-    --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel) shift ;;
+    # 导航侧窗口 / 镜像构建选项在宿主解析并处理，容器内忽略。
+    --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel|--nav-build) shift ;;
     --build) do_build=1; shift ;;
     --scenario) scenario="$2"; shift 2 ;;
     --config) config="$2"; shift 2 ;;

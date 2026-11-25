@@ -54,7 +54,14 @@ tools/demo.sh --headless
 
 # 双仓库联合仿真（额外起真实导航容器，导航窗口默认关闭）
 tools/demo.sh --with-nav [--nav-viz] [--gazebo]
+# 默认是 Point-LIO + MINCO + 全局重定位：RViz 打开后先用 2D Pose Estimate
+# 在左半场约 x=-11.7, y=3.1 选出生点并拖出朝向，机器人 spawn 后才会出现 /navigate_to_pose。
+# 导航仓库源码更新后，从本地导航仓库重建镜像（只需在启动前加 --nav-build）
+tools/demo.sh --with-nav --nav-build --nav-viz
 xhost +SI:localuser:root # 若遇到 RViz/Gazebo 无法显示，执行此命令允许容器访问宿主 X11
+
+> 导航镜像必须包含 RMUC2027 世界；旧镜像会报 `Unknown world 'RMUC2027'`。
+> `tools/build_nav_image.sh` 从本地 `sentry_navgation_RM27` 重建 `rm27_nav:jazzy`，导航仓库变化后不再需要改 demo。
 ```
 
 #### 启动导航仓库

@@ -53,6 +53,7 @@
 - `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`；`strategy.use_utility` 选择 rule / utility。
 - `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
 - `TaskState`：变化即发，并补 10 Hz 心跳。
+- 双仓库联调新增 `tools/build_nav_image.sh` 与 `tools/demo.sh --nav-build`：导航仓库源码更新后可从本地源码重建 `rm27_nav:jazzy`，不需要再改 demo。
 
 ### Fixed
 
