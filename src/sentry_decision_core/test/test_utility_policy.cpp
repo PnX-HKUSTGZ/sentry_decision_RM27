@@ -264,6 +264,20 @@ void test_own_area_without_center_heals_at_own_outpost_buff() {
   CHECK(target_of(plan) == "own_outpost_buff");
 }
 
+void test_light_damage_in_own_area_does_not_start_heal() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 2.0);  // highland_area_center / our
+  world.upstream.self_hp = 300;
+  world.upstream.self_ammo = 200;
+  world.upstream.game_time_remaining = 420;  // 无待领免费发弹
+  world.supply_claimed_minutes = 0;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task != "Heal");
+}
+
 void test_low_hp_with_low_ammo_heals_at_base() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
@@ -421,6 +435,7 @@ int main() {
   test_low_hp_after_respawn_heals_at_base();
   test_low_hp_on_own_highland_heals_at_own_outpost_buff();
   test_own_area_without_center_heals_at_own_outpost_buff();
+  test_light_damage_in_own_area_does_not_start_heal();
   test_low_hp_with_low_ammo_heals_at_base();
   test_area_priority_overrides_active_base_heal();
   test_enemy_area_has_priority_over_own_outpost();

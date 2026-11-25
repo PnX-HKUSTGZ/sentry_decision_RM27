@@ -437,19 +437,22 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
 void UtilityTaskPolicy::add_heal_candidates(const WorldState& world, const Context& context,
                                             std::vector<Candidate>* out) const {
   const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
+  const int retreat_hp = static_cast<int>(config_.number("nav.retreat_hp").value_or(100.0));
   const bool hp_not_full = world.upstream.self_hp < max_hp;
+  // 回血只在低血阈值以下触发；300/400 这类轻伤不应打断占点/转场。
+  const bool need_heal = hp_not_full && world.upstream.self_hp <= retreat_hp;
   const bool low_ammo =
       static_cast<double>(world.upstream.self_ammo) <
       config_.number("nav.low_ammo").value_or(50.0);
   const std::string base(point_name(points2027::kOwnBaseSupply));
-  if (valid_point(base) && (hp_not_full || free_supply_ammo_pending(world))) {
+  if (valid_point(base) && (need_heal || free_supply_ammo_pending(world))) {
     TaskCall call{"Heal", HealParams{base, true}, Duration{0}};
     out->push_back(Candidate{call, score_heal(world, context, base, call), "heal " + base});
   }
 
   // 前哨站只回血、不补弹；低弹时必须回基地，避免为了回血错过补弹。
   // 高地范围点内按固定优先级选择：敌方前哨 buff > 己方前哨 buff > 基地。
-  if (hp_not_full && !low_ammo) {
+  if (need_heal && !low_ammo) {
     const bool in_center =
         inside_area(world, point_name(points2027::kHighlandAreaCenter));
     const std::string enemy(point_name(points2027::kEnemyOutpostBuff));
@@ -527,6 +530,29 @@ TaskPlan UtilityTaskPolicy::decide(const WorldState& world,
       world.upstream.self_hp > 0 && world.upstream.self_hp < max_hp * critical_hp_ratio_;
   const bool healing = active_task.has_value() && active_task->status == TaskStatus::kRunning &&
                        active_task->task == "Heal" && world.upstream.self_hp < max_hp;
+  if (healing && active_task->call.has_value()) {
+    const auto* heal = std::get_if<HealParams>(&active_task->call->params);
+    const bool low_ammo =
+        static_cast<double>(world.upstream.self_ammo) <
+        config_.number("nav.low_ammo").value_or(50.0);
+    const bool base_heal =
+        heal != nullptr && heal->heal_point == point_name(points2027::kOwnBaseSupply);
+    // 已经开始的 Heal 继续到满血；低弹时只允许继续回基地，不能继续在前哨站吃 buff。
+    if (heal != nullptr && (!low_ammo || base_heal)) {
+      bool already_listed = false;
+      for (const auto& candidate : list) {
+        if (candidate.call == *active_task->call) {
+          already_listed = true;
+          break;
+        }
+      }
+      if (!already_listed) {
+        list.push_back(Candidate{*active_task->call,
+                                 score_heal(world, context, heal->heal_point, *active_task->call),
+                                 "continue heal " + heal->heal_point});
+      }
+    }
+  }
   if (critical_hp || healing) {
     // 低血 / 正在回血时只允许恢复类任务，避免 Heal 被“回防/占点”抢断并在任务间抖动。
     std::vector<Candidate> heals;
