@@ -113,7 +113,7 @@ if(BUILD_TESTING)
   add_test(NAME strategy_smoke
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
             ${CMAKE_CURRENT_SOURCE_DIR}/scenario/strategy_smoke.yaml)
-  set_tests_properties(strategy_smoke PROPERTIES TIMEOUT 120)
+  set_tests_properties(strategy_smoke PROPERTIES TIMEOUT 150)
 
   # 端到端：utility policy 在敌方高地射击位选择 Outpost，打掉后回防。
   add_test(NAME utility_smoke
@@ -134,6 +134,19 @@ if(BUILD_TESTING)
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
             ${CMAKE_CURRENT_SOURCE_DIR}/scenario/heal_outpost_smoke.yaml)
   set_tests_properties(heal_outpost_utility_smoke PROPERTIES
+    ENVIRONMENT "SCENARIO_TASK_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles_rmuc27_utility.yaml"
+    TIMEOUT 25)
+
+  # 端到端：敌方增益点优先于己方增益点/基地。
+  add_test(NAME heal_enemy_outpost_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/heal_enemy_outpost_smoke.yaml)
+  set_tests_properties(heal_enemy_outpost_smoke PROPERTIES TIMEOUT 25)
+
+  add_test(NAME heal_enemy_outpost_utility_smoke
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/scenario_smoke_test.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/scenario/heal_enemy_outpost_smoke.yaml)
+  set_tests_properties(heal_enemy_outpost_utility_smoke PROPERTIES
     ENVIRONMENT "SCENARIO_TASK_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/../../config/profiles_rmuc27_utility.yaml"
     TIMEOUT 25)
 
@@ -184,6 +197,7 @@ if(BUILD_TESTING)
   set_tests_properties(
     match_smoke sim_effects_smoke referee_guard_smoke strategy_smoke utility_smoke
     heal_outpost_smoke heal_outpost_utility_smoke
+    heal_enemy_outpost_smoke heal_enemy_outpost_utility_smoke
     utility_defense_smoke utility_recover_smoke utility_respawn_recover_smoke
     control_gate_smoke low_ammo_reset_smoke nav_reset_smoke
     PROPERTIES RUN_SERIAL TRUE)

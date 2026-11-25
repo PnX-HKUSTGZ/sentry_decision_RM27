@@ -1,4 +1,4 @@
-# utility 复活恢复：在敌方 opposite 阵亡，复活后应自动 Heal 回基地。
+# utility 复活恢复：在敌方 opposite 阵亡，复活后应自动进入 Heal 回血。
 name: utility_respawn_recover_smoke
 start_pose: [-1.90, 5.54, 0.0]
 world:

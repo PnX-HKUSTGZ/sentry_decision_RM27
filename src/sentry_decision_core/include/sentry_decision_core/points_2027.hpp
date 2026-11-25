@@ -19,8 +19,12 @@ inline constexpr std::string_view kOwnOutpostSide = "own_outpost_side";
 inline constexpr std::string_view kEnemyOutpostSide = "enemy_outpost_side";
 inline constexpr std::string_view kOwnOutpostOpposite = "own_outpost_opposite";
 inline constexpr std::string_view kEnemyOutpostOpposite = "enemy_outpost_opposite";
+// 中央高地 / 敌方高地 / 己方高地范围点；半径来自地图配置，仅用于回血点判断。
+inline constexpr std::string_view kHighlandAreaCenter = "highland_area_center";
+inline constexpr std::string_view kHighlandAreaEnemy = "highland_area_enemy";
+inline constexpr std::string_view kHighlandAreaOur = "highland_area_our";
 
-inline constexpr std::array<std::string_view, 11> kAll = {
+inline constexpr std::array<std::string_view, 14> kAll = {
     kOwnBaseSupply,
     kOwnFort,
     kEnemyFort,
@@ -32,6 +36,9 @@ inline constexpr std::array<std::string_view, 11> kAll = {
     kEnemyOutpostSide,
     kOwnOutpostOpposite,
     kEnemyOutpostOpposite,
+    kHighlandAreaCenter,
+    kHighlandAreaEnemy,
+    kHighlandAreaOur,
 };
 
 }  // namespace points2027

@@ -39,6 +39,12 @@ PolicyConfig make_config() {
   config.points["enemy_outpost_opposite"] = Point2D{-2.0, -2.0, 0.0};
   config.point_radius["enemy_outpost_opposite"] = 0.5;
   config.points["enemy_outpost_front"] = Point2D{-1.0, 0.0, 0.0};
+  config.points["highland_area_center"] = Point2D{2.0, 2.0, 0.0};
+  config.point_radius["highland_area_center"] = 0.5;
+  config.points["highland_area_our"] = Point2D{2.0, 3.0, 0.0};
+  config.point_radius["highland_area_our"] = 0.5;
+  config.points["highland_area_enemy"] = Point2D{-2.0, 2.0, 0.0};
+  config.point_radius["highland_area_enemy"] = 0.5;
   return config;
 }
 
@@ -161,10 +167,10 @@ void test_active_heal_is_not_preempted_before_full() {
   CHECK(target_of(plan) == "own_base_supply");
 }
 
-void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
+void test_area_priority_overrides_active_base_heal() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
-  WorldState world = make_world(2.0, 2.0);  // 己方 side 高地
+  WorldState world = make_world(2.0, 2.0);  // highland_area_center / our
   world.upstream.self_hp = 100;
   world.upstream.self_ammo = 200;
 
@@ -174,6 +180,35 @@ void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
   heal.status = TaskStatus::kRunning;
 
   const TaskPlan plan = policy.decide(world, heal, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_outpost_buff");
+}
+
+void test_enemy_area_has_priority_over_own_outpost() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(-2.0, 2.0);  // 仅 highland_area_enemy
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 200;
+  world.upstream.enemy_outpost_hp = 500;
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kOwn;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "enemy_outpost_buff");
+}
+
+void test_outside_highland_area_heals_at_base() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 0.0);  // 己方 buff，但不在 highland_area 内
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 200;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
   CHECK(plan.call->task == "Heal");
   CHECK(target_of(plan) == "own_base_supply");
@@ -207,6 +242,19 @@ void test_low_hp_on_own_highland_heals_at_own_outpost_buff() {
   const PolicyConfig config = make_config();
   UtilityTaskPolicy policy(config);
   WorldState world = make_world(2.0, 2.0);  // 己方 side 高地
+  world.upstream.self_hp = 100;
+  world.upstream.self_ammo = 200;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(target_of(plan) == "own_outpost_buff");
+}
+
+void test_own_area_without_center_heals_at_own_outpost_buff() {
+  const PolicyConfig config = make_config();
+  UtilityTaskPolicy policy(config);
+  WorldState world = make_world(2.0, 3.0);  // 仅 highland_area_our
   world.upstream.self_hp = 100;
   world.upstream.self_ammo = 200;
 
@@ -372,8 +420,11 @@ int main() {
   test_low_ammo_returns_to_base();
   test_low_hp_after_respawn_heals_at_base();
   test_low_hp_on_own_highland_heals_at_own_outpost_buff();
+  test_own_area_without_center_heals_at_own_outpost_buff();
   test_low_hp_with_low_ammo_heals_at_base();
-  test_active_heal_keeps_its_point_when_passing_outpost_buff();
+  test_area_priority_overrides_active_base_heal();
+  test_enemy_area_has_priority_over_own_outpost();
+  test_outside_highland_area_heals_at_base();
   test_destroyed_own_buff_low_hp_heals_at_base();
   test_full_own_outpost_under_attack_stays_buff();
   test_both_full_defends_enemy_half();

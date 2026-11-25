@@ -30,6 +30,12 @@ PolicyConfig make_config() {
   config.point_radius["enemy_outpost_buff"] = 0.5;
   config.points["enemy_outpost_front"] = Point2D{5.0, 0.0, 0.0};
   config.point_radius["enemy_outpost_front"] = 0.2;
+  config.points["highland_area_center"] = Point2D{3.0, 3.0, 0.0};
+  config.point_radius["highland_area_center"] = 1.0;
+  config.points["highland_area_our"] = Point2D{3.0, 5.0, 0.0};
+  config.point_radius["highland_area_our"] = 1.0;
+  config.points["highland_area_enemy"] = Point2D{-3.0, 0.0, 0.0};
+  config.point_radius["highland_area_enemy"] = 1.0;
   return config;
 }
 
@@ -93,6 +99,21 @@ void test_low_hp_on_own_highland_heals_at_own_outpost_buff() {
   CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_outpost_buff");
 }
 
+void test_own_area_without_center_heals_at_own_outpost_buff() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{3.0, 5.0, 0.0};  // 仅 highland_area_our
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_outpost_buff");
+}
+
 void test_low_hp_with_low_ammo_heals_at_base() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
@@ -124,11 +145,11 @@ void test_low_hp_does_not_use_destroyed_outpost_buff() {
   CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
 }
 
-void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
+void test_area_priority_overrides_active_base_heal() {
   const PolicyConfig config = make_config();
   RuleBasedTaskPolicy policy(config);
   WorldState world = make_world();
-  world.self.pose = Point2D{3.0, 3.0, 0.0};
+  world.self.pose = Point2D{3.0, 3.0, 0.0};  // highland_area_center
   world.upstream.self_hp = 50;
   world.upstream.our_outpost_hp = 1000;
   world.upstream.our_outpost_control = OutpostControl::kOwnFull;
@@ -140,6 +161,41 @@ void test_active_heal_keeps_its_point_when_passing_outpost_buff() {
   heal.status = TaskStatus::kRunning;
 
   const TaskPlan plan = policy.decide(world, heal, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_outpost_buff");
+}
+
+void test_enemy_area_has_priority_over_own_outpost() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{-3.0, 0.0, 0.0};  // 仅 highland_area_enemy
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+  world.upstream.enemy_outpost_hp = 500;
+  world.upstream.enemy_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kOwn;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
+  CHECK(plan.call.has_value());
+  CHECK(plan.call->task == "Heal");
+  CHECK(std::get<HealParams>(plan.call->params).heal_point == "enemy_outpost_buff");
+}
+
+void test_outside_highland_area_heals_at_base() {
+  const PolicyConfig config = make_config();
+  RuleBasedTaskPolicy policy(config);
+  WorldState world = make_world();
+  world.self.pose = Point2D{2.0, 0.0, 0.0};  // 不在任何 highland_area 内
+  world.upstream.self_hp = 50;
+  world.upstream.our_outpost_hp = 1000;
+  world.upstream.our_outpost_control = OutpostControl::kOwnFull;
+  world.upstream.our_outpost_owner = OutpostOwner::kOwn;
+
+  const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
   CHECK(plan.call->task == "Heal");
   CHECK(std::get<HealParams>(plan.call->params).heal_point == "own_base_supply");
@@ -276,9 +332,12 @@ int main() {
   test_dead_selects_respawn();
   test_low_hp_selects_heal();
   test_low_hp_on_own_highland_heals_at_own_outpost_buff();
+  test_own_area_without_center_heals_at_own_outpost_buff();
   test_low_hp_with_low_ammo_heals_at_base();
   test_low_hp_does_not_use_destroyed_outpost_buff();
-  test_active_heal_keeps_its_point_when_passing_outpost_buff();
+  test_area_priority_overrides_active_base_heal();
+  test_enemy_area_has_priority_over_own_outpost();
+  test_outside_highland_area_heals_at_base();
   test_low_ammo_far_from_base_selects_heal();
   test_low_ammo_at_base_does_not_use_main_resource();
   test_low_ammo_at_base_with_free_batch_selects_heal();

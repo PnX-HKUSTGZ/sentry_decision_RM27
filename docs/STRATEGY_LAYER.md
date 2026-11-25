@@ -253,7 +253,7 @@ else: switch
 - 己方完全控制的前哨站可作为补给区使用，但不能领取免费发弹量。
 - 战略优先级：先保全己方半场的前哨站；己方前哨站完全控制且安全后，再尝试敌方前哨站。
 - 对 Task 的影响：`Outpost` 只负责下发攻击状态和监测目标；`Heal` 需要根据控制状态选择基地补给区，或己方完全控制的前哨站（己方/敌方半场均可用）。
-- 回血点选择：低弹必须回基地；前哨站回血只在距离增益点 5 m 内、完全控制且存活时生效，避免从敌方半场跨图去吃 buff。Heal 进行中保持当前回血点，防止去基地途中路过另一个回血点后改目标。
+- 回血点选择按优先级：① 敌方前哨站增益点被我方完全控制，且自己在 `highland_area_center` / `highland_area_enemy` 内 → 敌方增益点；② 己方前哨站增益点被我方完全控制，且自己在 `highland_area_center` / `highland_area_our` 内 → 己方增益点；③ 否则回基地。低弹或需要领取基地免费发弹时必须回基地。区域点半径来自地图配置。
 - `Heal` 在前哨站只回血：`claim_free_ammo` 默认 `true` 但在前哨站忽略，不领免费弹、也不因此失败。
 - 基地补给区免费发弹是“存活且在区内”自动触发；`Heal` 只负责 5 s 到账确认，见 [TASK_CATALOG.md](TASK_CATALOG.md) §5.5。
 
@@ -473,7 +473,7 @@ using Strategy = std::function<TaskPlan(
 - 动作层无固定周期：事件触发；无事件时最长 1 s 触发一次。`TaskRuntime` 仍为 `10–20 Hz`。
 - 打断默认允许；仅特定任务不可中断，由任务级 `Task::can_abort()` 决定；不设 `min_commit` / `abort_if` / `lease`。
 - 主任务栏每时刻最多一个 active Task；`Resource` 由独立辅助栏执行，远程兑换暂不做。
-- 所有点位使用 [POINTS_2027.md](POINTS_2027.md) 的 11 个命名点；Task 层只看到 `own` / `enemy`，红蓝映射只在 IO / Belief 做一次。
+- 所有点位使用 [POINTS_2027.md](POINTS_2027.md) 的 14 个命名点；Task 层只看到 `own` / `enemy`，红蓝映射只在 IO / Belief 做一次。
 - `HistoryView` 只保留上一次任务及结果；`TacticalMode` 完全删除，调试改用 `task_state`。
 - 所有 Task 不做内部重试；失败/超时交给动作层。裁判兑换类任务只设 5 s 检测窗口，不重发。`ActionDispatcher` 已改为单次发送，旧重试字段已删除。
 - `Scan` / `Outpost` 是同级、互斥的 state-only 主任务；`Outpost` 不含导航。

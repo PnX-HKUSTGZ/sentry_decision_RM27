@@ -66,6 +66,7 @@ class UtilityTaskPolicy : public TaskPolicy {
 
   bool valid_point(const std::string& name) const;
   bool at_point(const WorldState& world, const std::string& name, double radius) const;
+  bool inside_area(const WorldState& world, const std::string& name) const;
   bool near_any_strike(const WorldState& world, Side side) const;
   bool free_supply_ammo_pending(const WorldState& world) const;
   bool is_gain_point(const std::string& name) const;

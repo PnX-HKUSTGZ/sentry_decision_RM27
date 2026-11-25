@@ -39,7 +39,7 @@
 - `core/task_policy` / `core/task_runner`：手写 Task 选择 + Policy/Runtime 组合根。
 - `task_node`：TaskRunner + RosIoNode + SafetySupervisor 的 2027 主程序；`decision_node.launch.py` 与 `tools/demo.sh` 默认已切到 `task_node`。
 - 2027 原子 Task：`Navigate`、`Scan`、`Outpost`、`Respawn`、`Heal`、`Resource`，含宿主单测。
-- `points_2027.hpp`：11 个 2027 命名点常量。
+- `points_2027.hpp`：14 个 2027 命名点常量（含 3 个 `highland_area_*` 范围点）。
 - `WorldState`：`OutpostControl`、`supply_claimed_minutes`。
 - 2027 `0x0101` 事件解码：`EventCode` 按 `own_color` 映射 R/B → own/enemy；`GameInfo.event_code_2` 上行字段。
 
@@ -73,7 +73,7 @@
 - `set_world enemy_outpost_hp/our_outpost_hp = 0` 直接改血量时没有走 `destroy_outpost`，导致「临时控制 + 击毁」不转完全控制/不重建；现在置 0 也走击毁结算，并按当前控制状态推断击毁方（我方完全控制视为敌方击毁，其余视为我方击毁）。
 - utility 低血时未优先回基地、低弹时不主动回基地；现在低血/低弹会生成恢复候选，低血时只允许 Heal，Heal 开始后持续到满血，不再被回防/占点抢断。
 - 前哨站被击毁后仿真仍上报前哨站增益点、仍按前哨站 buff 回血/兑换；现在 `hp=0` 时 buff 失效。
-- `Heal` 选点此前 rule 策略总是回基地，忽略了己方完全控制且存活的前哨站增益点；现在低血时会在基地与附近（5 m 内）的己方前哨站增益点之间选更近的有效点，低弹仍强制回基地；回血过程中保持当前点，避免去基地途中路过前哨站时改目标。
+- `Heal` 选点此前 rule 策略总是回基地，忽略了己方完全控制且存活的前哨站增益点；现在按 `highland_area_center` / `highland_area_enemy` / `highland_area_our` 区域判断：敌方前哨增益点优先，其次己方前哨增益点，区域外回基地；低弹/需领基地免费发弹时强制回基地。
 
 ### Removed
 

@@ -12,8 +12,6 @@ namespace {
 
 constexpr Duration kNavigateTimeout{30000};
 constexpr Duration kPlanValidFor{1000};
-// 只在前哨站附近（高地/增益点）就地回血；远处仍回基地，避免跨半场去前哨站回血。
-constexpr double kOutpostHealRadius{5.0};
 
 TaskCall call(TaskId id, TaskParams params, Duration timeout = Duration{0}) {
   return TaskCall{std::move(id), std::move(params), timeout};
@@ -53,17 +51,20 @@ bool valid_heal_point(const PolicyConfig& config, const std::string& name) {
   return radius != config.point_radius.end() && radius->second > 0.0;
 }
 
-double distance_to_point(const WorldState& world, const PolicyConfig& config,
-                         const std::string& name) {
+bool inside_area(const WorldState& world, const PolicyConfig& config,
+                 const std::string& name) {
   const Point2D* point = config.find_point(name);
-  if (point == nullptr || !world.self.valid) {
-    return 1.0e6;
+  const auto radius = config.point_radius.find(name);
+  if (point == nullptr || radius == config.point_radius.end() || radius->second <= 0.0 ||
+      !world.self.valid) {
+    return false;
   }
-  return std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y);
+  return std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y) <=
+         radius->second;
 }
 
-// 低血时优先选择距离最近的有效回血点：基地，或己方完全控制且存活的前哨站增益点。
-// 低弹必须回基地，因为前哨站增益点不能补弹。
+// 回血点优先级：敌方前哨 buff（中央/敌方高地区域） > 己方前哨 buff（中央/己方高地区域）
+// > 基地。低弹必须回基地，因为前哨站增益点不能补弹。
 std::string choose_heal_point(const WorldState& world, const PolicyConfig& config,
                               bool need_ammo) {
   const std::string base(points2027::kOwnBaseSupply);
@@ -71,18 +72,23 @@ std::string choose_heal_point(const WorldState& world, const PolicyConfig& confi
     return base;
   }
 
-  std::string best = base;
-  double best_distance = distance_to_point(world, config, base);
+  const bool in_center = inside_area(world, config, std::string(points2027::kHighlandAreaCenter));
+  const std::string enemy_buff(points2027::kEnemyOutpostBuff);
+  if (world.upstream.enemy_outpost_control == OutpostControl::kOwnFull &&
+      world.upstream.enemy_outpost_hp > 0 && valid_heal_point(config, enemy_buff) &&
+      (in_center ||
+       inside_area(world, config, std::string(points2027::kHighlandAreaEnemy)))) {
+    return enemy_buff;
+  }
+
   const std::string own_buff(points2027::kOwnOutpostBuff);
   if (world.upstream.our_outpost_control == OutpostControl::kOwnFull &&
-      world.upstream.our_outpost_hp > 0 && valid_heal_point(config, own_buff)) {
-    const double distance = distance_to_point(world, config, own_buff);
-    if (distance <= kOutpostHealRadius && distance < best_distance) {
-      best = own_buff;
-      best_distance = distance;
-    }
+      world.upstream.our_outpost_hp > 0 && valid_heal_point(config, own_buff) &&
+      (in_center ||
+       inside_area(world, config, std::string(points2027::kHighlandAreaOur)))) {
+    return own_buff;
   }
-  return best;
+  return base;
 }
 
 // 当前是否还有未领取的补给区免费发弹批次（每满 1 分钟 100 发）。
@@ -115,15 +121,8 @@ TaskPlan RuleBasedTaskPolicy::decide(const WorldState& world,
   const bool low_ammo = low_threshold(config_, "nav.low_ammo", world.upstream.self_ammo);
   const bool at_base = point_near(world, config_, std::string(points2027::kOwnBaseSupply));
 
-  // 低血优先回血；有可用前哨站增益点时选最近的有效点，低弹仍回基地。
+  // 低血优先回血：按高地范围点选择前哨站增益点，区域外或低弹回基地。
   if (low_hp) {
-    // 已经在回血时保持同一个回血点，避免去基地途中路过前哨站又改目标。
-    // 低弹例外：必须回基地补弹。
-    if (!low_ammo && active_task.has_value() &&
-        active_task->status == TaskStatus::kRunning && active_task->task == "Heal" &&
-        active_task->call.has_value()) {
-      return plan_with(world, *active_task->call);
-    }
     const std::string heal_point = choose_heal_point(world, config_, low_ammo);
     return plan_with(world, call("Heal", HealParams{heal_point, true}));
   }
