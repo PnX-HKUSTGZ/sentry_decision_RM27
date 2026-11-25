@@ -52,15 +52,9 @@ tools/demo.sh --headless
 #   --nav-gimbal-panel  导航仿真里的云台控制面板
 #   --no-viz / --nav-silent  兼容旧写法，只关闭对应窗口
 
-# 双仓库联合仿真（额外起导航容器，导航窗口默认关闭）
-# 默认真值定位 + legacy Nav2：自动出生，RViz 直接有地图/机器人，不依赖初始位姿
+# 双仓库联合仿真（额外起真实导航容器，导航窗口默认关闭）
 tools/demo.sh --with-nav [--nav-viz] [--gazebo]
-# 真实定位链路（Point-LIO + MINCO + 全局重定位）；当前分支需要 RViz 选出生点
-tools/demo.sh --with-nav --nav-real --nav-viz
 xhost +SI:localuser:root # 若遇到 RViz/Gazebo 无法显示，执行此命令允许容器访问宿主 X11
-
-> 导航镜像必须包含 RMUC2027 世界；旧镜像会报 `Unknown world 'RMUC2027'`。
-> 更新导航仓库后需要从该仓库重新构建 `rm27_nav:jazzy`，不能继续用旧镜像。
 ```
 
 #### 启动导航仓库
