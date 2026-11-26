@@ -172,9 +172,9 @@ class TaskDecisionNode : public rclcpp::Node {
       const std::string params =
           resource->call.has_value() ? task_params_text(*resource->call) : std::string{};
       out << "{\"id\":\"" << json_escape(resource->task)
-          << "\",\"status\":" << static_cast<int>(resource->status)
-          << ",\"phase\":\"" << json_escape(resource->phase) << "\",\"detail\":\""
-          << json_escape(resource->detail) << "\",\"progress\":" << resource->progress
+          << "\",\"status\":" << static_cast<int>(resource->status) << ",\"phase\":\""
+          << json_escape(resource->phase) << "\",\"detail\":\"" << json_escape(resource->detail)
+          << "\",\"progress\":" << resource->progress
           << ",\"elapsed_ms\":" << resource->elapsed.count() << ",\"params\":\""
           << json_escape(params) << "\",\"metrics\":\""
           << json_escape(metrics_text(resource->metrics)) << "\"}";
@@ -222,8 +222,8 @@ class TaskDecisionNode : public rclcpp::Node {
                  static_cast<int>(result->status), result->reason.c_str());
     }
     if (const auto result = runner_.take_resource_result(); result.has_value()) {
-      SD_LOG_ACT("resource", "辅助兑换结束 status=%d reason=%s",
-                 static_cast<int>(result->status), result->reason.c_str());
+      SD_LOG_ACT("resource", "辅助兑换结束 status=%d reason=%s", static_cast<int>(result->status),
+                 result->reason.c_str());
     }
     while (auto epoch = runner_.take_epoch()) {
       SD_LOG_DEBUG("task", "DecisionEpoch reason=%d", static_cast<int>(epoch->reason));

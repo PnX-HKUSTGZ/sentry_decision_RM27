@@ -56,10 +56,10 @@ class UtilityTaskPolicy : public TaskPolicy {
   void add_scan_candidate(const WorldState& world, const Context& context,
                           std::vector<Candidate>* out) const;
 
-  double score_navigate(const WorldState& world, const Context& context,
-                        const std::string& point, const TaskCall& call) const;
-  double score_heal(const WorldState& world, const Context& context,
-                    const std::string& point, const TaskCall& call) const;
+  double score_navigate(const WorldState& world, const Context& context, const std::string& point,
+                        const TaskCall& call) const;
+  double score_heal(const WorldState& world, const Context& context, const std::string& point,
+                    const TaskCall& call) const;
   double score_outpost(const WorldState& world, const Context& context, Side side,
                        const TaskCall& call) const;
   double score_scan(const WorldState& world, const Context& context, const TaskCall& call) const;

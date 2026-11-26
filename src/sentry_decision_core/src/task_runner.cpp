@@ -12,7 +12,9 @@ constexpr Duration kDecisionPeriod{1000};
 }  // namespace
 
 TaskRunner::TaskRunner(const PolicyConfig& config, int max_hp, Duration match_duration)
-    : runtime_(registry_), policy_(make_task_policy(config)), resource_(config),
+    : runtime_(registry_),
+      policy_(make_task_policy(config)),
+      resource_(config),
       match_duration_(match_duration) {
   register_default_tasks(registry_, config, max_hp, match_duration);
 }

@@ -13,7 +13,14 @@ if [[ -z "${SCENARIO}" ]]; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OVERLAY="${SCENARIO_OVERLAY_DIR:-${ROOT}/.docker-build/install}"
+OVERLAY="${SCENARIO_OVERLAY_DIR:-}"
+if [[ -z "${OVERLAY}" ]]; then
+  if [[ -f "${ROOT}/.docker-build/install/setup.bash" ]]; then
+    OVERLAY="${ROOT}/.docker-build/install"
+  else
+    OVERLAY="${ROOT}/install"
+  fi
+fi
 
 set +u
 source /opt/ros/jazzy/setup.bash

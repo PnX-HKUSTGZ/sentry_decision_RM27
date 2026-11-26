@@ -54,9 +54,9 @@ void WorldModel::update_outpost_owner(OutpostOwner* owner, int* previous_hp, boo
   *previous_hp = hp;
 }
 
-void WorldModel::update_outpost_trend(OutpostTrend* trend, int* last_hp,
-                                      TimePoint* last_sample, TimePoint* last_damage,
-                                      bool* initialized, int hp, TimePoint now) {
+void WorldModel::update_outpost_trend(OutpostTrend* trend, int* last_hp, TimePoint* last_sample,
+                                      TimePoint* last_damage, bool* initialized, int hp,
+                                      TimePoint now) {
   if (!*initialized) {
     *initialized = true;
     *last_hp = hp;
@@ -99,15 +99,15 @@ WorldState WorldModel::snapshot(TimePoint now) {
     state.our_outpost_trend = OutpostTrend{};
     state.enemy_outpost_trend = OutpostTrend{};
   } else {
-    update_outpost_owner(&our_outpost_owner_, &previous_our_outpost_hp_,
-                         &our_rebuild_pending_, &our_rebuild_at_, upstream.our_outpost_hp,
-                         upstream.our_outpost_control, now);
+    update_outpost_owner(&our_outpost_owner_, &previous_our_outpost_hp_, &our_rebuild_pending_,
+                         &our_rebuild_at_, upstream.our_outpost_hp, upstream.our_outpost_control,
+                         now);
     update_outpost_owner(&enemy_outpost_owner_, &previous_enemy_outpost_hp_,
                          &enemy_rebuild_pending_, &enemy_rebuild_at_, upstream.enemy_outpost_hp,
                          upstream.enemy_outpost_control, now);
-    update_outpost_trend(&state.our_outpost_trend, &last_our_trend_hp_,
-                         &last_our_trend_sample_, &last_our_damage_at_,
-                         &our_trend_initialized_, upstream.our_outpost_hp, now);
+    update_outpost_trend(&state.our_outpost_trend, &last_our_trend_hp_, &last_our_trend_sample_,
+                         &last_our_damage_at_, &our_trend_initialized_, upstream.our_outpost_hp,
+                         now);
     update_outpost_trend(&state.enemy_outpost_trend, &last_enemy_trend_hp_,
                          &last_enemy_trend_sample_, &last_enemy_damage_at_,
                          &enemy_trend_initialized_, upstream.enemy_outpost_hp, now);

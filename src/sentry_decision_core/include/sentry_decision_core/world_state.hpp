@@ -96,7 +96,7 @@ struct AllyRobot {
 
 // 前哨站最近一段时间的血量趋势，仅用于策略判断，不进入上行/下行协议。
 struct OutpostTrend {
-  int hp_delta_1s = 0;     // 最近 1 s 的血量变化；负值表示正在掉血
+  int hp_delta_1s = 0;        // 最近 1 s 的血量变化；负值表示正在掉血
   bool under_attack = false;  // 最近 1.5 s 内是否观察到掉血
 };
 

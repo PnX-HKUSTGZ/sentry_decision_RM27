@@ -58,8 +58,7 @@ std::optional<ResourceController::ExchangePoint> ResourceController::find_exchan
     if (point == nullptr || radius == config_.point_radius.end() || radius->second <= 0.0) {
       return std::nullopt;
     }
-    const double distance =
-        std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y);
+    const double distance = std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y);
     if (distance > radius->second) {
       return std::nullopt;
     }
@@ -212,8 +211,7 @@ void ResourceController::tick(const WorldState& world, TimePoint now) {
     return;
   }
   // 基地还有未领取的免费发弹批次时，先让主栏 Heal 领取；不要花金币重复买。
-  if (point->name == point_name(points2027::kOwnBaseSupply) &&
-      free_supply_ammo_pending(world)) {
+  if (point->name == point_name(points2027::kOwnBaseSupply) && free_supply_ammo_pending(world)) {
     return;
   }
 

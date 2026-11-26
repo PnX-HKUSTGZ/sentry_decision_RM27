@@ -23,8 +23,7 @@ class WorldModel {
 
  private:
   void update_outpost_owner(OutpostOwner* owner, int* previous_hp, bool* pending,
-                            TimePoint* pending_at, int hp, OutpostControl control,
-                            TimePoint now);
+                            TimePoint* pending_at, int hp, OutpostControl control, TimePoint now);
   void update_outpost_trend(OutpostTrend* trend, int* last_hp, TimePoint* last_sample,
                             TimePoint* last_damage, bool* initialized, int hp, TimePoint now);
 

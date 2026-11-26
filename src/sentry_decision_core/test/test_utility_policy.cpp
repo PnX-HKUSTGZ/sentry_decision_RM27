@@ -130,8 +130,7 @@ void test_own_highland_does_not_hop_to_other_highland() {
 
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
-  CHECK(!(plan.call->task == "Navigate" &&
-          target_of(plan).rfind("own_outpost_", 0) == 0));
+  CHECK(!(plan.call->task == "Navigate" && target_of(plan).rfind("own_outpost_", 0) == 0));
 }
 
 void test_invalid_own_buff_moves_to_highland() {
@@ -406,8 +405,7 @@ void test_no_navigate_churn_at_destination() {
 
   const TaskPlan plan = policy.decide(world, std::nullopt, HistoryView{});
   CHECK(plan.call.has_value());
-  CHECK(!(plan.call->task == "Navigate" &&
-          target_of(plan) == "own_outpost_buff"));
+  CHECK(!(plan.call->task == "Navigate" && target_of(plan) == "own_outpost_buff"));
 }
 
 void test_owned_outpost_is_not_attacked() {

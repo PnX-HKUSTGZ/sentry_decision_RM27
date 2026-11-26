@@ -34,10 +34,10 @@ TaskOutput OutpostTask::tick(const WorldState& world, TimePoint) {
 
   const bool own_side = params_.target_side == Side::kOwn;
   const int hp = own_side ? world.upstream.our_outpost_hp : world.upstream.enemy_outpost_hp;
-  const OutpostControl control = own_side ? world.upstream.our_outpost_control
-                                          : world.upstream.enemy_outpost_control;
-  const OutpostOwner owner = own_side ? world.upstream.our_outpost_owner
-                                      : world.upstream.enemy_outpost_owner;
+  const OutpostControl control =
+      own_side ? world.upstream.our_outpost_control : world.upstream.enemy_outpost_control;
+  const OutpostOwner owner =
+      own_side ? world.upstream.our_outpost_owner : world.upstream.enemy_outpost_owner;
   out.metrics["outpost_hp"] = static_cast<double>(hp);
   out.metrics["outpost_control"] = static_cast<double>(control);
   out.metrics["outpost_owner"] = static_cast<double>(owner);

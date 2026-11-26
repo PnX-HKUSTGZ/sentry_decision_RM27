@@ -200,11 +200,11 @@ struct GainZone {
 
 // 仿真场上的增益点区域。中央高地增益点由多个圆组成（每侧两个打击点）。
 struct GainZones {
-  GainZone supply;              // 己方补给区
-  GainZone base_buff;           // 己方基地增益点
-  GainZone our_outpost_buff;    // 己方前哨站增益点
-  GainZone enemy_outpost_buff;  // 敌方前哨站增益点
-  GainZone fort_buff;           // 己方堡垒增益点
+  GainZone supply;                       // 己方补给区
+  GainZone base_buff;                    // 己方基地增益点
+  GainZone our_outpost_buff;             // 己方前哨站增益点
+  GainZone enemy_outpost_buff;           // 敌方前哨站增益点
+  GainZone fort_buff;                    // 己方堡垒增益点
   std::vector<GainZone> our_highland;    // 己方中央高地增益点
   std::vector<GainZone> enemy_highland;  // 敌方中央高地增益点
 };

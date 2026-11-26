@@ -51,22 +51,19 @@ bool valid_heal_point(const PolicyConfig& config, const std::string& name) {
   return radius != config.point_radius.end() && radius->second > 0.0;
 }
 
-bool inside_area(const WorldState& world, const PolicyConfig& config,
-                 const std::string& name) {
+bool inside_area(const WorldState& world, const PolicyConfig& config, const std::string& name) {
   const Point2D* point = config.find_point(name);
   const auto radius = config.point_radius.find(name);
   if (point == nullptr || radius == config.point_radius.end() || radius->second <= 0.0 ||
       !world.self.valid) {
     return false;
   }
-  return std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y) <=
-         radius->second;
+  return std::hypot(world.self.pose.x - point->x, world.self.pose.y - point->y) <= radius->second;
 }
 
 // 回血点优先级：敌方前哨 buff（中央/敌方高地区域） > 己方前哨 buff（中央/己方高地区域）
 // > 基地。低弹必须回基地，因为前哨站增益点不能补弹。
-std::string choose_heal_point(const WorldState& world, const PolicyConfig& config,
-                              bool need_ammo) {
+std::string choose_heal_point(const WorldState& world, const PolicyConfig& config, bool need_ammo) {
   const std::string base(points2027::kOwnBaseSupply);
   if (need_ammo || !world.self.valid) {
     return base;
@@ -76,16 +73,14 @@ std::string choose_heal_point(const WorldState& world, const PolicyConfig& confi
   const std::string enemy_buff(points2027::kEnemyOutpostBuff);
   if (world.upstream.enemy_outpost_control == OutpostControl::kOwnFull &&
       world.upstream.enemy_outpost_hp > 0 && valid_heal_point(config, enemy_buff) &&
-      (in_center ||
-       inside_area(world, config, std::string(points2027::kHighlandAreaEnemy)))) {
+      (in_center || inside_area(world, config, std::string(points2027::kHighlandAreaEnemy)))) {
     return enemy_buff;
   }
 
   const std::string own_buff(points2027::kOwnOutpostBuff);
   if (world.upstream.our_outpost_control == OutpostControl::kOwnFull &&
       world.upstream.our_outpost_hp > 0 && valid_heal_point(config, own_buff) &&
-      (in_center ||
-       inside_area(world, config, std::string(points2027::kHighlandAreaOur)))) {
+      (in_center || inside_area(world, config, std::string(points2027::kHighlandAreaOur)))) {
     return own_buff;
   }
   return base;

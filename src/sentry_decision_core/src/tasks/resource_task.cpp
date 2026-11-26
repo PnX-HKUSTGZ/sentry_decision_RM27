@@ -45,8 +45,7 @@ void ResourceTask::start(const TaskCall& call, TimePoint now) {
   const bool enemy_outpost = params_.exchange_point == point_name(points2027::kEnemyOutpostBuff);
   if (!base && !own_outpost && !enemy_outpost) {
     invalid_ = true;
-    invalid_reason_ =
-        "Resource 点必须是 own_base_supply、own_outpost_buff 或 enemy_outpost_buff";
+    invalid_reason_ = "Resource 点必须是 own_base_supply、own_outpost_buff 或 enemy_outpost_buff";
     return;
   }
   zone_ = base ? ZoneKind::kBaseSupply

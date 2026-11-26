@@ -30,8 +30,7 @@ OutpostControl outpost_control(const WorldState& world, Side side) {
 }
 
 OutpostOwner outpost_owner(const WorldState& world, Side side) {
-  return side == Side::kOwn ? world.upstream.our_outpost_owner
-                            : world.upstream.enemy_outpost_owner;
+  return side == Side::kOwn ? world.upstream.our_outpost_owner : world.upstream.enemy_outpost_owner;
 }
 
 double clamp01(double value) {
@@ -114,8 +113,7 @@ bool UtilityTaskPolicy::is_buff(const std::string& name) const {
 }
 
 bool UtilityTaskPolicy::is_gain_point(const std::string& name) const {
-  return is_buff(name) || is_highland(name) ||
-         name == point_name(points2027::kOwnBaseSupply);
+  return is_buff(name) || is_highland(name) || name == point_name(points2027::kOwnBaseSupply);
 }
 
 bool UtilityTaskPolicy::free_supply_ammo_pending(const WorldState& world) const {
@@ -165,13 +163,11 @@ UtilityTaskPolicy::Context UtilityTaskPolicy::make_context(const WorldState& wor
   context.own_risk = std::min(1.8, context.own_risk);
 
   context.own_hold = 0.0;
-  if (up.our_outpost_owner == OutpostOwner::kOwn &&
-      (context.own_full || context.own_temp)) {
+  if (up.our_outpost_owner == OutpostOwner::kOwn && (context.own_full || context.own_temp)) {
     context.own_hold = context.own_full ? 1.0 : 0.7;
   }
   context.enemy_hold = 0.0;
-  if (up.enemy_outpost_owner == OutpostOwner::kOwn &&
-      (context.enemy_full || context.enemy_temp)) {
+  if (up.enemy_outpost_owner == OutpostOwner::kOwn && (context.enemy_full || context.enemy_temp)) {
     context.enemy_hold = context.enemy_full ? 1.15 : 0.8;
   }
 
@@ -206,8 +202,7 @@ UtilityTaskPolicy::Context UtilityTaskPolicy::make_context(const WorldState& wor
 }
 
 double UtilityTaskPolicy::score_navigate(const WorldState& world, const Context& context,
-                                         const std::string& point,
-                                         const TaskCall& /*call*/) const {
+                                         const std::string& point, const TaskCall& /*call*/) const {
   const auto& up = world.upstream;
   const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
   const double hp_need = clamp01(1.0 - static_cast<double>(up.self_hp) / std::max(1, max_hp));
@@ -295,8 +290,8 @@ double UtilityTaskPolicy::score_heal(const WorldState& world, const Context& con
   return -1.0e6;
 }
 
-double UtilityTaskPolicy::score_outpost(const WorldState& world, const Context& context,
-                                        Side side, const TaskCall& /*call*/) const {
+double UtilityTaskPolicy::score_outpost(const WorldState& world, const Context& context, Side side,
+                                        const TaskCall& /*call*/) const {
   const auto& up = world.upstream;
   const int hp = outpost_hp(world, side);
   const auto control = outpost_control(world, side);
@@ -362,20 +357,18 @@ double UtilityTaskPolicy::score_scan(const WorldState& world, const Context& con
   }
   if (at_point(world, point_name(points2027::kEnemyOutpostSide), 0.5) ||
       at_point(world, point_name(points2027::kEnemyOutpostOpposite), 0.5)) {
-    return 1.2 * context.enemy_attack + 1.6 * context.enemy_convert +
-           1.4 * context.enemy_hold + 0.3 - 0.7 * context.own_risk;
+    return 1.2 * context.enemy_attack + 1.6 * context.enemy_convert + 1.4 * context.enemy_hold +
+           0.3 - 0.7 * context.own_risk;
   }
   return 0.3;
 }
 
 void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const Context& context,
                                                 std::vector<Candidate>* out) const {
-  const bool at_own_highland =
-      at_point(world, point_name(points2027::kOwnOutpostSide), 0.5) ||
-      at_point(world, point_name(points2027::kOwnOutpostOpposite), 0.5);
-  const bool at_own_buff_valid =
-      at_point(world, point_name(points2027::kOwnOutpostBuff), 0.5) && context.own_full &&
-      context.own_alive;
+  const bool at_own_highland = at_point(world, point_name(points2027::kOwnOutpostSide), 0.5) ||
+                               at_point(world, point_name(points2027::kOwnOutpostOpposite), 0.5);
+  const bool at_own_buff_valid = at_point(world, point_name(points2027::kOwnOutpostBuff), 0.5) &&
+                                 context.own_full && context.own_alive;
   const bool at_enemy_highland =
       at_point(world, point_name(points2027::kEnemyOutpostSide), 0.5) ||
       at_point(world, point_name(points2027::kEnemyOutpostOpposite), 0.5);
@@ -386,14 +379,10 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
   const bool at_enemy_gain = at_enemy_highland || at_enemy_buff_valid;
 
   const std::vector<std::string> points = {
-      point_name(points2027::kOwnBaseSupply),
-      point_name(points2027::kOwnOutpostBuff),
-      point_name(points2027::kEnemyOutpostBuff),
-      point_name(points2027::kOwnOutpostSide),
-      point_name(points2027::kOwnOutpostOpposite),
-      point_name(points2027::kOwnOutpostFront),
-      point_name(points2027::kEnemyOutpostSide),
-      point_name(points2027::kEnemyOutpostOpposite),
+      point_name(points2027::kOwnBaseSupply),      point_name(points2027::kOwnOutpostBuff),
+      point_name(points2027::kEnemyOutpostBuff),   point_name(points2027::kOwnOutpostSide),
+      point_name(points2027::kOwnOutpostOpposite), point_name(points2027::kOwnOutpostFront),
+      point_name(points2027::kEnemyOutpostSide),   point_name(points2027::kEnemyOutpostOpposite),
       point_name(points2027::kEnemyOutpostFront),
   };
   const int max_hp = static_cast<int>(config_.number("self.max_hp").value_or(400.0));
@@ -402,8 +391,7 @@ void UtilityTaskPolicy::add_navigate_candidates(const WorldState& world, const C
       continue;
     }
     // 低血时由 Heal 直接负责导航 + 等待回血，不要用 Navigate 抢走主任务。
-    if (point == point_name(points2027::kOwnBaseSupply) &&
-        world.upstream.self_hp < max_hp * 0.6) {
+    if (point == point_name(points2027::kOwnBaseSupply) && world.upstream.self_hp < max_hp * 0.6) {
       continue;
     }
     // 已在目标点附近时不再生成同点 Navigate，避免到达后反复成功/重启。
@@ -442,8 +430,7 @@ void UtilityTaskPolicy::add_heal_candidates(const WorldState& world, const Conte
   // 回血只在低血阈值以下触发；300/400 这类轻伤不应打断占点/转场。
   const bool need_heal = hp_not_full && world.upstream.self_hp <= retreat_hp;
   const bool low_ammo =
-      static_cast<double>(world.upstream.self_ammo) <
-      config_.number("nav.low_ammo").value_or(50.0);
+      static_cast<double>(world.upstream.self_ammo) < config_.number("nav.low_ammo").value_or(50.0);
   const std::string base(point_name(points2027::kOwnBaseSupply));
   if (valid_point(base) && (need_heal || free_supply_ammo_pending(world))) {
     TaskCall call{"Heal", HealParams{base, true}, Duration{0}};
@@ -453,25 +440,22 @@ void UtilityTaskPolicy::add_heal_candidates(const WorldState& world, const Conte
   // 前哨站只回血、不补弹；低弹时必须回基地，避免为了回血错过补弹。
   // 高地范围点内按固定优先级选择：敌方前哨 buff > 己方前哨 buff > 基地。
   if (need_heal && !low_ammo) {
-    const bool in_center =
-        inside_area(world, point_name(points2027::kHighlandAreaCenter));
+    const bool in_center = inside_area(world, point_name(points2027::kHighlandAreaCenter));
     const std::string enemy(point_name(points2027::kEnemyOutpostBuff));
     const bool enemy_area =
         in_center || inside_area(world, point_name(points2027::kHighlandAreaEnemy));
     if (valid_point(enemy) && context.enemy_full && context.enemy_alive && enemy_area) {
       TaskCall call{"Heal", HealParams{enemy, false}, Duration{0}};
-      out->push_back(Candidate{call, score_heal(world, context, enemy, call) +
-                                         kAreaHealPriorityBonus,
-                               "heal " + enemy});
+      out->push_back(Candidate{
+          call, score_heal(world, context, enemy, call) + kAreaHealPriorityBonus, "heal " + enemy});
     } else {
       const std::string own(point_name(points2027::kOwnOutpostBuff));
       const bool own_area =
           in_center || inside_area(world, point_name(points2027::kHighlandAreaOur));
       if (valid_point(own) && context.own_full && context.own_alive && own_area) {
         TaskCall call{"Heal", HealParams{own, false}, Duration{0}};
-        out->push_back(Candidate{call,
-                                 score_heal(world, context, own, call) + kAreaHealPriorityBonus,
-                                 "heal " + own});
+        out->push_back(Candidate{
+            call, score_heal(world, context, own, call) + kAreaHealPriorityBonus, "heal " + own});
       }
     }
   }
@@ -532,9 +516,8 @@ TaskPlan UtilityTaskPolicy::decide(const WorldState& world,
                        active_task->task == "Heal" && world.upstream.self_hp < max_hp;
   if (healing && active_task->call.has_value()) {
     const auto* heal = std::get_if<HealParams>(&active_task->call->params);
-    const bool low_ammo =
-        static_cast<double>(world.upstream.self_ammo) <
-        config_.number("nav.low_ammo").value_or(50.0);
+    const bool low_ammo = static_cast<double>(world.upstream.self_ammo) <
+                          config_.number("nav.low_ammo").value_or(50.0);
     const bool base_heal =
         heal != nullptr && heal->heal_point == point_name(points2027::kOwnBaseSupply);
     // 已经开始的 Heal 继续到满血；低弹时只允许继续回基地，不能继续在前哨站吃 buff。
@@ -578,9 +561,8 @@ TaskPlan UtilityTaskPolicy::decide(const WorldState& world,
     }
   }
 
-  std::sort(list.begin(), list.end(), [](const Candidate& a, const Candidate& b) {
-    return a.score > b.score;
-  });
+  std::sort(list.begin(), list.end(),
+            [](const Candidate& a, const Candidate& b) { return a.score > b.score; });
   if (list.empty()) {
     return plan;
   }
