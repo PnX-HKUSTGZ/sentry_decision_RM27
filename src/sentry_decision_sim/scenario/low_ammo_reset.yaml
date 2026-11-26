@@ -1,0 +1,29 @@
+# 无头回归：低弹在基地时主栏保持 Scan，买弹由独立 Resource 辅助栏完成；重置后能重新进入任务。
+name: low_ammo_reset
+start_pose: [-12.37, -3.35, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 200
+  self_hp: 400
+  self_ammo: 0
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 0
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: scan
+  - at: 3.0
+    set_world:
+      game_status: 0
+  - at: 4.0
+    expect:
+      task_state: idle
+  - at: 5.0
+    set_world:
+      game_status: 4
+  - at: 7.0
+    expect:
+      task_state: scan

@@ -24,26 +24,44 @@ enum class GameStatus : std::uint8_t {
   kUnknown = 0xFF,   // 未识别取值，便于上层判定协议异常
 };
 
-// GameInfo.event_code：0x0101 场地事件数据（uint32）。
+// GameInfo.event_code / event_code_2：2027 0x0101 场地事件数据。
+// 字段已按己方视角映射；R/B -> own/enemy 只由 own_color 决定。
 struct EventCode {
-  bool supply_zone_occupied = false;         // bit 0：己方补给区已占领
-  bool supply_zone_occupied_rmul = false;    // bit 2：己方补给区已占领（仅 RMUL）
-  std::uint8_t small_energy_status = 0;      // bit 3-4：0 未激活 / 1 已激活 / 2 正在激活
-  std::uint8_t big_energy_status = 0;        // bit 5-6：0 未激活 / 1 已激活 / 2 正在激活
-  std::uint8_t central_highland_status = 0;  // bit 7-8：1 己方 / 2 对方
-  std::uint8_t trapezoid_highland_status = 0;  // bit 9-10：1 已占领
-  std::uint16_t enemy_dart_last_hit_time_s = 0;  // bit 11-19：对方飞镖最后击中时间（0-420s）
-  std::uint8_t enemy_dart_last_target = 0;  // bit 20-22：1 前哨 / 2-5 基地各类目标
-  std::uint8_t center_buff_status = 0;  // bit 23-24：0/1 己方/2 对方/3 双方（仅 RMUL）
-  std::uint8_t fort_occupation_status = 0;   // bit 25-26：己方堡垒增益点占领状态
-  std::uint8_t our_outpost_buff_status = 0;  // bit 27-28：己方前哨站增益点占领状态
-  bool base_buff_occupied = false;           // bit 29：己方基地增益点已占领
+  bool supply_zone_occupied = false;     // event_data bit 0：己方补给区激活
+  std::uint8_t small_energy_status = 0;  // bit 1-2：0 未激活 / 1 已激活 / 2 正在激活
+  std::uint8_t big_energy_status = 0;    // bit 3-4：同上
 
-  // 本地兑换发弹量（规则表 5-8）要求占领补给区 / 基地增益点 / 前哨站增益点之一。
-  // 补给区占用在 RMUC 走 bit 0、在 RMUL 走 bit 2，两者都要判，避免 RMUL 场次漏判。
+  std::uint8_t own_fort_buff_status = 0;           // bit 5-7 / 8-10：0/1/2/3/4
+  std::uint8_t enemy_fort_buff_status = 0;         // 己方 / 对方堡垒增益点激活状态
+  std::uint8_t own_base_buff_status = 0;           // bit 11-13 / 14-16
+  std::uint8_t enemy_base_buff_status = 0;         // 己方 / 对方基地增益点激活状态
+  bool high_point_buff_active = false;             // bit 17：己方制高点增益点激活
+  std::uint8_t own_central_highland_status = 0;    // bit 18-19 / 20-21
+  std::uint8_t enemy_central_highland_status = 0;  // 己方 / 对方中央高地增益点
+  std::uint8_t our_outpost_buff_status = 0;        // bit 22-24 / 25-27
+  std::uint8_t enemy_outpost_buff_status = 0;      // 己方 / 对方前哨站增益点
+
+  OutpostControl our_outpost_control = OutpostControl::kNotOwned;    // bit 28-29 / 30-31
+  OutpostControl enemy_outpost_control = OutpostControl::kNotOwned;  // 己方 / 对方前哨阵地
+
+  std::uint16_t enemy_dart_last_hit_time_s = 0;  // event_data_2 bit 4-12
+  std::uint8_t enemy_dart_last_target = 0;       // event_data_2 bit 13-15
+
+  // 便利字段：己方基地增益点是否由己方 / 双方激活。
+  bool base_buff_occupied = false;
+
+  static bool own_active(std::uint8_t status) {
+    return status == 1 || status == 3;
+  }
+
+  // 本地兑换发弹量（2027 表 5-8）：己方补给区 / 基地增益点 / 前哨站增益点。
+  // 2027 规则 5.6.4.6：只有己方完全控制的前哨阵地，其增益点才可兑换。
   bool local_ammo_exchange_point() const {
-    return supply_zone_occupied || supply_zone_occupied_rmul || base_buff_occupied ||
-           our_outpost_buff_status != 0;
+    const bool own_outpost =
+        own_active(our_outpost_buff_status) && our_outpost_control == OutpostControl::kOwnFull;
+    const bool enemy_outpost =
+        own_active(enemy_outpost_buff_status) && enemy_outpost_control == OutpostControl::kOwnFull;
+    return supply_zone_occupied || base_buff_occupied || own_outpost || enemy_outpost;
   }
 };
 
@@ -80,7 +98,8 @@ struct SentryInfo3 {
 GameStatus decode_game_status(std::uint8_t raw);
 // 裁判姿态位段 -> 具名姿态（1 进攻 / 2 防御 / 3 移动，其余 kUnknown）。
 SentryStance decode_stance(std::uint8_t raw);
-EventCode decode_event_code(std::uint32_t raw);
+EventCode decode_event_code(std::uint32_t event_data, std::uint32_t event_data_2,
+                            TeamColor own_color);
 SentryInfo1 decode_sentry_info1(std::uint32_t raw);
 SentryInfo2 decode_sentry_info2(std::uint16_t raw);
 SentryInfo3 decode_sentry_info3(std::uint64_t raw);

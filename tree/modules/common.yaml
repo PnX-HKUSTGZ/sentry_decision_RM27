@@ -1,6 +1,0 @@
-# common 模块元数据（条件 + 通用 Intent 叶子节点）。
-name: common
-provides:
-  - intent.tactical_mode
-consumes:
-  - world.upstream

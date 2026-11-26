@@ -24,23 +24,52 @@ bool parse_stance_name(const std::string& name, int* out) {
   return true;
 }
 
-bool parse_tactical_mode(const std::string& name, int* out) {
-  if (name == "unknown") {
+bool set_outpost_control(OutpostControlState* state, int value) {
+  switch (value) {
+    case 0:  // 己方完全控制
+      state->held_by_us = true;
+      state->full = true;
+      state->owner_is_us = true;
+      break;
+    case 1:  // 己方临时控制：正常路径为「敌方完全控制 -> 我方临时」
+      state->held_by_us = true;
+      state->full = false;
+      state->owner_is_us = false;
+      break;
+    case 2:  // 己方未控制（由对方控制）
+      state->held_by_us = false;
+      state->full = true;
+      state->owner_is_us = false;
+      break;
+    default:
+      return false;
+  }
+  state->challenge_ms = 0;
+  state->holder_absent_ms = 0;
+  return true;
+}
+
+// 直接改 HP=0 / 通用“摧毁”效果没有显式攻击方时的推断：
+// 己方完全控制时，更可能是敌方摧毁；其余状态（我方临时、敌方控制）更可能是我方在打。
+bool destroyer_is_us_for_state(const OutpostControlState& state) {
+  return !(state.held_by_us && state.full);
+}
+
+bool parse_task_state(const std::string& name, int* out) {
+  if (name == "idle") {
     *out = 0;
-  } else if (name == "patrol") {
+  } else if (name == "navigate") {
     *out = 1;
-  } else if (name == "attack") {
+  } else if (name == "scan") {
     *out = 2;
-  } else if (name == "defend") {
+  } else if (name == "outpost") {
     *out = 3;
-  } else if (name == "retreat") {
+  } else if (name == "resource") {
     *out = 4;
   } else if (name == "heal") {
     *out = 5;
   } else if (name == "respawn") {
     *out = 6;
-  } else if (name == "idle") {
-    *out = 7;
   } else {
     return false;
   }
@@ -105,7 +134,16 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
   } else if (field == "manual_key") {
     world->manual_key = as_int;
   } else if (field == "enemy_outpost_hp") {
-    world->enemy_outpost_hp = as_int;
+    const int before = world->enemy_outpost_hp;
+    if (before > 0 && as_int <= 0) {
+      // set_world 直接置 0 也视为我方击毁，保证控制权/重建逻辑与面板效果一致。
+      // destroy_outpost 要求当前 hp>0，因此先保留击毁前血量再结算。
+      world->enemy_outpost_hp = before;
+      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                      destroyer_is_us_for_state(world->enemy_outpost_control));
+    } else {
+      world->enemy_outpost_hp = as_int;
+    }
   } else if (field == "enemy_base_hp") {
     world->enemy_base_hp = as_int;
   } else if (field == "self_hp") {
@@ -163,7 +201,33 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
   } else if (field == "base_hp") {
     world->base_hp = as_int;
   } else if (field == "our_outpost_hp") {
-    world->our_outpost_hp = as_int;
+    const int before = world->our_outpost_hp;
+    if (before > 0 && as_int <= 0) {
+      // set_world 直接置 0 也视为敌方击毁。
+      world->our_outpost_hp = before;
+      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                      destroyer_is_us_for_state(world->our_outpost_control));
+    } else {
+      world->our_outpost_hp = as_int;
+    }
+  } else if (field == "our_outpost_control") {
+    if (!set_outpost_control(&world->our_outpost_control, as_int)) {
+      *error = "our_outpost_control 只能是 0（完全）/ 1（临时）/ 2（未控制）";
+      return false;
+    }
+  } else if (field == "enemy_outpost_control") {
+    if (!set_outpost_control(&world->enemy_outpost_control, as_int)) {
+      *error = "enemy_outpost_control 只能是 0（完全）/ 1（临时）/ 2（未控制）";
+      return false;
+    }
+  } else if (field == "our_outpost_owner") {
+    world->our_outpost_control.owner_is_us = number != 0.0;
+  } else if (field == "enemy_outpost_owner") {
+    world->enemy_outpost_control.owner_is_us = number != 0.0;
+  } else if (field == "enemy_at_our_outpost_buff") {
+    world->our_outpost_control.enemy_present = number != 0.0;
+  } else if (field == "enemy_at_enemy_outpost_buff") {
+    world->enemy_outpost_control.enemy_present = number != 0.0;
   } else {
     *error = "未知 set_world 字段: " + field;
     return false;
@@ -179,19 +243,19 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
   const bool expected_bool =
       expected.type == ScenarioValue::Type::kBool ? expected.boolean : (expected.number != 0.0);
 
-  if (field == "tactical_mode") {
+  if (field == "task_state") {
     int want = 0;
     if (expected.type == ScenarioValue::Type::kString) {
-      if (!parse_tactical_mode(expected.text, &want)) {
-        *error = "未知战术模式: " + expected.text;
+      if (!parse_task_state(expected.text, &want)) {
+        *error = "未知 TaskState: " + expected.text;
         return false;
       }
     } else {
       want = static_cast<int>(expected_number);
     }
-    if (view.tactical_mode != want) {
-      *error = "期望 tactical_mode=" + std::to_string(want) +
-               "，实际=" + std::to_string(view.tactical_mode);
+    if (view.task_state != want) {
+      *error =
+          "期望 task_state=" + std::to_string(want) + "，实际=" + std::to_string(view.task_state);
       return false;
     }
     return true;
@@ -240,28 +304,6 @@ bool check_expect(const DecisionView& view, const std::string& field, const Scen
     }
     return true;
   }
-  if (field == "resource_ammo") {
-    if (view.resource_ammo != static_cast<int>(expected_number)) {
-      *error = "resource_ammo 不匹配";
-      return false;
-    }
-    return true;
-  }
-  if (field == "resource_revive") {
-    if (view.resource_revive != expected_bool) {
-      *error = "resource_revive 不匹配";
-      return false;
-    }
-    return true;
-  }
-  if (field == "resource_instant_revive") {
-    if (view.resource_instant_revive != expected_bool) {
-      *error = "resource_instant_revive 不匹配";
-      return false;
-    }
-    return true;
-  }
-
   *error = "未知 expect 字段: " + field;
   return false;
 }
@@ -362,26 +404,42 @@ EffectResult apply_effect(SimWorld* world, const std::string& effect, const SimE
     result.new_value = 0.0;
     result.detail = "自身战亡（血量归零）";
   } else if (effect == "our_outpost_damage") {
-    world->our_outpost_hp = damage(world->our_outpost_hp, effects.our_outpost_damage);
+    const int before = world->our_outpost_hp;
+    const int after = damage(before, effects.our_outpost_damage);
+    if (after == 0 && before > 0) {
+      destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                      destroyer_is_us_for_state(world->our_outpost_control));
+    } else {
+      world->our_outpost_hp = after;
+    }
     result.new_value = world->our_outpost_hp;
     result.detail =
         "己方前哨站血量 -" + std::to_string(static_cast<int>(effects.our_outpost_damage));
   } else if (effect == "our_outpost_destroy") {
-    world->our_outpost_hp = 0;
-    result.new_value = 0.0;
+    destroy_outpost(&world->our_outpost_control, &world->our_outpost_hp,
+                    destroyer_is_us_for_state(world->our_outpost_control));
+    result.new_value = world->our_outpost_hp;
     result.detail = "己方前哨站被摧毁";
   } else if (effect == "our_base_damage") {
     world->base_hp = damage(world->base_hp, effects.our_base_damage);
     result.new_value = world->base_hp;
     result.detail = "己方基地血量 -" + std::to_string(static_cast<int>(effects.our_base_damage));
   } else if (effect == "enemy_outpost_damage") {
-    world->enemy_outpost_hp = damage(world->enemy_outpost_hp, effects.enemy_outpost_damage);
+    const int before = world->enemy_outpost_hp;
+    const int after = damage(before, effects.enemy_outpost_damage);
+    if (after == 0 && before > 0) {
+      destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                      destroyer_is_us_for_state(world->enemy_outpost_control));
+    } else {
+      world->enemy_outpost_hp = after;
+    }
     result.new_value = world->enemy_outpost_hp;
     result.detail =
         "敌方前哨站血量 -" + std::to_string(static_cast<int>(effects.enemy_outpost_damage));
   } else if (effect == "enemy_outpost_destroy") {
-    world->enemy_outpost_hp = 0;
-    result.new_value = 0.0;
+    destroy_outpost(&world->enemy_outpost_control, &world->enemy_outpost_hp,
+                    destroyer_is_us_for_state(world->enemy_outpost_control));
+    result.new_value = world->enemy_outpost_hp;
     result.detail = "敌方前哨站被摧毁";
   } else if (effect == "enemy_base_damage") {
     world->enemy_base_hp = damage(world->enemy_base_hp, effects.enemy_base_damage);
@@ -496,12 +554,23 @@ RespawnStepResult step_respawn(SimWorld* world, int max_hp, bool speed_up) {
   return result;
 }
 
+Occupancy evaluate_occupancy_if_alive(const GainZones& zones, double x, double y, bool alive) {
+  return alive ? evaluate_occupancy(zones, x, y) : Occupancy{};
+}
+
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y) {
   Occupancy occupancy;
   occupancy.supply = zones.supply.contains(x, y);
   occupancy.base_buff = zones.base_buff.contains(x, y);
   occupancy.our_outpost_buff = zones.our_outpost_buff.contains(x, y);
+  occupancy.enemy_outpost_buff = zones.enemy_outpost_buff.contains(x, y);
   occupancy.fort_buff = zones.fort_buff.contains(x, y);
+  for (const GainZone& zone : zones.our_highland) {
+    occupancy.our_highland = occupancy.our_highland || zone.contains(x, y);
+  }
+  for (const GainZone& zone : zones.enemy_highland) {
+    occupancy.enemy_highland = occupancy.enemy_highland || zone.contains(x, y);
+  }
   return occupancy;
 }
 
@@ -523,16 +592,120 @@ ActionOutcome reject(std::uint8_t code, const std::string& detail) {
 
 }  // namespace
 
+void step_outpost_control(OutpostControlState* state, int* hp, bool our_active, int dt_ms) {
+  if (state == nullptr || dt_ms <= 0) {
+    return;
+  }
+  const bool holder_active = state->held_by_us ? our_active : state->enemy_present;
+  const bool challenger_active = state->held_by_us ? state->enemy_present : our_active;
+
+  if (state->full) {
+    if (challenger_active && !holder_active) {
+      state->challenge_ms += dt_ms;
+      if (state->challenge_ms >= 5000) {
+        // 对方完全控制 -> 挑战方临时控制。
+        state->held_by_us = !state->held_by_us;
+        state->full = false;
+        state->challenge_ms = 0;
+        state->holder_absent_ms = 0;
+      }
+    } else if (challenger_active && holder_active) {
+      // 双方同时激活：占领进度暂停。
+    } else {
+      // 连续激活未满 5 s 后离开：进度均匀倒退。
+      state->challenge_ms = std::max(0, state->challenge_ms - dt_ms);
+    }
+    return;
+  }
+
+  // 临时控制：控制方连续 5 s 不激活，挑战方转为完全控制。
+  if (holder_active) {
+    state->holder_absent_ms = 0;
+    return;
+  }
+  state->holder_absent_ms += dt_ms;
+  if (state->holder_absent_ms >= 5000) {
+    state->held_by_us = !state->held_by_us;
+    state->full = true;
+    state->challenge_ms = 0;
+    state->holder_absent_ms = 0;
+    // 规则 5.6.1：只有完全控制换到「另一方」时才重建 500 血。
+    // 同方完全控制恢复不重建，已毁前哨站保持 0 血。
+    if (state->held_by_us != state->owner_is_us) {
+      state->owner_is_us = state->held_by_us;
+      if (hp != nullptr && *hp <= 0) {
+        *hp = 500;
+      }
+    }
+  }
+}
+
+void destroy_outpost(OutpostControlState* state, int* hp, bool by_us) {
+  if (state == nullptr || hp == nullptr || *hp <= 0) {
+    return;
+  }
+  const bool destroyer_is_holder = state->held_by_us == by_us;
+  if (state->full) {
+    // 完全控制被击毁：控制方转为临时，归属不变；等待其离开 5 s。
+    state->full = false;
+    *hp = 0;
+  } else if (destroyer_is_holder) {
+    // 临时控制方击毁：临时 -> 完全。只有换成另一方时才重建 500 血。
+    state->full = true;
+    if (state->held_by_us != state->owner_is_us) {
+      state->owner_is_us = state->held_by_us;
+      *hp = 500;
+    } else {
+      *hp = 0;
+    }
+  } else {
+    // 非控制方击毁临时控制的前哨站：保持临时，血量归零。
+    *hp = 0;
+  }
+  state->challenge_ms = 0;
+  state->holder_absent_ms = 0;
+}
+
+void apply_outpost_control_bits(SimWorld* world) {
+  if (world == nullptr) {
+    return;
+  }
+  const auto encode = [](const OutpostControlState& state) -> unsigned {
+    if (!state.held_by_us) {
+      return 2;  // 己方未控制
+    }
+    return state.full ? 0u : 1u;
+  };
+  unsigned int event = world->event_code;
+  set_bits(&event, 28, 2, encode(world->our_outpost_control));
+  set_bits(&event, 30, 2, encode(world->enemy_outpost_control));
+  world->event_code = event;
+}
+
 void apply_occupancy(SimWorld* world, const Occupancy& occupancy) {
   if (world == nullptr) {
     return;
   }
   unsigned int event = world->event_code;
-  set_bits(&event, 0, 1, occupancy.supply ? 1u : 0u);  // 己方补给区已占领
-  set_bits(&event, 2, 1, occupancy.supply ? 1u : 0u);  // RMUL 同义位
-  set_bits(&event, 25, 2, occupancy.fort_buff ? 1u : 0u);
-  set_bits(&event, 27, 2, occupancy.our_outpost_buff ? 1u : 0u);
-  set_bits(&event, 29, 1, occupancy.base_buff ? 1u : 0u);
+  // 仿真默认己方为红方：R 堡垒 / 基地 / 前哨增益点分别写 bit 5-7 / 11-13 / 22-24。
+  set_bits(&event, 0, 1, occupancy.supply ? 1u : 0u);  // 己方补给区激活
+  set_bits(&event, 5, 3, occupancy.fort_buff ? 1u : 0u);
+  set_bits(&event, 11, 3, occupancy.base_buff ? 1u : 0u);
+  // 协议：仅在己方控制对应阵地时发送增益点状态（完全 / 临时控制都算控制），
+  // 否则发送 4。能否兑换 / 回血仍由 EventCode 的完全控制判断。
+  const bool our_outpost_controlled = world->our_outpost_control.held_by_us;
+  const bool enemy_outpost_controlled = world->enemy_outpost_control.held_by_us;
+  // 前哨站被击毁后其增益点失效；即使控制状态仍为完全控制，也不再上报激活。
+  const bool our_buff_alive = world->our_outpost_hp > 0;
+  const bool enemy_buff_alive = world->enemy_outpost_hp > 0;
+  set_bits(&event, 22, 3,
+           our_outpost_controlled && our_buff_alive ? (occupancy.our_outpost_buff ? 1u : 0u) : 4u);
+  set_bits(
+      &event, 25, 3,
+      enemy_outpost_controlled && enemy_buff_alive ? (occupancy.enemy_outpost_buff ? 1u : 0u) : 4u);
+  // 中央高地增益点：bit 18-19 / 20-21；未控制对应阵地时发送 3。
+  set_bits(&event, 18, 2, our_outpost_controlled ? (occupancy.our_highland ? 1u : 0u) : 3u);
+  set_bits(&event, 20, 2, enemy_outpost_controlled ? (occupancy.enemy_highland ? 1u : 0u) : 3u);
   world->event_code = event;
 }
 
@@ -545,8 +718,8 @@ ActionOutcome execute_action(SimWorld* world, const sentry_decision::DecisionAct
   }
   // 先把复活状态与死活同步（含 info1.bit19），保证下面的前置校验读到最新状态。
   sync_respawn(world);
-  const sentry_decision::EventCode event =
-      sentry_decision::decode_event_code(static_cast<std::uint32_t>(world->event_code));
+  const sentry_decision::EventCode event = sentry_decision::decode_event_code(
+      static_cast<std::uint32_t>(world->event_code), 0, sentry_decision::TeamColor::kRed);
   const sentry_decision::SentryInfo1 info1 =
       sentry_decision::decode_sentry_info1(static_cast<std::uint32_t>(world->sentry_info_1));
   const sentry_decision::SentryInfo2 info2 =

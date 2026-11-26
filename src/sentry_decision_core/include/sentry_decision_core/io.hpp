@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "sentry_decision_core/task.hpp"
 #include "sentry_decision_core/world_state.hpp"
 
 namespace sentry_decision {
@@ -42,6 +43,7 @@ class DecisionSink {
  public:
   virtual ~DecisionSink() = default;
   virtual void send_action(const DecisionAction& action) = 0;
+  virtual void send_task_state(TaskState state) = 0;
 };
 
 }  // namespace sentry_decision

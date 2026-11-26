@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "sentry_decision_sim/match_stage.hpp"
 
@@ -14,6 +15,13 @@ struct SimEffects {
   double our_base_damage = 0.0;
   double enemy_outpost_damage = 0.0;
   double enemy_base_damage = 0.0;
+};
+
+// 一个圆形增益区（来自 map 命名点及其第 4 位半径）。
+struct SimZone {
+  double x = 0.0;
+  double y = 0.0;
+  double radius = 0.0;
 };
 
 // 裁判仿真参数：默认值全部来自 config/sim.yaml（点位来自其引用的 map），源码不硬编码。
@@ -34,7 +42,10 @@ struct SimConfig {
   double start_x = 0.0, start_y = 0.0;
   double base_x = 0.0, base_y = 0.0, base_radius = 0.0;
   double our_x = 0.0, our_y = 0.0, our_radius = 0.0;
+  double enemy_outpost_x = 0.0, enemy_outpost_y = 0.0, enemy_outpost_radius = 0.0;
   double fort_x = 0.0, fort_y = 0.0, fort_radius = 0.0;
+  std::vector<SimZone> our_highland;
+  std::vector<SimZone> enemy_highland;
   SimEffects effects;
 };
 

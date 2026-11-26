@@ -18,7 +18,8 @@ using SentryInfoOnlineMsg = sentry_interfaces::msg::SentryInfoOnline;
 using SentryInfoOfflineMsg = sentry_interfaces::msg::SentryInfoOffline;
 using TeamInfoMsg = sentry_interfaces::msg::TeamInfo;
 
-void merge(const GameInfoMsg& msg, sentry_decision::UpstreamState* out);
+void merge(const GameInfoMsg& msg, sentry_decision::UpstreamState* out,
+           sentry_decision::TeamColor own_color);
 void merge(const SentryInfoOnlineMsg& msg, sentry_decision::UpstreamState* out);
 void merge(const SentryInfoOfflineMsg& msg, sentry_decision::UpstreamState* out);
 void merge(const TeamInfoMsg& msg, sentry_decision::UpstreamState* out);

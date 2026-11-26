@@ -16,14 +16,37 @@ struct PendingRemoteExchange {
   int remaining_ms = 0;  // 距离生效还剩的毫秒
 };
 
-// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区增益点或己方基地血量 <4000 时每秒
-// +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
+// 复活读条状态（规则 5.2.2）：战亡后立即开始，每秒 +1（在己方补给区增益点或己方基地血量 <4000
+// 时每秒 +4）。 哨兵确认复活后，读条完成即以 10% 上限血复活。仿真专属，不进入上行消息。
 struct RespawnState {
   bool pending = false;      // 处于待复活（战亡且未复活）状态
   bool confirmed = false;    // 哨兵已确认复活（协议 0x0120 bit 0 = 1）
   int total_progress = 0;    // 本次复活所需总读条，战亡瞬间按公式锁定
   int current_progress = 0;  // 当前读条进度
   int instant_count = 0;     // 本局累计兑换立即复活次数（计入读条公式）
+};
+
+// 一处前哨阵地的控制状态（相对我方视角）。
+//
+// 2027 规则 5.6.2：
+//   - 对方完全控制 -> 我方连续激活增益点 5 s -> 我方临时控制；
+//   - 对方临时控制 -> 对方连续 5 s 不激活 -> 我方完全控制；
+//   - 前哨站被击毁时，控制方在完全 / 临时之间切换；临时控制方击毁后转为完全控制。
+//
+// held_by_us / full 共同表示「谁控制、是否完全控制」；owner_is_us 表示前哨站
+// 建筑归属（相对我方）。临时控制不改变归属；只有「一方完全控制 -> 另一方完全
+// 控制」时才重建并更新归属。challenge_ms 是挑战方连续激活增益点的累计时长；
+// holder_absent_ms 是临时控制方连续不激活的时长。
+//
+// 占点输入包括对应前哨站增益点和中央高地增益点，两者在 evaluate_occupancy()
+// 里分别给出，由调用方并入 active 判定。
+struct OutpostControlState {
+  bool held_by_us = false;
+  bool full = true;
+  bool owner_is_us = true;
+  bool enemy_present = false;  // 仿真输入：敌方机器人是否激活该前哨站增益点
+  int challenge_ms = 0;
+  int holder_absent_ms = 0;
 };
 
 // 消息级仿真世界：字段与 sentry_interfaces 上行消息一一对应。
@@ -67,6 +90,11 @@ struct SimWorld {
   // 复活读条状态（规则 5.2.2）。
   RespawnState respawn;
 
+  // 2027 前哨阵地控制状态（仿真专属，写入 event_code bit 22-31）。
+  // 开局时己方半场完全控制，敌方半场由对方完全控制。
+  OutpostControlState our_outpost_control{true, true, true};
+  OutpostControlState enemy_outpost_control{false, true, false};
+
   // TeamInfo
   int base_hp = 0;
   int our_outpost_hp = 0;
@@ -78,15 +106,12 @@ bool apply_world_field(SimWorld* world, const std::string& field, const Scenario
 
 // 决策输出的纯视图，供 expect 断言，避免依赖 ROS 消息。
 struct DecisionView {
-  int tactical_mode = 0;
+  int task_state = 0;
   int stance = 0;
   bool has_nav_goal = false;
   double nav_goal_x = 0.0;
   double nav_goal_y = 0.0;
   bool has_cmd_vel = false;
-  int resource_ammo = 0;
-  bool resource_revive = false;
-  bool resource_instant_revive = false;
 };
 
 // 校验一个 expect 字段：满足返回 true；不满足或字段未知返回 false 并写 error。
@@ -173,31 +198,52 @@ struct GainZone {
   }
 };
 
-// 仿真场上的己方增益点区域。
+// 仿真场上的增益点区域。中央高地增益点由多个圆组成（每侧两个打击点）。
 struct GainZones {
-  GainZone supply;            // 己方补给区
-  GainZone base_buff;         // 己方基地增益点
-  GainZone our_outpost_buff;  // 己方前哨站增益点
-  GainZone fort_buff;         // 己方堡垒增益点
+  GainZone supply;                       // 己方补给区
+  GainZone base_buff;                    // 己方基地增益点
+  GainZone our_outpost_buff;             // 己方前哨站增益点
+  GainZone enemy_outpost_buff;           // 敌方前哨站增益点
+  GainZone fort_buff;                    // 己方堡垒增益点
+  std::vector<GainZone> our_highland;    // 己方中央高地增益点
+  std::vector<GainZone> enemy_highland;  // 敌方中央高地增益点
 };
 
 struct Occupancy {
   bool supply = false;
   bool base_buff = false;
   bool our_outpost_buff = false;
+  bool enemy_outpost_buff = false;
   bool fort_buff = false;
+  bool our_highland = false;
+  bool enemy_highland = false;
 
   // 规则表 5-8：本地兑换发弹量要求占领补给区 / 基地 / 前哨站增益点之一。
+  // 前哨站的「完全控制」条件由 EventCode::local_ammo_exchange_point() 判断。
   bool local_ammo_exchange_point() const {
-    return supply || base_buff || our_outpost_buff;
+    return supply || base_buff || our_outpost_buff || enemy_outpost_buff;
   }
 };
 
 // 按机器人位置判定占领了哪些增益点。
 Occupancy evaluate_occupancy(const GainZones& zones, double x, double y);
+// 阵亡机器人不能激活任何增益点。
+Occupancy evaluate_occupancy_if_alive(const GainZones& zones, double x, double y, bool alive);
 
 // 把占领状态写回 SimWorld 的 event_code 位段（只改占领相关位，保留其它位）。
 void apply_occupancy(SimWorld* world, const Occupancy& occupancy);
+
+// 推进一处前哨阵地的控制状态（dt_ms 为本次步长，内部按 5 s 阈值结算）。
+// our_active 表示我方机器人是否激活该前哨站对应的增益点；敌方是否激活读
+// state->enemy_present。
+void step_outpost_control(OutpostControlState* state, int* hp, bool our_active, int dt_ms);
+
+// 结算一次前哨站击毁。by_us=true 表示我方击毁（目标为敌方半场前哨站）；
+// by_us=false 表示敌方击毁（目标为己方半场前哨站）。
+void destroy_outpost(OutpostControlState* state, int* hp, bool by_us);
+
+// 把两处前哨阵地的控制状态写回 event_code bit 28-31。
+void apply_outpost_control_bits(SimWorld* world);
 
 // ---- 裁判侧动作前置校验与结算 ----
 

@@ -51,6 +51,7 @@ class RosIoNode : public rclcpp::Node,
   void set_velocity(const sentry_decision::Twist& cmd) override;
 
   void send_action(const sentry_decision::DecisionAction& action) override;
+  void send_task_state(sentry_decision::TaskState state) override;
 
  private:
   // odom_frame_ 非空时，用 TF map->odom 把订阅到的 odom 系位姿转成 map 系。
@@ -58,6 +59,8 @@ class RosIoNode : public rclcpp::Node,
 
   std::string map_frame_;
   std::string odom_frame_;
+  sentry_decision::TeamColor own_color_ = sentry_decision::TeamColor::kRed;
+  sentry_decision::TaskState task_state_ = sentry_decision::TaskState::kIdle;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   bool tf_warned_ = false;

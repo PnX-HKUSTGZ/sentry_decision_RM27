@@ -24,7 +24,9 @@ void test_apply_game_info() {
   msg.game_status = 4;
   msg.game_time_remaining = 200;
   msg.coin_remaining = 50;
-  msg.event_code = (1u << 3);  // small_energy_status = 1
+  // small_energy_status = 1；R 前哨临时控制（1）；B 前哨未控制（2）。
+  msg.event_code = (1u << 1) | (1u << 28) | (2u << 30);
+  msg.event_code_2 = (300u << 4) | (4u << 13);  // 飞镖命中时间 / 目标
   msg.detect_color = 1;
   msg.can_rebuild_outpost = true;
   msg.manual_point_x = 1.5f;
@@ -34,11 +36,15 @@ void test_apply_game_info() {
   msg.enemy_base_hp = 5000;
 
   UpstreamState state;
-  merge(msg, &state);
+  merge(msg, &state, TeamColor::kRed);
   CHECK(state.game_status == GameStatus::kRunning);
   CHECK(state.game_time_remaining == 200);
   CHECK(state.coins == 50);
   CHECK(state.event.small_energy_status == 1);
+  CHECK(state.our_outpost_control == OutpostControl::kOwnTemporary);
+  CHECK(state.enemy_outpost_control == OutpostControl::kNotOwned);
+  CHECK(state.event.enemy_dart_last_hit_time_s == 300);
+  CHECK(state.event.enemy_dart_last_target == 4);
   CHECK(state.detect_color == 1);
   CHECK(state.can_rebuild_outpost);
   CHECK(state.manual_point.x == 1.5);

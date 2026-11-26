@@ -1,0 +1,25 @@
+# 回血点选择冒烟：己方前哨完全控制且存活时，在己方高地低血应去前哨站增益点，
+# 而不是跨半场回基地。默认 rule 策略。
+name: heal_outpost_smoke
+start_pose: [-3.24, -0.06, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 240
+  coins: 500
+  self_hp: 100
+  self_ammo: 200
+  base_hp: 10000
+  our_outpost_hp: 1000
+  our_outpost_control: 0
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: heal
+      has_nav_goal: true
+      nav_goal_x: -2.43
+      nav_goal_y: -2.21
+  - at: 6.0
+    expect:
+      task_state: heal

@@ -12,7 +12,15 @@ void DecisionActuatorSim::bind_world(SimWorld* world, int max_hp) {
   max_hp_ = max_hp;
 }
 
+void DecisionActuatorSim::send_task_state(sentry_decision::TaskState state) {
+  task_state_ = state;
+}
+
 void DecisionActuatorSim::send_action(const sentry_decision::DecisionAction& action) {
+  // kind=0 是 task_state 心跳携带的空动作，不是裁判动作，直接忽略。
+  if (action.kind == sentry_decision::DecisionActionKind::kNone) {
+    return;
+  }
   in_flight_.push_back(InFlight{action, latency_ticks_});
 }
 
@@ -33,9 +41,9 @@ void DecisionActuatorSim::update() {
     const ActionOutcome outcome = execute_action(world_, item.action, max_hp_);
     if (!outcome.accepted) {
       // 裁判是动作合法性的权威：拒绝时留下日志，供仿真排查。
-      SD_LOG_WARN("sim", "裁判拒绝动作 request_id=%u kind=%d code=%u %s",
-                  item.action.request_id, static_cast<int>(item.action.kind),
-                  static_cast<unsigned>(outcome.code), outcome.detail.c_str());
+      SD_LOG_WARN("sim", "裁判拒绝动作 request_id=%u kind=%d code=%u %s", item.action.request_id,
+                  static_cast<int>(item.action.kind), static_cast<unsigned>(outcome.code),
+                  outcome.detail.c_str());
     }
   }
   in_flight_.swap(still_in_flight);

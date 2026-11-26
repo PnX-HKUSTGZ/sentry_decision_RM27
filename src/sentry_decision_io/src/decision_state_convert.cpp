@@ -17,11 +17,8 @@ DecisionOutputMsg to_msg(const sentry_decision::DecisionOutput& output) {
     msg.cmd_vel.linear.y = output.cmd_vel->vy;
     msg.cmd_vel.angular.z = output.cmd_vel->wz;
   }
-  msg.tactical_mode = static_cast<std::uint8_t>(output.tactical_mode);
+  msg.task_state = static_cast<std::uint8_t>(output.task_state);
   msg.stance = static_cast<std::uint8_t>(output.stance);
-  msg.resource_ammo = static_cast<std::uint16_t>(output.resource.ammo);
-  msg.resource_revive = output.resource.revive;
-  msg.resource_instant_revive = output.resource.instant_revive;
   return msg;
 }
 
@@ -36,6 +33,10 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
   msg.base_hp = upstream.base_hp;
   msg.our_outpost_hp = upstream.our_outpost_hp;
   msg.enemy_outpost_hp = upstream.enemy_outpost_hp;
+  msg.our_outpost_control = static_cast<std::uint8_t>(upstream.our_outpost_control);
+  msg.enemy_outpost_control = static_cast<std::uint8_t>(upstream.enemy_outpost_control);
+  msg.our_outpost_owner = static_cast<std::uint8_t>(upstream.our_outpost_owner);
+  msg.enemy_outpost_owner = static_cast<std::uint8_t>(upstream.enemy_outpost_owner);
   msg.enemy_base_hp = upstream.enemy_base_hp;
   msg.can_rebuild_outpost = upstream.can_rebuild_outpost;
   msg.upstream_valid = upstream.valid;
@@ -70,11 +71,9 @@ WorldStateMsg to_msg(const sentry_decision::WorldState& world) {
 }
 
 void fill_state(DecisionStateMsg* msg, const sentry_decision::WorldState& world,
-                const sentry_decision::ArbiterResult& result, std::uint32_t tick) {
+                const sentry_decision::DecisionOutput& output, std::uint32_t tick) {
   msg->tick = tick;
-  msg->output = to_msg(result.output);
-  msg->conflict_count = static_cast<std::uint32_t>(result.conflicts.size());
-  msg->warnings = result.warnings;
+  msg->output = to_msg(output);
   msg->upstream_valid = world.upstream.valid;
   msg->self_valid = world.self.valid;
   msg->nav_valid = world.nav.valid;

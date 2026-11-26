@@ -7,6 +7,83 @@
 > [注意] 本文档是项目历史的单一事实来源，应随项目演进保持更新。
 > [注意] 本文档不是所有变更的完整清单；只记录重要变更并保持简洁易读。完整变更见版本控制系统（如 Git）历史。
 
+## [Unreleased]
+
+> 2027 Task 层：原子 Task + TaskRuntime，逐步替代 TacticalMode / Mission 树。
+
+### Added
+
+- 无头策略冒烟：`strategy_smoke` 场景覆盖进攻前哨、Scan、低血 Heal、战亡 Respawn 的完整策略流程；`low_ammo_reset_smoke` 覆盖低弹兑换与重置恢复；`nav_reset_smoke` 覆盖导航成功后重置再启动。
+- 面板「资源与动作」显示当前 `TaskSnapshot`（任务、状态、阶段、参数、已进行时间、指标）与上一次 `TaskResult`。
+- 世界状态面板显示两处前哨阵地的控制方（我方完全 / 我方临时 / 敌方控制）。
+- 世界状态面板移除未启用的“期望 / 当前姿态”行；2027 Task 层当前不输出姿态。
+- 仿真控制新增「己方前哨 / 对方前哨」快捷行：切换完全 / 临时 / 未控制，以及敌方占点 / 离开。
+- 仿真裁判 2027 前哨控制：增益点 5 s 占点、击毁后的完全 / 临时控制转换、前哨站 500 血重建，以及前哨站增益点按补给区 50% 速率回血（不领免费发弹量）。
+- 仿真前哨站归属：`OutpostControlState.owner_is_us`；只有完全控制换到另一方时才重建 500 血，同方恢复不重建。
+- 仿真中央高地增益点：`own_outpost_side` + `enemy_outpost_opposite` 并入己方前哨占点，`enemy_outpost_side` + `own_outpost_opposite` 并入敌方前哨占点，半径 0.5 m。
+- 决策层前哨站归属 belief：`OutpostOwner`、`WorldState.upstream.our_outpost_owner/enemy_outpost_owner`；HP 上升视为重建并反转归属，1 s 后用 full 控制方校正。
+- 独立 `ResourceController` 辅助栏：自己的状态机 / 配置 / 快照，不占主任务栏、不产生 `DecisionEpoch`，主栏有 action 时让位。
+- 面板增加 Resource 辅助栏显示；Resource 配置新增低弹阈值、批量、保留金币、驻留与重试冷却。
+- 前哨站血量趋势：`OutpostTrend`（1 s 差分 + 最近受击），用于己方半场安全判定。
+- `UtilityTaskPolicy`：合法 TaskCall 生成 + 控制/基地/生存/转场/切换成本打分；`strategy.use_utility` 切换，并提供 `profiles_rmuc27_utility.yaml` A/B。
+- `TaskResult.call`：保留完整 TaskCall，供 utility 做同点连续性/迟滞。
+- 端到端 `utility_smoke`：敌方高地射击位选择 Outpost，打掉后回己方半场。
+- 端到端 `utility_defense_smoke`：己方前哨掉到临时控制时回防。
+- 端到端 `utility_recover_smoke` / `utility_respawn_recover_smoke`：低血/低弹、复活后自动 Heal 回基地。
+- 手动 420s headless soak 场景 `full_match_soak.yaml`（不加入默认 ctest）。
+- `Navigate` 新目标 500 ms 内忽略上一个目标的 `nav.failed`，避免 utility/rule 反复选同一点并立即失败。
+- `Outpost` 要求目标归属敌方；归属我方 / 未知时失败，`kOwnTemporary` 继续攻击。
+- 世界状态面板显示前哨站归属。
+- `core/task`：`Task` / `TaskCall` / `TaskPlan` / `TaskSnapshot` / `TaskResult` / `TaskState` 纯逻辑契约。
+- `core/task_runtime`：`TaskRegistry`、Task 生命周期、超时、抢占、结果与 `DecisionEpoch`。
+- `core/task_policy` / `core/task_runner`：手写 Task 选择 + Policy/Runtime 组合根。
+- `task_node`：TaskRunner + RosIoNode + SafetySupervisor 的 2027 主程序；`decision_node.launch.py` 与 `tools/demo.sh` 默认已切到 `task_node`。
+- 2027 原子 Task：`Navigate`、`Scan`、`Outpost`、`Respawn`、`Heal`、`Resource`，含宿主单测。
+- `points_2027.hpp`：14 个 2027 命名点常量（含 3 个 `highland_area_*` 范围点）。
+- `WorldState`：`OutpostControl`、`supply_claimed_minutes`。
+- 2027 `0x0101` 事件解码：`EventCode` 按 `own_color` 映射 R/B → own/enemy；`GameInfo.event_code_2` 上行字段。
+
+### Changed
+
+- 所有 Task 不重试；裁判兑换类任务只设 5 s 检测窗口。
+- `Heal`：基地补给区按每分钟 100 发累积确认；前哨站只回血。
+- `Resource`：辅助栏状态型买弹，5 s 等 `info1.ammo_exchanged_local` 到账；支持 `enemy_outpost_buff`，前哨站增益点要求完全控制且 `hp > 0`。
+- 主策略不再选择主栏 `Resource`；低弹买弹交给独立辅助栏。
+- 仿真默认/场景数值对齐 2027：基地 10000、前哨站 1000、初始弹 300。
+- `TaskRunner`：按 `DecisionEpoch` + 1 s 周期门控策略调用；启动 Task 前执行 `can_start`；`strategy.use_utility` 选择 rule / utility。
+- `Respawn`：待复活期间发送 `kFreeResurrect` 确认，不再只等待血量变化。
+- `TaskState`：变化即发，并补 10 Hz 心跳。
+- 双仓库联调新增 `tools/build_nav_image.sh` 与 `tools/demo.sh --nav-build`：导航仓库源码更新后可从本地源码重建 `rm27_nav:jazzy`，不需要再改 demo。
+
+### Fixed
+
+- 重置后 `nav.reached` / `nav.failed` 残留，下一次 `Navigate` 会误判“导航已结束但不在到达半径内”并反复失败；现在取消目标时清空旧结果。
+- 低弹且已在基地时策略反复选择 `Heal`（满血立即成功），任务态反复回到 `idle` 且弹药不增加；现在买弹由独立 Resource 辅助栏处理，主栏不再因此空转。
+- `RosIoNode::status` 只在发送导航目标后置 `nav.valid`，导致首个 `Navigate` 永远无法启动；现在以 action server 就绪为可用条件，并在查询时刷新心跳。
+- 仿真补给区 / 前哨站回血会把 `self_hp=0` 的机器人“救活”，导致 `Respawn` 被取消；现在战亡期间不执行回血。
+- `sentry_bridge` 未把 `event_code` 中已解码的前哨控制状态写入 `UpstreamState`，导致 Task 层始终看到 `kNotOwned`。
+- `match_smoke` 仍按 2026 起点坐标校验，切换 RMUC27 后失败。
+- `Heal` 离开补给区后 5 s 发弹确认窗口未重置。
+- `Resource` 动作在 dispatcher 暂停时被清理，导致 5 s 后误失败。
+- 策略恢复当前任务时旧的 pending 计划未撤销。
+- 跨局 `HistoryView` 未清空，可能导致新局误选 `Resource`。
+- 面板急停状态硬编码为 false。
+- `Outpost` / `Resource` / `Respawn` 在裁判数据失效时仍使用旧值。
+- `Scan` 是无限任务，rule 策略此前会一直返回当前 `Scan`，导致新出现的前哨目标无法触发进攻；现在 `Scan` 允许每拍重新评估。
+- 阵亡机器人仍被算作激活增益点，导致尸体占点/阻止敌方夺回；现在 `self_hp<=0` 时占用为空，己方临时控制会按 5 s 缺席转为敌方完全控制并重建。
+- `set_world enemy_outpost_hp/our_outpost_hp = 0` 直接改血量时没有走 `destroy_outpost`，导致「临时控制 + 击毁」不转完全控制/不重建；现在置 0 也走击毁结算，并按当前控制状态推断击毁方（我方完全控制视为敌方击毁，其余视为我方击毁）。
+- utility 低血时未优先回基地、低弹时不主动回基地；现在低血/低弹会生成恢复候选，低血时只允许 Heal，Heal 开始后持续到满血，不再被回防/占点抢断。
+- 前哨站被击毁后仿真仍上报前哨站增益点、仍按前哨站 buff 回血/兑换；现在 `hp=0` 时 buff 失效。
+- `Heal` 选点此前 rule 策略总是回基地，忽略了己方完全控制且存活的前哨站增益点；现在按 `highland_area_center` / `highland_area_enemy` / `highland_area_our` 区域判断：敌方前哨增益点优先，其次己方前哨增益点，区域外回基地；低弹/需领基地免费发弹时强制回基地。
+- utility 的 `Heal` 之前只要未满血就会生成前哨站回血候选，轻伤（如 300/400）也会打断占点；现在回血候选要求 `self_hp <= nav.retreat_hp`（默认 100），已开始的 Heal 仍持续到满血。
+
+### Removed
+
+- `ActionRequest.retry_interval` / `max_attempts`、`ActionReport.attempts`、`ActionDispatcher` 重发状态机、resource BT 的 `retry_ms` / `max_attempts` 端口与 `action.*attempts` 配置。
+- 旧 Task 架构：`TacticalMode`、Intent/Arbiter、Mission 树、`sentry_decision_nodes`、`decision_node` / `decision_main` / `replay_main`、面板战术层覆盖。
+- 旧行为树可视化：`TreeStatus` / `TreeNodeStatus`、`TreeStatePublisher`、Groot2 桥、网页行为树面板与 tree smoke 话题。
+- 旧资源协议字段：`ResourceRequest`、`DecisionOutput.resource_*`、`DecisionState.conflict_count` / `warnings`。
+
 ## [v0.5.2] - 2026-10-31
 
 > 动作策略下沉：重试间隔 / 次数 / 生效判据不再由 dispatcher 按 `kind` 反推，

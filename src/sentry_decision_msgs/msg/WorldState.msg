@@ -12,6 +12,12 @@ int32 base_hp
 int32 our_outpost_hp
 int32 enemy_outpost_hp
 int32 enemy_base_hp
+# 2027 前哨阵地控制状态：0 我方完全 / 1 我方临时 / 2 敌方控制（0x0101 不区分敌方完全/临时）
+uint8 our_outpost_control
+uint8 enemy_outpost_control
+# 前哨站建筑归属：0 未知 / 1 我方 / 2 敌方（由决策层根据重建维护）
+uint8 our_outpost_owner
+uint8 enemy_outpost_owner
 bool can_rebuild_outpost
 bool upstream_valid
 

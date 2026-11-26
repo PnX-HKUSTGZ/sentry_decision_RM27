@@ -36,7 +36,6 @@ export function createBridge(options) {
     ros = new ROSLIB.Ros({ url: target });
     ros.on('connection', function () {
       setConnected(true, target);
-      subscribe('/decision/tree_status', 'sentry_decision_msgs/TreeStatus', options.onTree);
       subscribe('/decision/world_state', 'sentry_decision_msgs/WorldState', options.onWorld);
       subscribe('/decision/state', 'sentry_decision_msgs/DecisionState', options.onDecision);
     });

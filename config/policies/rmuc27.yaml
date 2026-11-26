@@ -1,0 +1,49 @@
+# rmuc27 策略阈值 / 时间窗（由 profiles.yaml 的 strategy_profile 选择）。
+# 2027 第一版默认 RuleBasedTaskPolicy；strategy.use_utility=true 时切换 utility。
+strategy:
+  use_utility: false
+
+self:
+  max_hp: 400
+
+match:
+  duration_s: 420
+
+nav:
+  retreat_hp: 100              # 低于该血量 -> 回补给区
+  recovery_hp: 400             # 撤退退出阈值
+  low_ammo: 50                 # 低于该弹量 -> 回补给区
+  supply_ammo: 150
+  patrol_dwell_s: 5.0
+
+# Utility policy 参数（strategy.use_utility=true 时生效）。
+utility:
+  safe_hp_ratio: 0.55
+  low_hp_ratio: 0.35
+  critical_hp_ratio: 0.5
+  attack_radius: 0.65
+  travel_weight: 0.06
+  switch_penalty: 0.35
+  continue_bonus: 0.55
+  last_call_bonus: 0.15
+
+# 独立 Resource 辅助栏：不占主任务，不写 TaskState。
+resource:
+  enabled: true
+  low_ammo: 80                 # 低于该弹量才考虑买弹
+  batch: 100                   # 每次目标发数，必须是 10 的倍数
+  reserve_coins: 150           # 为立即复活 / 远程兑换保留的金币
+  dwell_s: 0.5                 # 在兑换点驻留确认，避免路过误触发
+  retry_s: 2.0                 # 失败后的重试冷却
+
+safety:
+  max_vx: 3.0
+  max_vy: 3.0
+  max_wz: 6.0
+  require_upstream: true
+  require_odometry: true
+
+timeouts:
+  upstream_ms: 500
+  odometry_ms: 500
+  navigation_ms: 500

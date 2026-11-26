@@ -4,8 +4,6 @@ std_msgs/Header header
 
 uint32 tick
 DecisionOutput output
-uint32 conflict_count
-string[] warnings
 
 bool upstream_valid
 bool self_valid

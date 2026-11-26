@@ -1,6 +1,0 @@
-name: common
-provides:
-  - intent.tactical_mode
-consumes:
-  - world.upstream
-  - missing.field

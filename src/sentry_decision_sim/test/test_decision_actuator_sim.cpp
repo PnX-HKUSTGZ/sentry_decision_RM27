@@ -51,6 +51,18 @@ void test_apply_after_latency_and_idempotent() {
   CHECK(world.coins == 50);
 }
 
+// 空动作（task_state 心跳）不应进入裁判结算。
+void test_none_action_is_ignored() {
+  SimWorld world;
+  DecisionActuatorSim actuator(0);
+  actuator.bind_world(&world, 400);
+
+  DecisionAction action;
+  action.kind = DecisionActionKind::kNone;
+  actuator.send_action(action);
+  CHECK(actuator.in_flight() == 0);
+}
+
 // 非法动作不修改世界。
 void test_rejected_action_keeps_world() {
   SimWorld world;
@@ -84,8 +96,6 @@ void test_dispatch_verify_roundtrip() {
   request.kind = DecisionActionKind::kAmmoExchange;
   request.target = 10;  // 由 action factory 按累计值折算后的目标
   request.delta = 10;
-  request.retry_interval = Duration{100};
-  request.max_attempts = 3;
   request.verify = ActionVerify::kAmmoExchangedLocal;
   request.monotonic = true;
 
@@ -94,7 +104,7 @@ void test_dispatch_verify_roundtrip() {
   CHECK(outgoing.size() == 1);
   CHECK(outgoing[0].value == 10);  // 0 + 10，折算成累计目标
 
-  // 等待期内不重发。
+  // 只发一次，不重发。
   dispatcher.submit(request);
   CHECK(dispatcher.poll(t0 + Duration{50}, &upstream).empty());
 
@@ -105,13 +115,13 @@ void test_dispatch_verify_roundtrip() {
   const auto report = dispatcher.last_report();
   CHECK(report.has_value());
   CHECK(report->effective);
-  CHECK(report->attempts == 1);
 }
 
 }  // namespace
 
 int main() {
   test_apply_after_latency_and_idempotent();
+  test_none_action_is_ignored();
   test_rejected_action_keeps_world();
   test_dispatch_verify_roundtrip();
   if (g_failures == 0) {

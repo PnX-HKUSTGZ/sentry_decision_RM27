@@ -1,0 +1,23 @@
+# utility 复活恢复：在敌方 opposite 阵亡，复活后应自动进入 Heal 回血。
+name: utility_respawn_recover_smoke
+start_pose: [-1.90, 5.54, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 500
+  self_hp: 0
+  self_ammo: 200
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: respawn
+  - at: 15.0
+    expect:
+      task_state: heal
+  - at: 25.0
+    expect:
+      task_state: heal

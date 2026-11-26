@@ -23,7 +23,7 @@
   core 结构体（如 `WorldTimeouts` / `SafetyLimits` / `MatchDurations`）不设默认值，
   缺 key 由加载器 / `runtime_config` 直接报错，**启动即失败**，不静默用魔数。
   - 由此带来的写法约束：持有这类「无默认构造」成员的类，必须在**构造函数初始化列表**里构造它们；
-    只在构造函数体内 `obj_ = X(...)` 赋值会编译失败（成员已被默认构造），见 `decision_node`。
+    只在构造函数体内 `obj_ = X(...)` 赋值会编译失败（成员已被默认构造），见 `task_node`。
 
 ## 开发流程
 
@@ -41,7 +41,7 @@
 
 ### 代码规范
 
-> 详细规范见 `docs/CONVENTIONS.md`；行为树编写规范见 `docs/ARCHITECTURE.md`。以下为摘要。
+> 详细规范见 `docs/CONVENTIONS.md`；Task 架构见 `docs/ARCHITECTURE.md`。以下为摘要。
 
 - **命名**
   - 目录、文件、函数、变量：`snake_case`
@@ -50,7 +50,7 @@
   - 常量：`kPascalCase`
   - 宏：`SCREAMING_SNAKE_CASE`
 - **格式**：统一使用 clang-format，提交前不得残留格式差异。
-- **注释**：ROS 2 包、节点、行为树节点需说明用途；复杂决策分支必须写明进入 / 退出条件与抢占关系。
+- **注释**：ROS 2 包、节点、Task 需说明用途；复杂决策分支必须写明进入 / 退出条件与抢占关系。
 - **日志**：统一使用项目日志接口，禁止散落的 `std::cout` 与原始 `RCLCPP_*` 调用；日志分级为 DEBUG / INFO / ACT / WARN / ERROR。
 - **状态**：禁止新增全局可变状态；所有决策状态必须显式、可观测。
 

@@ -1,8 +1,7 @@
-// 仿真与战术层覆盖控件：比赛阶段 / 仿真世界 / 仿真效果 -> 裁判仿真 service；
-// 战术层覆盖 -> /decision/debug (service)。面板不使用 ROS action 客户端：vendored roslib
-// 1.4.1 的 ActionClient 是 ROS 1 actionlib 命名，无法对接 ROS 2 action，故面板统一走 service。
+// 仿真控件：比赛阶段 / 仿真世界 / 仿真效果 -> 裁判仿真 service。
+// 面板不使用 ROS action 客户端：vendored roslib 1.4.1 的 ActionClient 是 ROS 1
+// actionlib 命名，无法对接 ROS 2 action，故面板统一走 service。
 export function createControlsPanel(el, bridge, onLog, onRefresh) {
-  const modeOptions = ['patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn'];
   const worldFields = [
     ['self_hp', '自身血量'],
     ['self_ammo', '自身弹量'],
@@ -12,6 +11,10 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     ['enemy_outpost_hp', '敌方前哨'],
     ['enemy_base_hp', '敌方基地'],
     ['game_time_remaining', '剩余时间'],
+    ['our_outpost_control', '己方前哨控制 0/1/2'],
+    ['enemy_outpost_control', '敌方前哨控制 0/1/2'],
+    ['enemy_at_our_outpost_buff', '敌方占己方前哨 0/1'],
+    ['enemy_at_enemy_outpost_buff', '敌方占敌方前哨 0/1'],
   ];
   let html = '';
   html += '<div class="row"><span>比赛</span>';
@@ -54,35 +57,40 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     });
     html += '</div>';
   });
-  // 战术层覆盖：设置 / 清除期望 TacticalMode（行为树之外，安全层优先级不变）。
-  html += '<div class="row"><span>战术模式</span><select id="mode-select">';
-  modeOptions.forEach(function (name) {
-    html += '<option value="' + name + '">' + name + '</option>';
+
+  // 前哨快捷操作：直接改控制状态与敌方占点标志，省去逐项选字段。
+  const outpostRows = [
+    ['己方前哨', [
+      ['完全控制', 'our_outpost_control', 0],
+      ['临时控制', 'our_outpost_control', 1],
+      ['未控制', 'our_outpost_control', 2],
+      ['敌方占点', 'enemy_at_our_outpost_buff', 1],
+      ['敌方离开', 'enemy_at_our_outpost_buff', 0],
+    ]],
+    ['对方前哨', [
+      ['我方完全', 'enemy_outpost_control', 0],
+      ['我方临时', 'enemy_outpost_control', 1],
+      ['敌方控制', 'enemy_outpost_control', 2],
+      ['敌方占点', 'enemy_at_enemy_outpost_buff', 1],
+      ['敌方离开', 'enemy_at_enemy_outpost_buff', 0],
+    ]],
+  ];
+  outpostRows.forEach(function (group) {
+    html += '<div class="row"><span>' + group[0] + '</span>';
+    group[1].forEach(function (item) {
+      html +=
+        '<button class="sim-world-quick" data-field="' +
+        item[1] +
+        '" data-value="' +
+        item[2] +
+        '">' +
+        item[0] +
+        '</button>';
+    });
+    html += '</div>';
   });
-  html += '</select></div>';
-  html += '<div class="row"><span>持续</span><input id="lease" value="0" size="4"/>';
-  html += '<span class="meta">秒：0 = 持续到「清除 / 重置」，正数则到期自动交还战略层</span></div>';
-  html += '<div class="row"><button id="btn-tactical-set">设置覆盖</button>';
-  html += '<button id="btn-tactical-clear">清除</button></div>';
   html += '<pre id="log" class="log"></pre>';
   el.innerHTML = html;
-
-  // lease 秒；0 表示持续到「清除 / 重置」，负数按 0 处理。
-  function lease() {
-    const value = parseFloat(document.getElementById('lease').value);
-    return isFinite(value) && value > 0 ? value : 0;
-  }
-
-  function debug(command, args, label) {
-    bridge
-      .callDebug(command, args)
-      .then(function (response) {
-        onLog(label + ': ' + (response && response.success ? 'ok' : '失败 ' + (response && response.message)));
-      })
-      .catch(function (error) {
-        onLog(label + ' 失败: ' + error);
-      });
-  }
 
   // 比赛阶段：0 重置，1-4 快进（服务端负责拒绝回退）。
   function setStage(stage, label) {
@@ -110,15 +118,11 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
   });
 
   document.getElementById('btn-reset').addEventListener('click', function () {
-    // 重置裁判仿真的世界与位姿，并清除决策节点的战术层覆盖。
+    // 重置裁判仿真的世界与位姿。
     bridge
       .setGameStage(0)
       .then(function () {
         onLog('比赛已重置到未开始（含位置）');
-        return bridge.callDebug('clear_tactical_mode', '');
-      })
-      .then(function () {
-        onLog('战术层覆盖已清除');
         // 重新读取 list_state，使面板叠加的命名点等随重置刷新。
         if (onRefresh) {
           onRefresh();
@@ -129,9 +133,7 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       });
   });
 
-  document.getElementById('btn-sim-world-set').addEventListener('click', function () {
-    const field = document.getElementById('sim-world-field').value;
-    const value = parseFloat(document.getElementById('sim-world-value').value);
+  function setSimWorld(field, value) {
     if (!isFinite(value)) {
       onLog('仿真世界: 取值无效');
       return;
@@ -145,6 +147,19 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       .catch(function (error) {
         onLog('仿真世界设置失败: ' + error + '（裁判仿真节点未运行？）');
       });
+  }
+
+  document.getElementById('btn-sim-world-set').addEventListener('click', function () {
+    const field = document.getElementById('sim-world-field').value;
+    const value = parseFloat(document.getElementById('sim-world-value').value);
+    setSimWorld(field, value);
+  });
+
+  // 前哨快捷按钮：data-field / data-value -> set_world。
+  Array.prototype.forEach.call(document.querySelectorAll('.sim-world-quick'), function (button) {
+    button.addEventListener('click', function () {
+      setSimWorld(button.getAttribute('data-field'), Number(button.getAttribute('data-value')));
+    });
   });
 
   // 仿真效果按钮统一走 /sentry_sim/apply_effect；步长在 sim.yaml，前端只传效果名。
@@ -166,22 +181,6 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
     });
   });
 
-  document.getElementById('btn-tactical-set').addEventListener('click', function () {
-    const args =
-      '{mode: ' + document.getElementById('mode-select').value + ', lease_sec: ' + lease() + '}';
-    debug('set_tactical_mode', args, '设置战术层覆盖');
-  });
-  document.getElementById('btn-tactical-clear').addEventListener('click', function () {
-    debug('clear_tactical_mode', '', '清除战术层覆盖');
-  });
-
-  // 未进入「比赛中」时禁用战术层覆盖控件（仿真世界 / 仿真效果仍可用）。
-  const tacticalElements = ['btn-tactical-set', 'btn-tactical-clear', 'mode-select', 'lease'].map(
-    function (id) {
-      return document.getElementById(id);
-    }
-  );
-
   return {
     render: function (state) {
       const current = state.world ? state.world.gameStatus : 0;
@@ -189,14 +188,6 @@ export function createControlsPanel(el, bridge, onLog, onRefresh) {
       stageButtons.forEach(function (item) {
         item.el.disabled = item.stage <= current;
       });
-      // 只有 game_status=4（比赛中）才接受战术层覆盖。
-      const running = current === 4;
-      tacticalElements.forEach(function (element) {
-        element.disabled = !running;
-      });
-      if (!running) {
-        document.getElementById('mode-select').title = '比赛开始后才能设置战术层覆盖';
-      }
     },
   };
 }

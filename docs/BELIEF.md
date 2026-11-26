@@ -28,7 +28,7 @@ flowchart LR
 - **实机**：`RosIoNode`（`sentry_decision_io`）订阅 4 条上行 + odom，
   `sentry_bridge` 把消息字段合并进 `UpstreamState`。
 - **本地仿真**：`referee_sim_node` 发同样的 4 条消息 + odom，`RosIoNode` 照常消费；
-  离线 `decision_main` 用 ROS 无关的 `RefereeSimulator` + `NavSimulator`。
+  离线仿真库仍保留 `RefereeSimulator` + `NavSimulator`，由 `sentry_decision_sim` 使用。
 - **回放**：`ReplaySource`（`sentry_decision_core/include/sentry_decision_core/replay.hpp`）按时刻回放同一批上游数据。
 - **串口字节层**：auto-aim 侧已实现 v1 帧收发，MCU 固件待实现；决策侧不接触串口，
   `sentry_interfaces` 是决策与 auto-aim 之间的契约，auto-aim ↔ MCU 的字节帧见
@@ -70,6 +70,10 @@ flowchart LR
 | `enemy_outpost_hp` | int | `GameInfo.enemy_outpost_hp` | 敌方前哨站血量 |
 | `enemy_base_hp` | int | `GameInfo.enemy_base_hp` | 敌方基地血量 |
 | `can_rebuild_outpost` | bool | `GameInfo.can_rebuild_outpost` | 己方是否可重建前哨站 |
+| `our_outpost_control` | `OutpostControl` | `event_data` bit 28-29 映射 | 己方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
+| `enemy_outpost_control` | `OutpostControl` | `event_data` bit 30-31 映射 | 对方半场前哨阵地：完全 / 临时 / 未控制；2027 解码已接入 |
+| `our_outpost_owner` | `OutpostOwner` | `WorldModel` belief | 己方半场前哨站归属：我方 / 敌方 / 未知 |
+| `enemy_outpost_owner` | `OutpostOwner` | `WorldModel` belief | 对方半场前哨站归属：我方 / 敌方 / 未知 |
 | `self_hp` | int | `SentryInfoOnline.self_health` | 自身血量 |
 | `self_ammo` | int | `SentryInfoOnline.bullets_remaining` | 自身允许发弹量 |
 | `cooling_value` | int | `SentryInfoOnline.cooling_value` | 冷却值 |
@@ -78,10 +82,27 @@ flowchart LR
 | `energy_ratio` | int / % | `SentryInfoOnline.energy_ratio` | 底盘能量比例 |
 | `gimbal_yaw_deg` | double / deg | `SentryInfoOnline.speed_monitor_angle` | 测速模块朝向（正北 0） |
 | `capacitor_capacity` | int / % | `SentryInfoOffline.capacitor_capacity` | 电容容量 |
-| `event` | `EventCode` | `GameInfo.event_code` | `decode_event_code` 位段，含增益点占领 / 能量机关等 |
+| `event` | `EventCode` | `GameInfo.event_code` / `event_code_2` | 2027 `0x0101` 位段，已按 `own_color` 映射成 own/enemy |
 | `info1` | `SentryInfo1` | `SentryInfoOnline.sentry_info_1` | 兑换与复活（`can_free/instant_resurrect`、成本等） |
 | `info2` | `SentryInfo2` | `SentryInfoOnline.sentry_info_2` | 脱战、剩余可兑换、姿态（`stance`） |
 | `info3` | `SentryInfo3` | `SentryInfoOnline.sentry_info_3` | 各姿态剩余时长 |
+
+> **2027 场地事件**：`0x0101` 拆成 `event_data` / `event_data_2`；前哨阵地控制状态在
+> `event_data` bit 28-31（R/B 各 2 bit），基地控制状态在 `event_data_2` bit 0-3。
+> 前哨控制 2 bit 的取值：0 己方完全控制 / 1 己方临时控制 / 2 己方未控制；3 为保留值，
+> 解码为 `kNotOwned`。注意：0x0101 直接链路看不到「敌方完全控制 / 敌方临时控制」的区别，
+> 需要这项信息时只能用 `GlobalUnitStatus`（1-4 四态，服务器→自定义终端），当前决策链路未接入。
+> `RosIoNode` 已在 `merge(GameInfo)` 中把解码后的 `our_outpost_control` /
+> `enemy_outpost_control` 写入 `UpstreamState`，Task 层不再看到恒定的 `kNotOwned`。
+> R/B → own/enemy 的映射在本层用 `RosIoNode` 的 `own_color` 参数做一次，Task 层不出现红蓝。
+> `GameInfo.event_code_2` 已加入消息，auto-aim 已转发；MCU 固件未按 33 B 上行前按 0 处理，此时基地控制状态不可用，前哨控制不受影响。
+>
+> **前哨站增益点**：只有己方完全控制且前哨站 `hp > 0` 时才可回血/兑换；前哨站被击毁后 buff 失效，但中央高地增益点仍可作为占点输入。
+>
+> **前哨站归属 belief**：前哨站不会回血，HP 上升只可能来自重建。按规则 5.6.1，
+> 重建只发生在「一方完全控制 -> 另一方完全控制」，因此 HP 上升时归属反转；
+> 1 s 后若能看到 full 控制方，用它校正。`kOwnTemporary` 不用于校正，因为
+> 「我方临时控制」也可能对应敌方归属。归属我方 / 未知时 `Outpost` 不允许攻击。
 
 > 复活（规则 5.2.2）：`info1.can_free_resurrect`（bit 19）表示当前可否确认免费复活，
 > 仿真裁判在待复活（`self_hp<=0`）期间置 1；`can_instant_resurrect`（bit 20）与成本（bit 21-30）
@@ -89,6 +110,13 @@ flowchart LR
 
 > 注：`SentryInfoOnline.sentry_pos` 当前**未合并**；自身位姿来自 odom（见 `SelfState.pose`）。
 > `SentryInfoOffline` 的目标锁定字段（`is_get` / `armor_pos` / `armor_num`）当前**未接入**（见 §7）。
+
+### 4.1 WorldState 派生字段
+
+| 字段 | 类型 | 来源 | 说明 |
+| --- | --- | --- | --- |
+| `supply_claimed_minutes` | int | `TaskRunner` 信念跟踪 | 己方补给区免费发弹已领取到第几个整分钟；只在补给区内观测到 `self_ammo` 正增量、且 `info1.ammo_exchanged_local` 未同步增加时更新 |
+| `our_outpost_trend` / `enemy_outpost_trend` | `OutpostTrend` | `WorldModel` | 前哨站最近 1 s 血量差 + 最近 1.5 s 是否掉血；只供策略判断，不进入上行/下行协议 |
 
 ## 5. SelfState 字段
 

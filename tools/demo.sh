@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
-# 一键启动仿真演示：网页面板 + 裁判仿真 + 决策节点。
+# 一键启动仿真演示：裁判仿真 + 决策节点（可选网页面板 + 导航 RViz/Gazebo）。
 #
 # 宿主运行会自动起一个映射 8080/9090 的容器；容器内运行则直接启动。
-# 三个进程的 stdout 汇到当前终端并按 [viz]/[sim]/[decision] 加前缀，
+# 各进程的 stdout 汇到当前终端并按 [viz]/[sim]/[decision] 加前缀，
 # 同时各写一份到 .docker-build/demo_logs/<name>.log。Ctrl+C 停止全部。
 #
-# 用法：
-#   tools/demo.sh                    # 面板 + 仿真 + 决策（独立仿真）
-#   tools/demo.sh --no-viz           # 只起仿真 + 决策
-#   tools/demo.sh --with-nav         # 双仓库联调：额外起真实导航容器
-#   tools/demo.sh --with-nav --nav-silent  # 导航不开 RViz
+# 用法（默认启动网页面板 8080/9090；导航侧窗口默认关闭）：
+#   tools/demo.sh                    # 仿真 + 决策 + 网页面板
+#   tools/demo.sh --headless         # 无头模式：不启动网页面板，也不开任何窗口
+#   tools/demo.sh --with-nav         # 双仓库联调：额外起真实导航容器（导航 RViz/Gazebo 默认关闭）
+#   tools/demo.sh --gazebo           # 打开导航侧 Gazebo 客户端窗口
+#   tools/demo.sh --with-nav --nav-viz  # 打开导航 RViz
+#   tools/demo.sh --viz              # 兼容旧写法：显式打开网页面板（现在默认已开）
+#   tools/demo.sh --no-viz           # 兼容旧写法：只关闭网页面板
+#   tools/demo.sh --nav-silent       # 兼容旧写法：强制关闭导航 RViz
+#   tools/demo.sh --nav-gimbal-panel # 打开导航仿真里的云台控制面板（Tk 窗口）
+#   tools/demo.sh --nav-build        # 从本地导航仓库重建 rm27_nav:jazzy 镜像
 #   tools/demo.sh --build            # 先构建工作区
 #   tools/demo.sh --scenario <path>  # 指定场景（容器内路径）
+#   tools/demo.sh --config <path>    # 指定 profiles.yaml（默认 RMUC27）
 #   tools/demo.sh --rate 20          # 仿真频率
 set -euo pipefail
 
@@ -24,18 +31,34 @@ NAV_CONTAINER="${DEMO_NAV_CONTAINER:-rm27_nav_sim}"
 
 # 宿主：按是否要面板决定端口映射，按是否双仓库决定导航容器，再把参数交给容器内的自己。
 if [[ ! -f /.dockerenv ]]; then
-  need_viz=1
+  need_viz=1        # 本仓库网页面板（rosbridge :9090 + 页面 :8080），默认开启
+  headless=0        # --headless：关闭网页面板和所有导航窗口
+  nav_viz=0         # 导航 RViz，默认关闭
+  nav_gazebo=0      # 导航侧 Gazebo 客户端窗口，默认关闭
+  nav_gimbal_panel=0
+  nav_build=0       # --nav-build：先从本地导航仓库重建 rm27_nav 镜像
   need_build=0
   with_nav=0
-  nav_silent=0
   for arg in "$@"; do
     case "${arg}" in
+      --headless) headless=1 ;;
+      --viz|--gui) need_viz=1 ;;
       --no-viz) need_viz=0 ;;
+      --gazebo) nav_gazebo=1 ;;
+      --nav-viz|--nav-rviz) nav_viz=1 ;;
+      --nav-silent) nav_viz=0 ;;
+      --nav-gimbal-panel) nav_gimbal_panel=1 ;;
+      --nav-build) nav_build=1 ;;
       --build) need_build=1 ;;
       --with-nav) with_nav=1 ;;
-      --nav-silent) nav_silent=1 ;;
     esac
   done
+  if [[ "${headless}" == 1 ]]; then
+    need_viz=0
+    nav_viz=0
+    nav_gazebo=0
+    nav_gimbal_panel=0
+  fi
   [[ -f "${INSTALL}/setup.bash" ]] || need_build=1
   tty=(-i)
   if [[ -t 0 ]]; then tty+=(-t); fi
@@ -49,31 +72,50 @@ if [[ ! -f /.dockerenv ]]; then
   if [[ "${with_nav}" == 1 ]]; then
     NAV_REPO="${NAV_REPO:-$(cd "${ROOT}/../sentry_navgation_RM27" && pwd)}"
     NAV_IMAGE="${NAV_IMAGE:-rm27_nav:jazzy}"
+    if [[ "${nav_build}" == 1 ]]; then
+      NAV_REPO="${NAV_REPO}" NAV_IMAGE="${NAV_IMAGE}" "${ROOT}/tools/build_nav_image.sh"
+    fi
     docker network inspect "${NETWORK}" >/dev/null 2>&1 || docker network create "${NETWORK}" >/dev/null
     docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true
-    nav_use_rviz=true
+    nav_use_rviz=false
+    nav_use_gui=false
+    nav_gimbal=false
     nav_display=()
-    if [[ "${nav_silent}" == 1 ]]; then
-      nav_use_rviz=false
-    elif [[ -z "${DISPLAY:-}" || -z "$(ls -A /tmp/.X11-unix 2>/dev/null)" ]]; then
-      # RViz 连不上显示会退出，而它的死亡会触发 Gazebo 整套 launch 关闭。
-      echo "[demo] 未检测到可用 X11（DISPLAY 或 /tmp/.X11-unix），自动关闭导航 RViz"
-      nav_use_rviz=false
-    else
-      nav_display=(-e "DISPLAY=${DISPLAY:-}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
-      # 只挂 socket 不够：X server 开启访问控制时，容器里的 root 没有 cookie，
-      # RViz/gimbal_panel 会因 "Authorization required" 退出；RViz 一死整套 launch 就关。
-      xauth_file="${XAUTHORITY:-${HOME}/.Xauthority}"
-      if [[ -f "${xauth_file}" ]]; then
-        nav_display+=(-e "XAUTHORITY=/tmp/.Xauthority" -v "${xauth_file}:/tmp/.Xauthority:ro")
+    if [[ "${nav_viz}" == 1 ]]; then
+      nav_use_rviz=true
+    fi
+    if [[ "${nav_gazebo}" == 1 ]]; then
+      nav_use_gui=true
+    fi
+    if [[ "${nav_gimbal_panel}" == 1 ]]; then
+      nav_gimbal=true
+    fi
+    if [[ "${nav_use_rviz}" == true || "${nav_use_gui}" == true || "${nav_gimbal}" == true ]]; then
+      if [[ -z "${DISPLAY:-}" || -z "$(ls -A /tmp/.X11-unix 2>/dev/null)" ]]; then
+        # 窗口连不上显示会退出，而 RViz 的死亡会触发 Gazebo 整套 launch 关闭。
+        echo "[demo] 未检测到可用 X11（DISPLAY 或 /tmp/.X11-unix），关闭导航侧全部图形窗口"
+        nav_use_rviz=false
+        nav_use_gui=false
+        nav_gimbal=false
       else
-        echo "[demo] 未找到 Xauthority（${xauth_file}），RViz 可能因 X 授权失败；必要时 xhost +local:root 或加 --nav-silent"
+        nav_display=(-e "DISPLAY=${DISPLAY:-}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
+        # 只挂 socket 不够：X server 开启访问控制时，容器里的 root 没有 cookie，
+        # RViz/gimbal_panel 会因 "Authorization required" 退出；RViz 一死整套 launch 就关。
+        xauth_file="${XAUTHORITY:-${HOME}/.Xauthority}"
+        if [[ -f "${xauth_file}" ]]; then
+          nav_display+=(-e "XAUTHORITY=/tmp/.Xauthority" -v "${xauth_file}:/tmp/.Xauthority:ro")
+        else
+          echo "[demo] 未找到 Xauthority（${xauth_file}），RViz/Gazebo 可能因 X 授权失败；必要时 xhost +local:root"
+        fi
       fi
     fi
     docker run -d --name "${NAV_CONTAINER}" --network "${NETWORK}" "${nav_display[@]}" \
-      -v "${NAV_REPO}/src/pb2025_nav_bringup/pcd/simulation":/pcd:ro \
-      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2026 slam:=False gui:=false use_rviz:=${nav_use_rviz} prior_pcd_file:=/pcd/RMUC2026.pcd"
-    echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动，等待 /navigate_to_pose…"
+      -v "${NAV_REPO}/src/pnx-launch/launch_bringup/pcd/simulation":/pcd:ro \
+      "${NAV_IMAGE}" bash -lc "source /opt/ros/jazzy/setup.bash && source /ws/install/setup.bash && exec ros2 launch rm_27_stimulation sim_with_nav.launch.py world:=RMUC2027 nav_world:=auto slam:=False use_ground_truth_odom:=false navigation_mode:=minco enable_legacy_terrain:=auto gui:=${nav_use_gui} use_rviz:=${nav_use_rviz} gimbal_panel:=${nav_gimbal} prior_pcd_file:=/pcd/RMUC2027.pcd"
+    echo "[demo] 导航容器 ${NAV_CONTAINER} 已启动（RViz=${nav_use_rviz} Gazebo 窗口=${nav_use_gui} 云台面板=${nav_gimbal}），等待 /navigate_to_pose…"
+    if [[ "${nav_use_rviz}" == true ]]; then
+      echo "[demo] 请在 RViz 中点击 2D Pose Estimate，在左半场约 x=-11.7, y=3.1 处选择出生点并拖出朝向；否则导航会一直等待。"
+    fi
     cleanup_nav() { docker rm -f "${NAV_CONTAINER}" >/dev/null 2>&1 || true; }
     trap cleanup_nav EXIT INT TERM
     nav_ok=0
@@ -115,16 +157,21 @@ with_viz=1
 do_build=0
 with_nav=0
 scenario=""
+config=""
 rate="20.0"
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --headless) with_viz=0; shift ;;
+    --viz|--gui) with_viz=1; shift ;;
     --no-viz) with_viz=0; shift ;;
     --with-nav) with_nav=1; shift ;;
-    --nav-silent) shift ;;
+    # 导航侧窗口 / 镜像构建选项在宿主解析并处理，容器内忽略。
+    --nav-silent|--nav-viz|--nav-rviz|--gazebo|--nav-gimbal-panel|--nav-build) shift ;;
     --build) do_build=1; shift ;;
     --scenario) scenario="$2"; shift 2 ;;
+    --config) config="$2"; shift 2 ;;
     --rate) rate="$2"; shift 2 ;;
-    -h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知参数: $1" >&2; exit 2 ;;
   esac
 done
@@ -165,6 +212,10 @@ if [[ "${with_nav}" == 1 ]]; then
   # 决策订阅真实导航的 /odometry（odom 系）并用 TF map->odom 转成 map 系。
   sim_args=(--ros-args -p provide_nav:=false)
   decision_args=(--ros-args -p odom_topic:=/odometry -p odom_frame:=odom)
+fi
+if [[ -n "${config}" ]]; then
+  # task_node 在 --ros-args 处停止解析自有参数，--config 必须放在它前面。
+  decision_args=(--config "${config}" "${decision_args[@]}")
 fi
 
 LOG_DIR="${DEMO_LOG_DIR:-${ROOT}/.docker-build/demo_logs}"
@@ -207,12 +258,16 @@ if [[ "${with_viz}" == 1 ]]; then
   start viz ros2 launch sentry_decision_viz viz.launch.py
 fi
 start sim ros2 run sentry_decision_sim referee_sim_node --scenario "${scenario}" --hold --rate "${rate}" "${sim_args[@]}"
-start decision ros2 run sentry_decision_bringup decision_node "${decision_args[@]}"
+start decision ros2 run sentry_decision_bringup task_node "${decision_args[@]}"
 
 if [[ "${with_nav}" == 1 ]]; then
   echo "[demo] 双仓库联调模式：导航容器提供 /navigate_to_pose，位姿经 map->odom 变换"
 fi
-echo "[demo] 面板 http://localhost:8080（rosbridge ws://localhost:9090）；--no-viz 可关闭面板"
+if [[ "${with_viz}" == 1 ]]; then
+  echo "[demo] 面板 http://localhost:8080（rosbridge ws://localhost:9090）"
+else
+  echo "[demo] 无头模式：未启动网页面板，也没有打开任何窗口"
+fi
 echo "[demo] Ctrl+C 停止全部"
 
 # 任一进程退出即触发 cleanup。

@@ -30,48 +30,77 @@ void test_decode_game_status() {
 }
 
 void test_decode_event_code() {
-  const std::uint32_t raw = 1u | (1u << 2) | (1u << 3) | (2u << 5) | (2u << 7) | (3u << 9) |
-                            (300u << 11) | (4u << 20) | (2u << 23) | (3u << 25) | (2u << 27) |
-                            (1u << 29);
-  const EventCode event = decode_event_code(raw);
-  CHECK(event.supply_zone_occupied);
-  CHECK(event.supply_zone_occupied_rmul);
-  CHECK(event.small_energy_status == 1);
-  CHECK(event.big_energy_status == 2);
-  CHECK(event.central_highland_status == 2);
-  CHECK(event.trapezoid_highland_status == 3);
-  CHECK(event.enemy_dart_last_hit_time_s == 300);
-  CHECK(event.enemy_dart_last_target == 4);
-  CHECK(event.center_buff_status == 2);
-  CHECK(event.fort_occupation_status == 3);
-  CHECK(event.our_outpost_buff_status == 2);
-  CHECK(event.base_buff_occupied);
+  const std::uint32_t event = 1u | (1u << 1) | (2u << 3) | (2u << 5) | (3u << 8) | (1u << 11) |
+                              (2u << 14) | (1u << 17) | (2u << 18) | (1u << 20) | (2u << 22) |
+                              (1u << 25) | (1u << 28) | (2u << 30);
+  const std::uint32_t event2 = (300u << 4) | (4u << 13);
+  const EventCode decoded = decode_event_code(event, event2, TeamColor::kRed);
+  CHECK(decoded.supply_zone_occupied);
+  CHECK(decoded.small_energy_status == 1);
+  CHECK(decoded.big_energy_status == 2);
+  CHECK(decoded.own_fort_buff_status == 2);
+  CHECK(decoded.enemy_fort_buff_status == 3);
+  CHECK(decoded.own_base_buff_status == 1);
+  CHECK(decoded.enemy_base_buff_status == 2);
+  CHECK(decoded.high_point_buff_active);
+  CHECK(decoded.own_central_highland_status == 2);
+  CHECK(decoded.enemy_central_highland_status == 1);
+  CHECK(decoded.our_outpost_buff_status == 2);
+  CHECK(decoded.enemy_outpost_buff_status == 1);
+  CHECK(decoded.our_outpost_control == OutpostControl::kOwnTemporary);
+  CHECK(decoded.enemy_outpost_control == OutpostControl::kNotOwned);
+  CHECK(decoded.enemy_dart_last_hit_time_s == 300);
+  CHECK(decoded.enemy_dart_last_target == 4);
+  CHECK(decoded.base_buff_occupied);
+  CHECK(decoded.local_ammo_exchange_point());
 
-  // 全 1：各字段应被掩码截断到本段宽度。
-  const EventCode all = decode_event_code(0xFFFFFFFFu);
+  // 蓝方视角：R/B 字段互换。
+  const EventCode blue = decode_event_code(event, event2, TeamColor::kBlue);
+  CHECK(blue.own_fort_buff_status == 3);
+  CHECK(blue.enemy_fort_buff_status == 2);
+  CHECK(blue.own_central_highland_status == 1);
+  CHECK(blue.enemy_central_highland_status == 2);
+  CHECK(blue.our_outpost_buff_status == 1);
+  CHECK(blue.enemy_outpost_buff_status == 2);
+  CHECK(blue.our_outpost_control == OutpostControl::kNotOwned);
+  CHECK(blue.enemy_outpost_control == OutpostControl::kOwnTemporary);
+
+  // 全 1：各字段按位宽截断；own_active 只认 1 / 3。
+  const EventCode all = decode_event_code(0xFFFFFFFFu, 0xFFFFFFFFu, TeamColor::kRed);
   CHECK(all.supply_zone_occupied);
   CHECK(all.small_energy_status == 3);
   CHECK(all.big_energy_status == 3);
-  CHECK(all.central_highland_status == 3);
+  CHECK(all.own_fort_buff_status == 7);
+  CHECK(all.own_base_buff_status == 7);
+  CHECK(all.our_outpost_buff_status == 7);
+  CHECK(all.our_outpost_control == OutpostControl::kNotOwned);
   CHECK(all.enemy_dart_last_hit_time_s == 0x1FF);
   CHECK(all.enemy_dart_last_target == 7);
-  CHECK(all.fort_occupation_status == 3);
-  CHECK(all.base_buff_occupied);
+  CHECK(!all.base_buff_occupied);
 
-  // 本地兑换发弹量的增益点判定：RMUC bit 0 / RMUL bit 2 / 基地 / 前哨站都要认。
+  // 本地兑换发弹量：补给区 / 己方基地增益 / 己方前哨站增益。
   EventCode point{};
   CHECK(!point.local_ammo_exchange_point());
   point.supply_zone_occupied = true;
   CHECK(point.local_ammo_exchange_point());
   point = {};
-  point.supply_zone_occupied_rmul = true;
-  CHECK(point.local_ammo_exchange_point());
-  point = {};
+  point.own_base_buff_status = 1;
   point.base_buff_occupied = true;
   CHECK(point.local_ammo_exchange_point());
   point = {};
   point.our_outpost_buff_status = 1;
+  CHECK(!point.local_ammo_exchange_point());  // 仅占领增益点，未完全控制
+  point.our_outpost_control = OutpostControl::kOwnFull;
   CHECK(point.local_ammo_exchange_point());
+  point.our_outpost_control = OutpostControl::kOwnTemporary;
+  CHECK(!point.local_ammo_exchange_point());
+
+  point = {};
+  point.enemy_outpost_buff_status = 1;
+  point.enemy_outpost_control = OutpostControl::kOwnFull;
+  CHECK(point.local_ammo_exchange_point());
+  point.enemy_outpost_control = OutpostControl::kNotOwned;
+  CHECK(!point.local_ammo_exchange_point());
 }
 
 void test_decode_sentry_info1() {

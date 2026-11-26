@@ -28,11 +28,8 @@ void test_decision_output_conversion() {
   DecisionOutput output;
   output.nav_goal = Point2D{1.5, -2.5, 0.75};
   output.cmd_vel = Twist{0.1, 0.2, 0.3};
-  output.tactical_mode = TacticalMode::kRetreat;
+  output.task_state = TaskState::kHeal;
   output.stance = SentryStance::kDefense;
-  output.resource.ammo = 17;
-  output.resource.revive = true;
-  output.resource.instant_revive = true;
 
   const DecisionOutputMsg msg = to_msg(output);
   CHECK(msg.has_nav_goal);
@@ -43,11 +40,8 @@ void test_decision_output_conversion() {
   CHECK(msg.cmd_vel.linear.x == 0.1);
   CHECK(msg.cmd_vel.linear.y == 0.2);
   CHECK(msg.cmd_vel.angular.z == 0.3);
-  CHECK(msg.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kRetreat));
+  CHECK(msg.task_state == static_cast<std::uint8_t>(TaskState::kHeal));
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kDefense));
-  CHECK(msg.resource_ammo == 17);
-  CHECK(msg.resource_revive);
-  CHECK(msg.resource_instant_revive);
 }
 
 void test_world_state_conversion() {
@@ -61,6 +55,10 @@ void test_world_state_conversion() {
   world.upstream.base_hp = 5000;
   world.upstream.our_outpost_hp = 1500;
   world.upstream.enemy_outpost_hp = 1200;
+  world.upstream.our_outpost_control = OutpostControl::kOwnTemporary;
+  world.upstream.enemy_outpost_control = OutpostControl::kNotOwned;
+  world.upstream.our_outpost_owner = OutpostOwner::kEnemy;
+  world.upstream.enemy_outpost_owner = OutpostOwner::kOwn;
   world.upstream.enemy_base_hp = 5000;
   world.upstream.can_rebuild_outpost = true;
   world.upstream.info2.stance = SentryStance::kMove;
@@ -90,6 +88,10 @@ void test_world_state_conversion() {
   CHECK(msg.base_hp == 5000);
   CHECK(msg.our_outpost_hp == 1500);
   CHECK(msg.enemy_outpost_hp == 1200);
+  CHECK(msg.our_outpost_control == static_cast<std::uint8_t>(OutpostControl::kOwnTemporary));
+  CHECK(msg.enemy_outpost_control == static_cast<std::uint8_t>(OutpostControl::kNotOwned));
+  CHECK(msg.our_outpost_owner == static_cast<std::uint8_t>(OutpostOwner::kEnemy));
+  CHECK(msg.enemy_outpost_owner == static_cast<std::uint8_t>(OutpostOwner::kOwn));
   CHECK(msg.enemy_base_hp == 5000);
   CHECK(msg.can_rebuild_outpost);
   CHECK(msg.stance == static_cast<std::uint8_t>(SentryStance::kMove));
@@ -118,20 +120,16 @@ void test_fill_state() {
   world.upstream.valid = true;
   world.self.valid = true;
 
-  ArbiterResult result;
-  result.output.nav_goal = Point2D{1.0, 2.0, 0.0};
-  result.output.tactical_mode = TacticalMode::kPatrol;
-  result.conflicts.push_back(Conflict{});
-  result.warnings.push_back("non-owner submit");
+  DecisionOutput output;
+  output.nav_goal = Point2D{1.0, 2.0, 0.0};
+  output.task_state = TaskState::kScan;
 
   DecisionStateMsg msg;
-  fill_state(&msg, world, result, 42);
+  fill_state(&msg, world, output, 42);
 
   CHECK(msg.tick == 42);
   CHECK(msg.output.has_nav_goal);
-  CHECK(msg.output.tactical_mode == static_cast<std::uint8_t>(TacticalMode::kPatrol));
-  CHECK(msg.conflict_count == 1);
-  CHECK(msg.warnings.size() == 1);
+  CHECK(msg.output.task_state == static_cast<std::uint8_t>(TaskState::kScan));
   CHECK(msg.upstream_valid);
   CHECK(msg.self_valid);
   CHECK(!msg.nav_valid);

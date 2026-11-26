@@ -3,18 +3,28 @@
 
 import { fieldExtent } from './field.js';
 
-export const NODE_STATUS = ['IDLE', 'RUNNING', 'SUCCESS', 'FAILURE', 'SKIPPED'];
-export const TACTICAL_MODES = ['unknown', 'patrol', 'attack', 'defend', 'retreat', 'heal', 'respawn', 'idle'];
+export const TASK_STATES = ['idle', 'navigate', 'scan', 'outpost', 'resource', 'heal', 'respawn'];
+export const TASK_STATUSES = ['idle', 'running', 'success', 'failure', 'timeout', 'aborted'];
+export const OUTPOST_CONTROLS = ['我方完全控制', '我方临时控制', '敌方控制'];
+export const OUTPOST_OWNERS = ['未知', '我方', '敌方'];
 export const STANCES = ['unknown', 'attack', 'defense', 'move'];
 // 比赛阶段：0 未开始 / 1 准备 / 2 15s自检 / 3 5s倒计时 / 4 比赛中 / 5 结算。
 export const GAME_STAGES = ['未开始', '准备', '15s自检', '5s倒计时', '比赛中', '比赛结算'];
 
-export function nodeStatusName(status) {
-  return NODE_STATUS[status] || '#' + status;
+export function taskStateName(state) {
+  return TASK_STATES[state] || '#' + state;
 }
 
-export function tacticalModeName(mode) {
-  return TACTICAL_MODES[mode] || '#' + mode;
+export function taskStatusName(status) {
+  return TASK_STATUSES[status] || '#' + status;
+}
+
+export function outpostControlName(control) {
+  return OUTPOST_CONTROLS[control] || '未知';
+}
+
+export function outpostOwnerName(owner) {
+  return OUTPOST_OWNERS[owner] || '未知';
 }
 
 export function stanceName(stance) {
@@ -26,31 +36,16 @@ export function gameStageName(status) {
 }
 
 // 秒 -> "MM:SS"（用于比赛倒计时）。
+export function formatDuration(ms) {
+  const seconds = Math.max(0, Number(ms) || 0) / 1000;
+  return seconds.toFixed(1) + ' s';
+}
+
 export function formatMmSs(seconds) {
   const total = Math.max(0, Math.floor(Number(seconds) || 0));
   const mm = String(Math.floor(total / 60)).padStart(2, '0');
   const ss = String(total % 60).padStart(2, '0');
   return mm + ':' + ss;
-}
-
-export function treeStatusToView(msg) {
-  const active = new Set(msg.active_path || []);
-  const nodes = (msg.nodes || []).map(function (n) {
-    return {
-      path: n.full_path,
-      name: n.instance_name,
-      type: n.registration_name,
-      status: n.status,
-      statusName: nodeStatusName(n.status),
-      active: active.has(n.full_path),
-    };
-  });
-  return {
-    tick: msg.tick || 0,
-    tickMs: msg.tick_ms || 0,
-    activeCount: active.size,
-    nodes: nodes,
-  };
 }
 
 export function worldStateToView(msg) {
@@ -63,7 +58,15 @@ export function worldStateToView(msg) {
     selfAmmo: msg.self_ammo,
     baseHp: msg.base_hp,
     ourOutpostHp: msg.our_outpost_hp,
+    ourOutpostControl: msg.our_outpost_control,
+    ourOutpostControlName: outpostControlName(msg.our_outpost_control),
+    ourOutpostOwner: msg.our_outpost_owner || 0,
+    ourOutpostOwnerName: outpostOwnerName(msg.our_outpost_owner || 0),
     enemyOutpostHp: msg.enemy_outpost_hp,
+    enemyOutpostControl: msg.enemy_outpost_control,
+    enemyOutpostControlName: outpostControlName(msg.enemy_outpost_control),
+    enemyOutpostOwner: msg.enemy_outpost_owner || 0,
+    enemyOutpostOwnerName: outpostOwnerName(msg.enemy_outpost_owner || 0),
     enemyBaseHp: msg.enemy_base_hp,
     canRebuild: msg.can_rebuild_outpost,
     upstreamValid: msg.upstream_valid,
@@ -88,22 +91,17 @@ export function worldStateToView(msg) {
 
 export function decisionToView(msg) {
   const out = msg.output || {};
-  const mode = out.tactical_mode || 0;
+  const mode = out.task_state || 0;
   return {
     tick: msg.tick,
     mode: mode,
-    modeName: tacticalModeName(mode),
+    modeName: taskStateName(mode),
     stance: out.stance || 0,
     stanceName: stanceName(out.stance || 0),
     hasNavGoal: !!out.has_nav_goal,
     navGoalX: (out.nav_goal && out.nav_goal.x) || 0,
     navGoalY: (out.nav_goal && out.nav_goal.y) || 0,
     hasCmdVel: !!out.has_cmd_vel,
-    resourceAmmo: out.resource_ammo || 0,
-    resourceRevive: !!out.resource_revive,
-    resourceInstantRevive: !!out.resource_instant_revive,
-    conflictCount: msg.conflict_count || 0,
-    warnings: msg.warnings || [],
   };
 }
 

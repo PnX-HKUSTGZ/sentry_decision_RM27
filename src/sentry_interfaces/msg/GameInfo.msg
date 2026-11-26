@@ -5,7 +5,8 @@ std_msgs/Header header
 uint8 game_status          # 0 未开始 / 1 准备 / 2 自检 / 3 倒计时 / 4 比赛中 / 5 结算
 uint16 game_time_remaining  # 剩余时间，单位 s
 uint16 coin_remaining       # 己方剩余金币
-uint32 event_code           # 场地事件代码（原始，未解码）
+uint32 event_code           # 0x0101 event_data（原始，未解码）
+uint32 event_code_2         # 0x0101 event_data_2（原始，未解码）
 uint8 detect_color          # 红蓝方，编码待确认，当前留空
 bool can_rebuild_outpost    # 己方是否可重建前哨站
 

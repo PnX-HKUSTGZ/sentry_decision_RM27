@@ -1,0 +1,18 @@
+# 无头回归：event_data bit 30-31 解码为 enemy_outpost_control 后，策略不应再进攻该前哨。
+name: control_gate
+start_pose: [-12.37, -3.35, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 200
+  self_hp: 400
+  self_ammo: 300
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_outpost_control: 1
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: scan

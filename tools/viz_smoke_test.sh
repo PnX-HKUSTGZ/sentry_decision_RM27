@@ -21,7 +21,7 @@ if ! ros2 pkg executables rosbridge_server 2>/dev/null | grep -q rosbridge_webso
   exit 0
 fi
 
-DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/decision_node"
+DECISION_BIN="$(ros2 pkg prefix sentry_decision_bringup)/lib/sentry_decision_bringup/task_node"
 SIM_BIN="$(ros2 pkg prefix sentry_decision_sim)/lib/sentry_decision_sim/referee_sim_node"
 WEB_DIR="$(ros2 pkg prefix sentry_decision_viz)/share/sentry_decision_viz/web"
 
@@ -68,7 +68,7 @@ done
 
 check "200" "$(tcp_ok 9090)" "rosbridge 端口"
 
-for topic in /decision/tree_status /decision/world_state /decision/state; do
+for topic in /decision/world_state /decision/state; do
   if ! wait_echo "${topic}"; then
     echo "FAIL: 话题 ${topic} 无数据" >&2
     fail=1

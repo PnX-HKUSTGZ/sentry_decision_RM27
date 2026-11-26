@@ -3,13 +3,15 @@ import {
   battlefieldModel,
   decisionToView,
   escapeHtml,
+  formatDuration,
   formatMmSs,
   gameStageName,
-  nodeStatusName,
   parseListState,
+  outpostControlName,
+  outpostOwnerName,
   stanceName,
-  tacticalModeName,
-  treeStatusToView,
+  taskStateName,
+  taskStatusName,
   worldStateToView,
   worldToCanvas,
 } from '../src/format.js';
@@ -24,34 +26,27 @@ function check(ok, message) {
   }
 }
 
-check(nodeStatusName(1) === 'RUNNING', 'nodeStatusName');
-check(nodeStatusName(9) === '#9', 'nodeStatusName unknown');
-check(tacticalModeName(4) === 'retreat', 'tacticalModeName');
-check(tacticalModeName(42) === '#42', 'tacticalModeName unknown');
+check(taskStateName(5) === 'heal', 'taskStateName');
+check(taskStateName(42) === '#42', 'taskStateName unknown');
 check(stanceName(0) === 'unknown' && stanceName(2) === 'defense', 'stanceName');
 check(gameStageName(2) === '15s自检', 'gameStageName');
 check(gameStageName(99) === '#99', 'gameStageName unknown');
 check(formatMmSs(180) === '03:00', 'formatMmSs 3min');
 check(formatMmSs(5) === '00:05', 'formatMmSs seconds');
 check(formatMmSs(0) === '00:00', 'formatMmSs zero');
-check(tacticalModeName(7) === 'idle', 'tacticalModeName idle');
-
-const tree = treeStatusToView({
-  tick: 3,
-  tick_ms: 0.5,
-  nodes: [
-    { full_path: 'seq', registration_name: 'Sequence', instance_name: 'seq', status: 1 },
-    { full_path: 'hold', registration_name: 'Hold', instance_name: 'hold', status: 1 },
-    { full_path: 'ok', registration_name: 'Ok', instance_name: 'ok', status: 0 },
-  ],
-  active_path: ['hold', 'seq'],
-});
-check(tree.nodes.length === 3, 'tree nodes');
-check(tree.activeCount === 2, 'tree activeCount');
-check(tree.nodes[0].active === true && tree.nodes[2].active === false, 'tree active flags');
-check(tree.nodes[1].statusName === 'RUNNING', 'tree status name');
+check(taskStateName(0) === 'idle', 'taskStateName idle');
+check(taskStatusName(2) === 'success' && taskStatusName(99) === '#99', 'taskStatusName');
+check(outpostControlName(0) === '我方完全控制', 'outpostControlName full');
+check(outpostControlName(2) === '敌方控制', 'outpostControlName enemy');
+check(outpostControlName(9) === '未知', 'outpostControlName unknown');
+check(outpostOwnerName(0) === '未知' && outpostOwnerName(1) === '我方' && outpostOwnerName(2) === '敌方', 'outpostOwnerName');
+check(formatDuration(1500) === '1.5 s', 'formatDuration');
 
 const world = worldStateToView({
+  our_outpost_control: 1,
+  enemy_outpost_control: 2,
+  our_outpost_owner: 2,
+  enemy_outpost_owner: 1,
   pos_x: 1,
   pos_y: 2,
   yaw: 0.5,
@@ -65,9 +60,12 @@ const world = worldStateToView({
   enemy_y: -2,
 });
 check(world.posX === 1 && world.navGoalY === 4, 'world view');
-const decision = decisionToView({ output: { tactical_mode: 4, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
-check(decision.modeName === 'retreat', 'decision mode');
-const decisionMapped = decisionToView({ output: { tactical_mode: 2, stance: 1 } });
+check(world.ourOutpostControlName === '我方临时控制', 'world our outpost control');
+check(world.enemyOutpostControlName === '敌方控制', 'world enemy outpost control');
+check(world.ourOutpostOwnerName === '敌方' && world.enemyOutpostOwnerName === '我方', 'world outpost owners');
+const decision = decisionToView({ output: { task_state: 5, has_nav_goal: true, nav_goal: { x: 3, y: 4 } } });
+check(decision.modeName === 'heal', 'decision mode');
+const decisionMapped = decisionToView({ output: { task_state: 3, stance: 1 } });
 check(decisionMapped.stanceName === 'attack', 'decision stance');
 
 const model = battlefieldModel(world, decision);

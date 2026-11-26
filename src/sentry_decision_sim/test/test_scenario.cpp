@@ -40,6 +40,48 @@ ScenarioValue text(const std::string& value) {
   return out;
 }
 
+void test_set_world_hp_zero_triggers_outpost_destroy() {
+  SimWorld world;
+  world.enemy_outpost_hp = 1000;
+  world.enemy_outpost_control.held_by_us = false;
+  world.enemy_outpost_control.full = true;
+  world.enemy_outpost_control.owner_is_us = false;
+
+  // 先占点 5 s -> 我方临时控制，归属仍是敌方。
+  step_outpost_control(&world.enemy_outpost_control, &world.enemy_outpost_hp, true, 5000);
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(!world.enemy_outpost_control.full);
+  CHECK(!world.enemy_outpost_control.owner_is_us);
+
+  // set_world 直接置 0 也应走击毁结算：临时控制方击毁 -> 我方完全控制并重建。
+  std::string error;
+  CHECK(apply_world_field(&world, "enemy_outpost_hp", number(0), &error));
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(world.enemy_outpost_control.full);
+  CHECK(world.enemy_outpost_control.owner_is_us);
+  CHECK(world.enemy_outpost_hp == 500);
+}
+
+void test_set_world_our_temporary_holder_destroy_rebuilds() {
+  SimWorld world;
+  world.our_outpost_hp = 1000;
+  world.our_outpost_control.held_by_us = false;
+  world.our_outpost_control.full = true;
+  world.our_outpost_control.owner_is_us = false;
+
+  step_outpost_control(&world.our_outpost_control, &world.our_outpost_hp, true, 5000);
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(!world.our_outpost_control.full);
+  CHECK(!world.our_outpost_control.owner_is_us);
+
+  std::string error;
+  CHECK(apply_world_field(&world, "our_outpost_hp", number(0), &error));
+  CHECK(world.our_outpost_control.held_by_us);
+  CHECK(world.our_outpost_control.full);
+  CHECK(world.our_outpost_control.owner_is_us);
+  CHECK(world.our_outpost_hp == 500);
+}
+
 void test_apply_world_field() {
   SimWorld world;
   std::string error;
@@ -49,6 +91,15 @@ void test_apply_world_field() {
   CHECK(world.can_rebuild_outpost);
   CHECK(apply_world_field(&world, "sentry_info_1", number(7), &error));
   CHECK(world.sentry_info_1 == 7u);
+  CHECK(apply_world_field(&world, "enemy_outpost_control", number(1), &error));
+  CHECK(world.enemy_outpost_control.held_by_us);
+  CHECK(!world.enemy_outpost_control.full);
+  CHECK(!world.enemy_outpost_control.owner_is_us);
+  CHECK(apply_world_field(&world, "enemy_outpost_owner", boolean(false), &error));
+  CHECK(!world.enemy_outpost_control.owner_is_us);
+  CHECK(apply_world_field(&world, "enemy_at_our_outpost_buff", boolean(true), &error));
+  CHECK(world.our_outpost_control.enemy_present);
+  CHECK(!apply_world_field(&world, "enemy_outpost_control", number(3), &error));
 
   CHECK(!apply_world_field(&world, "not_a_field", number(1), &error));
   CHECK(!error.empty());
@@ -57,7 +108,7 @@ void test_apply_world_field() {
 
 void test_check_expect() {
   DecisionView view;
-  view.tactical_mode = 4;
+  view.task_state = 5;
   view.has_nav_goal = true;
   view.nav_goal_x = -5.0;
   view.nav_goal_y = 3.0;
@@ -66,10 +117,10 @@ void test_check_expect() {
   std::string error;
   CHECK(check_expect(view, "stance", text("defense"), 0.05, &error));
   CHECK(!check_expect(view, "stance", text("attack"), 0.05, &error));
-  CHECK(check_expect(view, "tactical_mode", text("retreat"), 0.05, &error));
-  CHECK(check_expect(view, "tactical_mode", number(4), 0.05, &error));
-  CHECK(!check_expect(view, "tactical_mode", number(2), 0.05, &error));
-  CHECK(!check_expect(view, "tactical_mode", text("bogus"), 0.05, &error));
+  CHECK(check_expect(view, "task_state", text("heal"), 0.05, &error));
+  CHECK(check_expect(view, "task_state", number(5), 0.05, &error));
+  CHECK(!check_expect(view, "task_state", number(2), 0.05, &error));
+  CHECK(!check_expect(view, "task_state", text("bogus"), 0.05, &error));
   CHECK(check_expect(view, "has_nav_goal", boolean(true), 0.05, &error));
   CHECK(check_expect(view, "nav_goal_x", number(-5.0), 0.05, &error));
   CHECK(!check_expect(view, "nav_goal_x", number(1.0), 0.05, &error));
@@ -86,13 +137,13 @@ void test_load_scenario(const std::string& path) {
     std::printf("scenario load error: %s\n", error.c_str());
   }
   CHECK(loaded.ok());
-  CHECK(loaded.scenario.name == "full_match");
-  CHECK(loaded.scenario.events.size() == 12);
-  CHECK(loaded.scenario.end == sentry_decision::Duration{26000});
+  CHECK(loaded.scenario.name == "demo");
+  CHECK(loaded.scenario.events.size() == 1);
+  CHECK(loaded.scenario.end == sentry_decision::Duration{0});
   CHECK(loaded.scenario.initial_world.count("self_hp") == 1);
   if (!loaded.scenario.events.empty()) {
-    CHECK(loaded.scenario.events.front().at == sentry_decision::Duration{2000});
-    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{26000});
+    CHECK(loaded.scenario.events.front().at == sentry_decision::Duration{0});
+    CHECK(loaded.scenario.events.back().at == sentry_decision::Duration{0});
   }
 }
 
@@ -100,6 +151,8 @@ void test_load_scenario(const std::string& path) {
 
 int main(int argc, char** argv) {
   test_apply_world_field();
+  test_set_world_hp_zero_triggers_outpost_destroy();
+  test_set_world_our_temporary_holder_destroy_rebuilds();
   test_check_expect();
   if (argc > 1) {
     test_load_scenario(argv[1]);

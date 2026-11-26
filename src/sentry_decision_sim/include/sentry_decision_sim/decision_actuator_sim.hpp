@@ -23,6 +23,13 @@ class DecisionActuatorSim : public sentry_decision::DecisionSink {
   // 接收一条待执行动作（DecisionSink）。
   void send_action(const sentry_decision::DecisionAction& action) override;
 
+  // 记录当前任务状态；仿真执行端不消费，只供测试 / 面板观察。
+  void send_task_state(sentry_decision::TaskState state) override;
+
+  sentry_decision::TaskState task_state() const {
+    return task_state_;
+  }
+
   // 推进一个 tick：在途动作倒计时，到点结算。
   void update();
 
@@ -42,6 +49,7 @@ class DecisionActuatorSim : public sentry_decision::DecisionSink {
   std::vector<InFlight> in_flight_;
   SimWorld* world_ = nullptr;
   int max_hp_ = 0;
+  sentry_decision::TaskState task_state_ = sentry_decision::TaskState::kIdle;
 };
 
 }  // namespace sentry_decision_sim

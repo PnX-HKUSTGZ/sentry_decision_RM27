@@ -2,13 +2,13 @@
 
 #include <yaml-cpp/yaml.h>
 
-#include "sentry_decision_core/action_factory.hpp"
-
 #include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <map>
 #include <sstream>
+
+#include "sentry_decision_core/action_factory.hpp"
 
 namespace sentry_decision_bringup {
 namespace {
@@ -27,11 +27,26 @@ struct NumericRule {
 
 const std::map<std::string, NumericRule>& numeric_rules() {
   static const std::map<std::string, NumericRule> rules = {
+      {"self.max_hp", {true, true}},
+      {"match.duration_s", {true, true}},
       {"nav.retreat_hp", {true, true}},
       {"nav.recovery_hp", {true, true}},
       {"nav.low_ammo", {true, true}},
       {"nav.supply_ammo", {true, true}},
       {"nav.patrol_dwell_s", {false, true}},
+      {"utility.safe_hp_ratio", {false, true}},
+      {"utility.low_hp_ratio", {false, true}},
+      {"utility.critical_hp_ratio", {false, true}},
+      {"utility.attack_radius", {false, true}},
+      {"utility.travel_weight", {false, true}},
+      {"utility.switch_penalty", {false, true}},
+      {"utility.continue_bonus", {false, true}},
+      {"utility.last_call_bonus", {false, true}},
+      {"resource.low_ammo", {true, true}},
+      {"resource.batch", {true, true}},
+      {"resource.reserve_coins", {true, true}},
+      {"resource.dwell_s", {false, true}},
+      {"resource.retry_s", {false, true}},
       {"resource.exchange_ammo_step", {true, true}},
       {"resource.hp_exchange_threshold", {true, true}},
       {"resource.min_coins", {true, true}},
@@ -45,10 +60,7 @@ const std::map<std::string, NumericRule>& numeric_rules() {
       {"timeouts.upstream_ms", {true, true}},
       {"timeouts.odometry_ms", {true, true}},
       {"timeouts.navigation_ms", {true, true}},
-      {"action.verify_delay_ms", {true, true}},
-      {"action.max_attempts", {true, true}},
-      {"action.revive_verify_delay_ms", {true, true}},
-      {"action.revive_max_attempts", {true, true}},
+
   };
   return rules;
 }
@@ -228,6 +240,12 @@ ConfigLoadResult load_policy_config(const std::string& profiles_path) {
   }
 
   // 规则约束：17mm 增益点兑换最小 10 发；远程兑换每次只能 +1 次。
+  const auto batch = result.config.number("resource.batch");
+  if (batch.has_value() &&
+      static_cast<int>(batch.value()) % sentry_decision::kAmmoExchangeUnit != 0) {
+    result.errors.push_back("resource.batch 必须是 " +
+                            std::to_string(sentry_decision::kAmmoExchangeUnit) + " 的倍数");
+  }
   const auto ammo_step = result.config.number("resource.exchange_ammo_step");
   if (ammo_step.has_value() &&
       static_cast<int>(ammo_step.value()) % sentry_decision::kAmmoExchangeUnit != 0) {

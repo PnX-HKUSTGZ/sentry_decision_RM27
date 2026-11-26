@@ -1,0 +1,26 @@
+# 端到端 utility 冒烟：在敌方高地射击位选择 Outpost；打掉后留在高地 Scan 争控制。
+name: utility_smoke
+start_pose: [3.16, 3.30, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 240
+  coins: 500
+  self_hp: 400
+  self_ammo: 200
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: outpost
+  - at: 12.0
+    expect:
+      task_state: outpost
+  - at: 14.0
+    set_world:
+      enemy_outpost_hp: 0
+  - at: 16.0
+    expect:
+      task_state: scan

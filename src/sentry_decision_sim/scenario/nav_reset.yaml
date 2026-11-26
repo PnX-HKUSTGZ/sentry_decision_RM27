@@ -1,0 +1,18 @@
+# 无头回归：导航成功并进入 Outpost 后重置，重新开始必须能再次 Navigate，
+# 不能因为上一局的 nav.reached 残留而反复失败。
+name: nav_reset
+start_pose: [-12.37, -3.35, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 420
+  coins: 200
+  self_hp: 400
+  self_ammo: 300
+  base_hp: 10000
+  our_outpost_hp: 1000
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 0.0
+    set_world:
+      game_status: 4

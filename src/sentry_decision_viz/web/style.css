@@ -206,6 +206,13 @@ th {
   vertical-align: top;
 }
 
+/* 「上一次任务」与当前任务之间加一条更粗的分割线。 */
+tr.section-start th,
+tr.section-start td {
+  border-top: 2px solid var(--muted);
+  padding-top: 6px;
+}
+
 /* 键列只占内容宽度，值列紧随其后并占满剩余宽度（键值不再有大间隙）。 */
 th {
   width: 1%;

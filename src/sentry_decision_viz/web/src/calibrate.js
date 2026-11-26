@@ -8,7 +8,8 @@ import {
   worldToImage,
 } from './field.js';
 
-const STORAGE_KEY = 'sentry.fieldPoints.v1';
+// 2027 独立存储键，避免浏览器继续载入 2026 的旧标定点。
+const STORAGE_KEY = 'sentry.fieldPoints.rmuc2027.v1';
 const SCALE = 3; // 画布 = 底图 * 3
 const PALETTE = ['#4aa3ff', '#49c46a', '#e0a44a', '#e05a5a', '#b07cff', '#4ad0c4', '#ff8fb0', '#8bd450', '#ffd24a'];
 

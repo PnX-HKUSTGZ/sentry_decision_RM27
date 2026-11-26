@@ -34,6 +34,14 @@ struct UpstreamState {
   int enemy_base_hp = 0;
   bool can_rebuild_outpost = false;
 
+  // 2027 前哨阵地控制状态（由 event_data bit 28-31 映射）。
+  OutpostControl our_outpost_control = OutpostControl::kNotOwned;
+  OutpostControl enemy_outpost_control = OutpostControl::kNotOwned;
+
+  // 前哨站建筑归属：由 WorldModel 依据控制转换 / 重建事件维护。
+  OutpostOwner our_outpost_owner = OutpostOwner::kUnknown;
+  OutpostOwner enemy_outpost_owner = OutpostOwner::kUnknown;
+
   // 自身状态（SentryInfoOnline + SentryInfoOffline）
   int self_hp = 0;
   int self_ammo = 0;
@@ -86,12 +94,23 @@ struct AllyRobot {
   int hp = 0;
 };
 
+// 前哨站最近一段时间的血量趋势，仅用于策略判断，不进入上行/下行协议。
+struct OutpostTrend {
+  int hp_delta_1s = 0;        // 最近 1 s 的血量变化；负值表示正在掉血
+  bool under_attack = false;  // 最近 1.5 s 内是否观察到掉血
+};
+
 struct WorldState {
   UpstreamState upstream;
   SelfState self;
   NavState nav;
   EnemyState enemy;
   std::vector<AllyRobot> allies;
+  OutpostTrend our_outpost_trend;
+  OutpostTrend enemy_outpost_trend;
+  // 补给区免费发弹：已确认领取到的最高分钟批次（0 = 尚未领取）。
+  // 与 entitled_minutes = floor(elapsed_s / 60) 比较，>= 表示当前累积批次都已领取。
+  int supply_claimed_minutes = 0;
   TimePoint stamp{};
 };
 

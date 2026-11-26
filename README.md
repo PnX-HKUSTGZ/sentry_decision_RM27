@@ -4,13 +4,13 @@
 
 ## 项目简介
 
-本仓库是 RM27 哨兵机器人的决策模块，负责汇聚裁判系统、感知、导航等外部信息，通过行为树产生决策，并输出导航目标、姿态、资源兑换等指令。
+本仓库是 RM27 哨兵机器人的决策模块，负责汇聚裁判系统、感知、导航等外部信息，通过 2027 Task 层产生决策，并输出导航目标、TaskState、资源兑换等指令。
 
 本项目是旧仓库 `sentry_DecisionMaking` 的重构版本，参考 `navi_minco_bit/src/decision` 的分层设计，在 ROS 2 Jazzy + BehaviorTree.CPP v4 上重新组织代码。详细技术设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 项目状态
 
-> :white_check_mark: **v0.5.2**：决策 ↔ auto-aim 的 ROS 上位机链路（`sentry_interfaces`）已落地；取消执行回执，改由决策侧用裁判上行校验生效并重试；动作的重试策略由行为树随 `ActionRequest` 传入。
+> :white_check_mark: **2027 Task 层**：`TaskRunner + TaskRuntime` 已接入 `task_node`；2027 事件解码、六个原子 Task、TaskState 下行与单次动作发送已落地。旧 Mission / TacticalMode / 行为树已删除。
 > 信念层完成一致性改名（`RefereeState` → `UpstreamState`），并移除未启用的雷达 / 变形字段。
 >
 > 下一步（v0.6.0 / P4）：实车与导航仓库联合跑通，MCU 侧实现协议 v1。完整历史见 [docs/CHANGELOG.md](docs/CHANGELOG.md)，当前进度见 [docs/NOTE.md](docs/NOTE.md)。
@@ -36,17 +36,20 @@ docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentr
 # 构建并测试
 docker run --rm -v "$PWD":/ws -w /ws --entrypoint /ws/docker/entrypoint.sh sentry_decision_rm27:jazzy test
 
-# 运行最小决策闭环（无需 ROS）
+# 运行 2027 Task 层（ROS IO）
 docker run --rm -v "$PWD":/ws -w /ws --entrypoint /bin/bash sentry_decision_rm27:jazzy \
-  -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup decision_main"
+  -lc "source /ws/.docker-build/install/setup.bash && ros2 run sentry_decision_bringup task_node"
 
 
-# 一键运行本地仿真（裁判 + 行为树 + 网页面板）
-tools/demo.sh [--build] # 首次运行需加 --build，后续可直接运行
+# 一键运行本地仿真（裁判 + Task 层 + 网页面板）
+tools/demo.sh --build # 首次运行需加 --build，后续可直接运行
 
-# 双仓库联合仿真（额外起真实导航）
-tools/demo.sh --with-nav [--nav-silent] # --nav-silent 关闭导航 RViz
-xhost +local:root # 若遇到 RViz 无法显示，执行此命令允许容器访问宿主 X11
+# 无头模式（不启动网页面板，也不开任何窗口）
+tools/demo.sh --headless
+
+# 双仓库联合仿真（额外起真实导航容器，导航窗口默认关闭）
+tools/demo.sh --with-nav [--nav-viz] [--gazebo]
+xhost +SI:localuser:root # 若遇到 RViz/Gazebo 无法显示，执行此命令允许容器访问宿主 X11
 ```
 
 完整命令与参数见 [docs/USAGE.md](docs/USAGE.md)；仿真、场景与面板操作见 [docs/SIMULATION.md](docs/SIMULATION.md)。
@@ -58,18 +61,16 @@ sentry_decision_RM27/
 ├── docs/                      # 项目文档
 ├── docker/                    # 开发 / 测试容器
 ├── tools/                     # 宿主测试脚本
-├── tree/                      # 行为树 XML（tree_manifest.yaml、root.xml 等）
 ├── config/                    # 外置参数（profiles / maps / policies / sim）
 ├── .github/workflows/         # CI
 └── src/
     ├── sentry_decision_core/    # 数据契约、信念、仲裁、日志
-    ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState / TreeStatus
+    ├── sentry_decision_msgs/    # 对外消息：DecisionState / WorldState
     ├── sentry_interfaces/       # 与 auto-aim 的上位机接口契约
     ├── sentry_decision_io/      # ROS IO 适配器与决策状态发布
     ├── sentry_decision_sim/     # 本地仿真：裁判仿真、场景脚本与伪导航
-    ├── sentry_decision_viz/     # 观测：树状态、Groot2 桥与 rosbridge 网页面板
-    ├── sentry_decision_nodes/   # 行为树节点插件
-    └── sentry_decision_bringup/ # main、launch（行为树见根目录 tree/）
+    ├── sentry_decision_viz/     # 观测：rosbridge 网页面板
+    └── sentry_decision_bringup/ # task_node、配置加载与 launch
 ```
 
 ## 文档索引

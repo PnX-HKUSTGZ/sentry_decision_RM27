@@ -1,0 +1,21 @@
+# utility 低血/低弹恢复：在前哨被毁的 buff 点，健康/弹药都低时应直接 Heal 回基地。
+name: utility_recover_smoke
+start_pose: [-2.43, -2.21, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 240
+  coins: 500
+  self_hp: 40
+  self_ammo: 10
+  base_hp: 10000
+  our_outpost_hp: 0
+  our_outpost_control: 1
+  enemy_outpost_hp: 1000
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: heal
+  - at: 10.0
+    expect:
+      task_state: heal

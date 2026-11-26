@@ -1,0 +1,27 @@
+# 回血点优先级冒烟：敌方增益点已被我方完全控制，且自己在敌方高地区域内，
+# 应优先去敌方前哨站增益点，而不是己方前哨站或基地。
+name: heal_enemy_outpost_smoke
+start_pose: [1.08, 7.53, 0.0]
+world:
+  game_status: 4
+  game_time_remaining: 240
+  coins: 500
+  self_hp: 100
+  self_ammo: 200
+  base_hp: 10000
+  our_outpost_hp: 1000
+  our_outpost_control: 0
+  enemy_outpost_hp: 500
+  enemy_outpost_control: 0
+  enemy_outpost_owner: 1
+  enemy_base_hp: 10000
+timeline:
+  - at: 2.0
+    expect:
+      task_state: heal
+      has_nav_goal: true
+      nav_goal_x: 2.31
+      nav_goal_y: 5.44
+  - at: 6.0
+    expect:
+      task_state: heal
